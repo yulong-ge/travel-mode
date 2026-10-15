@@ -25,6 +25,7 @@
   "exit_code": null,
   "labels": [
     "Default actions come from config.toml",
+    "Other configured items",
     "[green]✔ Quit Demo quit (off reopens it)[/]",
     "Ask Demo [dim]CPU 1.0% · default ask[/]",
     "Freeze Demo [dim]CPU 1.0% · default freeze[/]",
@@ -61,6 +62,7 @@
       "<ROOT>/Applications/Quit Demo.app"
     ],
     "saved_at": "<TIME>",
+    "scenario": "away",
     "sleepdisabled": "",
     "spotlight_off": "",
     "unloaded_svcs": [],

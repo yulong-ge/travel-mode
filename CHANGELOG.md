@@ -4,6 +4,21 @@ All notable changes follow Keep a Changelog.
 
 ## [Unreleased]
 
+### Added
+
+- Work and away scenarios, a bilingual startup picker, CLI scenario selection, configuration and snapshot/JSON scenario fields.
+- Packaged public category rules for sync, backup, updater and VM products; grouped discovery, category pause controls and explicit keep/skip precedence.
+- Single-line configuration/state diagnostics with exit codes 2/3 and opt-in debug tracebacks.
+
+### Changed
+
+- Work defaults change battery Low Power Mode only, preserve network/display/AC settings and leave unconfigured foreground apps alone.
+- Rewrite both READMEs around the two use cases, action boundaries, recovery and verification limits.
+
+### Removed
+
+- Merge the cafe profile into work; remove cafe without a compatibility alias.
+
 ## [1.1.0] - 2026-10-15
 
 ### Added

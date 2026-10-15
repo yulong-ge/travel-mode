@@ -15,7 +15,7 @@ async def test_tui_snapshot_honors_extra_app_dirs(monkeypatch, tmp_path):
         return capture(directories)
 
     monkeypatch.setattr(AppSnapshot, "capture", record)
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
         await app.workers.wait_for_complete()
         await pilot.pause()

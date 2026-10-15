@@ -108,7 +108,7 @@ async def test_tui_batch_then_off_button_events_are_serial(action_ui, fake_runne
 
     monkeypatch.setattr(system_apps, "freeze_app", freeze)
     monkeypatch.setattr(flow_restore, "run_restore", restore)
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     probe_seen = asyncio.Event()
     async with app.run_test(
         message_hook=lambda message: probe_seen.set() if isinstance(message, ButtonQueueProbe) else None
@@ -151,7 +151,7 @@ async def test_tui_off_then_single_button_events_are_serial(action_ui, fake_runn
     monkeypatch.setattr(flow_restore, "run_restore", restore)
     monkeypatch.setattr(system_apps, "freeze_app", single)
     monkeypatch.setattr(system_apps, "grace_quit", single)
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     probe_seen = asyncio.Event()
     async with app.run_test(
         message_hook=lambda message: probe_seen.set() if isinstance(message, ButtonQueueProbe) else None
@@ -211,7 +211,7 @@ async def test_tui_refresh_recompose_batch_uses_original_rows(action_ui, fake_ru
         return True
 
     monkeypatch.setattr(system_apps, "freeze_app", freeze)
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     originals = [row["path"] for row in action_ui]
     async with app.run_test() as pilot:
         await settled(app, pilot)
@@ -236,7 +236,7 @@ async def test_tui_double_click_admits_one_mutation(action_ui, fake_runner):
     fake_runner.responses[command] = CmdResult("", "", 0)
     blocker = BlockingRunner(fake_runner, command)
     shell.set_runner(blocker)
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
         await settled(app, pilot)
         click = asyncio.create_task(pilot.click("#b-killcaff-777", times=2))
@@ -253,7 +253,7 @@ async def test_tui_double_click_admits_one_mutation(action_ui, fake_runner):
 async def test_tui_queued_duplicate_button_messages_are_rejected(action_ui, fake_runner):
     command = ("kill", "-TERM", "777")
     fake_runner.responses[command] = CmdResult("", "", 0)
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
         await settled(app, pilot)
         button = app.query_one("#b-killcaff-777", Button)
@@ -285,7 +285,7 @@ def test_service_cpu_query_failure_is_explicit(tmp_paths, fake_runner):
 async def test_tui_caffeinate_failure_never_logs_success(action_ui, fake_runner):
     command = ("kill", "-TERM", "777")
     fake_runner.responses[command] = CmdResult("", "denied", 2)
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
         await settled(app, pilot)
         messages = []
@@ -327,7 +327,7 @@ async def test_tui_transaction_disables_mutations_across_recompose(
 
     monkeypatch.setattr(system_apps, "freeze_app", freeze)
     monkeypatch.setattr(flow_restore, "run_restore", restore)
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
         await settled(app, pilot)
         task = asyncio.create_task(app.on_button_pressed(Button.Pressed(app.query_one(f"#{first}"))))

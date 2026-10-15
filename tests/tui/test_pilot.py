@@ -87,7 +87,7 @@ async def test_list_row_buttons_are_compact_and_centered(
     monkeypatch.setattr(
         launchd, "svc_scan", lambda config=None: {"unloadable": [service], "kept": [], "invalid": []}
     )
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     async with app.run_test(size=size) as pilot:
         await wait_for_dashboard(app, pilot)
         # Mount deterministic running network rows without probing the host.
@@ -134,7 +134,7 @@ async def test_list_row_buttons_are_compact_and_centered(
 
 @pytest.mark.asyncio
 async def test_tui_pilot_read_only(demo_app, readonly_tui):
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     async with app.run_test(size=(110, 30)) as pilot:
         await wait_for_dashboard(app, pilot)
         audit = app.query_one("#dash-audit")
@@ -163,7 +163,7 @@ async def test_tui_pilot_read_only(demo_app, readonly_tui):
 @pytest.mark.asyncio
 async def test_tui_language_toggle_recomposes_and_persists(demo_app, monkeypatch, tmp_paths):
     set_language("en")
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     async with app.run_test(size=(110, 30)) as pilot:
         await wait_for_dashboard(app, pilot)
         assert "Language" in str(app._bindings.key_to_bindings["l"][0].description)
@@ -187,7 +187,7 @@ async def test_tui_pilot_freeze_saves_only_isolated_state(monkeypatch, tmp_paths
     fake_runner.responses[("ps", "-axo", "pid=,ppid=,stat=,lstart=,comm=")] = CmdResult(
         f"123 1 S Mon Oct 12 09:00:00 2026 {demo_app}/Contents/MacOS/Demo\n", "", 0
     )
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     assert not app.merged
     async with app.run_test(size=(110, 30)) as pilot:
         await wait_for_dashboard(app, pilot)
@@ -212,7 +212,7 @@ async def test_tui_pilot_freeze_saves_only_isolated_state(monkeypatch, tmp_paths
 @pytest.mark.skipif(sys.platform != "darwin", reason="requires a macOS host")
 @pytest.mark.asyncio
 async def test_tui_pilot_macos_read_only(readonly_tui):
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     async with app.run_test(size=(110, 30)) as pilot:
         await wait_for_dashboard(app, pilot)
 
@@ -227,7 +227,7 @@ def restore_language():
 
 @pytest.mark.asyncio
 async def test_tui_network_page_bottom_controls_stay_visible(demo_app, readonly_tui):
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     async with app.run_test(size=(120, 36)) as pilot:
         await wait_for_dashboard(app, pilot)
         tb = app.query_one(TabbedContent)
@@ -277,7 +277,7 @@ async def test_first_active_tab_renders_after_worker_without_switching(
 
     monkeypatch.setattr(network_apps, "network_scan", slow_network)
     monkeypatch.setattr(flow_check, "audit_lines", lambda: ["Audit complete"])
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     try:
         async with app.run_test(size=size) as pilot:
             assert await asyncio.to_thread(started.wait, 5)
@@ -313,7 +313,7 @@ async def test_network_hint_uses_actual_services_tab_title(
     language, demo_app, readonly_tui, restore_language
 ):
     set_language(language)
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     async with app.run_test(size=(140, 45)) as pilot:
         await wait_for_dashboard(app, pilot)
         title = str(app.query_one(TabbedContent).get_tab("p-svc").label)
@@ -332,7 +332,7 @@ async def test_debug_telemetry_survives_recompose_and_empty_active(
     import tui_debug
 
     telemetry = tmp_paths / "layout.json"
-    app = tui_debug.DebugApp(telemetry)
+    app = tui_debug.DebugApp(telemetry, scenario="away")
     async with app.run_test(size=(120, 36)) as pilot:
         await wait_for_dashboard(app, pilot)
         tb = app.query_one(TabbedContent)
@@ -376,7 +376,7 @@ async def test_debug_frame_records_atomic_content_after_worker_completion(demo_a
 
     monkeypatch.setattr(network_apps, "network_scan", network_sample)
     monkeypatch.setattr(flow_check, "audit_lines", lambda: [])
-    app = tui_debug.DebugApp(tmp_paths / "layout.json")
+    app = tui_debug.DebugApp(tmp_paths / "layout.json", scenario="away")
     build_net = app.build_net
     rendered = asyncio.Event()
     write_layout = app.write_layout
@@ -460,7 +460,7 @@ async def test_language_recompose_rejects_cancelled_refresh_payload(
     monkeypatch.setattr(network_apps, "network_scan", network_sample)
     monkeypatch.setattr(network, "wifi_dev", wifi_sample)
     monkeypatch.setattr(flow_check, "audit_lines", lambda: [])
-    app = tui_debug.DebugApp(tmp_paths / "layout.json")
+    app = tui_debug.DebugApp(tmp_paths / "layout.json", scenario="away")
     build_net = app.build_net
 
     async def record_net(network, *args):
@@ -505,7 +505,7 @@ async def test_pages_load_independently_while_app_scan_is_pending(
         return original()
 
     monkeypatch.setattr(system_apps, "scan_apps", slow_apps)
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     try:
         async with app.run_test(size=(140, 45)) as pilot:
             assert await asyncio.to_thread(started.wait, 5)
@@ -546,7 +546,7 @@ async def test_every_page_has_initial_loading_placeholder(
     from travel_mode.system.shell import set_runner
 
     set_language("zh")
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     release = threading.Event()
 
     def delayed_runner(command, timeout=None, interactive=False):
@@ -580,7 +580,7 @@ async def test_every_page_has_initial_loading_placeholder(
 async def test_stale_hidden_pane_focus_does_not_change_current_page(demo_app, readonly_tui):
     from textual.widgets import TabPane
 
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     async with app.run_test(size=(140, 45)) as pilot:
         await wait_for_dashboard(app, pilot)
         await pilot.press("3")
@@ -606,7 +606,7 @@ async def test_dashboard_counts_update_when_slow_apps_arrive(
         return original()
 
     monkeypatch.setattr(system_apps, "scan_apps", slow_apps)
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     try:
         async with app.run_test(size=(140, 45)) as pilot:
             assert await asyncio.to_thread(started.wait, 5)

@@ -276,6 +276,7 @@ class Session:
         issues.extend(layout["issues"])
         issues.extend(lint_active_tab(plain, layout, observed=observed))
         expected = {
+            "scenario": "scenario",
             "dashboard": "p-dash",
             "power": "p-power",
             "apps": "p-apps",
@@ -301,8 +302,8 @@ class Session:
 class DebugApp(TravelApp):
     """TravelApp plus layout telemetry for the tmux debug harness."""
 
-    def __init__(self, telemetry: Path):
-        super().__init__()
+    def __init__(self, telemetry: Path, *, scenario=None):
+        super().__init__(scenario=scenario)
         self.telemetry = telemetry
 
     def on_mount(self):
@@ -384,17 +385,23 @@ class DebugApp(TravelApp):
                     and not widget.parent.region.contains_region(region)
                 ):
                     issues.append({"kind": "clipped-control", "detail": widget.id or type(widget).__name__})
-            active = self.query_one(TabbedContent).active
+            active = "scenario" if self.scenario == "ask" else self.query_one(TabbedContent).active
             # TabbedContent.active is a reactive whose default is "" (also set on
             # Tabs.Cleared); recompose windows expose it. Never let a telemetry
             # tick kill the TUI under observation — surface it as a lint issue.
-            panel = self.query_one("#" + PANELS[active]) if active in PANELS else None
+            panel = (
+                self.query_one("#scenario-picker")
+                if active == "scenario"
+                else self.query_one("#" + PANELS[active])
+                if active in {*PANELS, "scenario"}
+                else None
+            )
             if panel is None:
                 issues.append({"kind": "no-active-panel", "detail": active})
             else:
                 # At the top, validate the sampled panel (not just surrounding controls).
                 # After scrolling, that panel may be offscreen while other page content is visible.
-                pane = self.query_one("#" + active)
+                pane = panel if active == "scenario" else self.query_one("#" + active)
                 scrolled = any(parent.scroll_y > 0 for parent in panel.ancestors if parent is not self)
                 visible_body = pane if scrolled else panel
                 body_visible = bool(self.visible_region(visible_body).area)
@@ -406,7 +413,7 @@ class DebugApp(TravelApp):
             complete = all(
                 not worker.is_running for worker in self.workers if worker.group in {"dash", "audit"}
             )
-            ready = complete and self.refresh_complete
+            ready = complete and (self.refresh_complete or active == "scenario")
         except NoMatches as error:
             issues.append({"kind": "telemetry-error", "detail": f"{type(error).__name__}: {error}"})
             ready = complete = False
@@ -469,6 +476,11 @@ def run_group(output: Path, cols: int, rows: int, language: str, args, results: 
         session = Session(root, cols, rows, language, args.live_readonly, args.config)
         try:
             session.wait_started()
+            if json.loads((session.root / "layout.json").read_text())["active"] == "scenario":
+                if tab == "dashboard":
+                    results.append(session.capture("scenario", "scenario"))
+                session.keys("w")
+                session.wait_complete()
             session.keys(str(key))
             observed = session.first_observation()
             results.append(session.capture("first-observation", tab))
@@ -481,6 +493,9 @@ def run_group(output: Path, cols: int, rows: int, language: str, args, results: 
     root = output / f"{cols}x{rows}-{language}"
     session = Session(root, cols, rows, language, args.live_readonly, args.config)
     try:
+        session.wait_started()
+        if json.loads((session.root / "layout.json").read_text())["active"] == "scenario":
+            session.keys("w")
         session.wait_text("SleepDisabled")
         if args.wait_text:
             session.wait_text(args.wait_text)

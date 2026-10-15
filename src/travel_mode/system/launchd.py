@@ -9,6 +9,8 @@ from fnmatch import fnmatchcase
 from pathlib import Path
 from xml.parsers.expat import ExpatError
 
+from ..categories import identify, ignored, metadata, protected
+from ..categories import selected as category_selected
 from ..config import Config, load_config
 from ..i18n import t
 from .shell import get_runner, run_out, run_rc, subprocess_runner
@@ -127,11 +129,16 @@ def invalid_plist_details(scan: dict) -> list[str]:
     return details
 
 
+def agent_directories():
+    return (Path.home() / "Library/LaunchAgents", Path("/Library/LaunchAgents"))
+
+
 def svc_scan(config: Config | None = None, *, directories: tuple[Path, ...] | None = None) -> dict:
     config = config or load_config()
-    directories = directories or (Path.home() / "Library" / "LaunchAgents",)
+    directories = agent_directories() if directories is None else directories
     loaded = _loaded(launchctl_names())
     rows, invalid = [], []
+    seen_labels = set()
     seen_invalid: set[str] = set()
     for plist_path in sorted(path for directory in directories for path in directory.glob("*.plist")):
         try:
@@ -152,8 +159,9 @@ def svc_scan(config: Config | None = None, *, directories: tuple[Path, ...] | No
                 seen_invalid.add(str(plist_path))
                 invalid.append({"plist_path": str(plist_path), "error": str(exc)})
             continue
-        if label not in loaded:
+        if label not in loaded or label in seen_labels:
             continue
+        seen_labels.add(label)
         pid, _ = loaded[label]
         cpu = ""
         if pid.lstrip("-").isdigit() and int(pid) > 0:
@@ -163,7 +171,22 @@ def svc_scan(config: Config | None = None, *, directories: tuple[Path, ...] | No
                     t("json.command_failed", command=f"ps -p {pid} -o %cpu=", rc=rc, detail=cpu_out)
                 )
             cpu = cpu_out.strip()
-        rows.append({"label": label, "plist_path": str(plist_path), "name": label, "pid": pid, "cpu": cpu})
+        program = plist.get("Program")
+        arguments = plist.get("ProgramArguments", [])
+        executable = (
+            program
+            if isinstance(program, str)
+            else (
+                arguments[0]
+                if isinstance(arguments, list) and arguments and isinstance(arguments[0], str)
+                else ""
+            )
+        )
+        rule = identify(label=label, executable=executable)
+        row = {"label": label, "plist_path": str(plist_path), "name": label, "pid": pid, "cpu": cpu}
+        if rule:
+            row.update(metadata(rule), executable=executable, category_ignored=ignored(rule, config))
+        rows.append(row)
     selected = {"unload": set(), "keep": set()}
     unmatched = []
     seen_unmatched: set[tuple[str, str]] = set()
@@ -174,6 +197,12 @@ def svc_scan(config: Config | None = None, *, directories: tuple[Path, ...] | No
                 seen_unmatched.add((group, item))
                 unmatched.append({"group": group, "item": item})
             selected[group].update(row["label"] for row in matches)
+    for row in rows:
+        rule = identify(label=row["label"], executable=row.get("executable", ""))
+        if rule and protected(rule, config):
+            selected["keep"].add(row["label"])
+        if rule and category_selected(rule, config):
+            selected["unload"].add(row["label"])
     # keep 优先：重叠的通配配置也不能误卸载；所有 Apple 服务均不提供操作。
     eligible = [row for row in rows if not row["label"].startswith("com.apple.")]
     kept = [row["label"] for row in eligible if row["label"] in selected["keep"]]
@@ -181,7 +210,14 @@ def svc_scan(config: Config | None = None, *, directories: tuple[Path, ...] | No
     candidates = [row for row in eligible if row not in unloadable and row["label"] not in kept]
     host_read = get_runner() is subprocess_runner or getattr(get_runner(), "readonly", False)
     tm = time_machine_info(None) if host_read else time_machine_info(set())
+    notices = [
+        {"label": label, **metadata(rule)}
+        for label in sorted(loaded)
+        if (rule := identify(label=label)) and rule["action"] == "notice"
+    ]
     return {
+        "recognized": rows,
+        "notices": notices,
         "unloadable": unloadable,
         "candidates": candidates,
         "kept": kept,

@@ -11,7 +11,7 @@
       "cap"
     ]
   ],
-  "config": "# travel-mode 配置模板\n[apps]\ndefault = \"ask\"\nwatch = [\"Google Chrome\", \"Slack\"]\nignore = []\nquit = [\"Spotify\"]\nfreeze = [\"WeChat\"]\nskip = [\"Raycast\"]\nask = [\"Visual Studio Code\"]\n\n[[apps.with_daemon]]\nname = \"Remote Support\"\nsystem_daemons = [\"/Library/LaunchDaemons/example.daemon.plist\"]\nuser_agents = [\"/Library/LaunchAgents/example.agent.plist\"]\ngroup = \"network\"\n\n[network]\napps = [\"Tailscale\"]\n\n[services]\nunload = []\nkeep = []\n\n[power.battery]\n# displaysleep = 3\n\n[options]\naggressive = false\nlanguage = \"auto\"\n\n[profiles.flight]\n# Add profile-specific values in a future release.\n",
+  "config": "# travel-mode 配置模板\n[apps]\ndefault = \"ask\"\nwatch = [\"Google Chrome\", \"Slack\"]\nignore = []\nquit = [\"Spotify\"]\nfreeze = [\"WeChat\"]\nskip = [\"Raycast\"]\nask = [\"Visual Studio Code\"]\n\n[[apps.with_daemon]]\nname = \"Remote Support\"\nsystem_daemons = [\"/Library/LaunchDaemons/example.daemon.plist\"]\nuser_agents = [\"/Library/LaunchAgents/example.agent.plist\"]\ngroup = \"network\"\n\n[network]\napps = [\"Tailscale\"]\n\n[services]\nunload = []\nkeep = []\n\n[power.battery]\n# displaysleep = 3\n\n[categories]\n# Category actions supplement services.unload and apps actions; keep/skip take priority.\npause = [\"sync\", \"backup\", \"updater\"]\n# Match a rule id or its public product name.\nignore = []\n\n[options]\naggressive = false\nlanguage = \"auto\"\n# Ask at startup, or choose work / away. --scenario and --profile skip the picker.\nscenario = \"ask\"\n\n[profiles.flight]\n# Add profile-specific values in a future release.\n",
   "exit_code": 0,
   "output": "Configuration template written: <ROOT>/config.toml\n",
   "state": null

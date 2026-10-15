@@ -27,9 +27,11 @@ def snapshot_origin():
         "ac_prof": state_api.profile_string(profs, "a"),
         "sleepdisabled": pmset.sleep_disabled(),
     }
-    from .profiles import active_name
+    from .profiles import active_name, active_scenario
 
     st["profile"] = active_name()
+    if active_scenario() != "ask":
+        st["scenario"] = active_scenario()
     return st, False
 
 

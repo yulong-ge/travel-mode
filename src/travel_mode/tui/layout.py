@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import VerticalScroll
-from textual.widgets import Footer, Header, RichLog, TabPane
+from textual.containers import Vertical, VerticalScroll
+from textual.widgets import Footer, Header, Label, RichLog, TabPane
 
 from travel_mode.i18n import t
-from travel_mode.tui.widgets import TravelTabs
+from travel_mode.tui.widgets import Button, TravelTabs
 
 
 class Layout:
@@ -15,6 +15,15 @@ class Layout:
         header = Header(show_clock=True)
         header.icon = "○"
         yield header
+        if self.scenario == "ask":
+            with VerticalScroll(id="scenario-picker"):
+                yield Label(t("scenario.prompt"), classes="scenario-title")
+                for name in ("work", "away"):
+                    with Vertical(classes="scenario-card"):
+                        yield Button(t(f"scenario.{name}"), id=f"scenario-{name}", variant="primary")
+                        yield Label(t(f"scenario.{name}_desc"))
+            yield Footer(show_command_palette=False)
+            return
         with TravelTabs(id="body", initial="p-dash"):
             with TabPane(t("impl.overview"), id="p-dash"), VerticalScroll():
                 yield from self.compose_dashboard()

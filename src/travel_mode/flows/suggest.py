@@ -9,6 +9,7 @@ from pathlib import Path
 import tomlkit
 
 from .. import __version__
+from ..categories import grouped
 from ..config import load_config
 from ..constants import DEFAULT_ACTIONS
 from ..i18n import t
@@ -129,12 +130,21 @@ def suggest_data(samples: int = 3) -> dict:
         row["pids"].append(int(pid))
         if pid in holders:
             row["action"] = "quit"
+    from ..system.apps import scan_apps
+
+    services = svc_scan(config)
+    app_scan = scan_apps()
+    categorized = [row for row in app_scan["running"] if "category" in row]
+    categorized.extend(app_scan.get("notices", []))
+    categorized.extend(row for row in services.get("recognized", []) if "category" in row)
+    categorized.extend(services.get("notices", []))
     return {
+        "categories": grouped(categorized),
         "version": __version__.split(".dev", 1)[0],
         "samples": samples,
         "apps": sorted(bundles.values(), key=lambda row: (-row["power"], row["name"])),
         "assertions": assertions,
-        "services": svc_scan(config)["candidates"],
+        "services": services["candidates"],
         "daemon_apps": daemon_apps,
         "with_daemon": with_daemon,
         "toml": daemon_toml(with_daemon),
@@ -256,6 +266,14 @@ def print_suggestions(data: dict):
     print(t("suggest.heading", samples=data["samples"]))
     for row in data["apps"]:
         print(t("suggest.app", name=row["name"], power=f"{row['power']:.2f}", action=row["action"]))
+    category = None
+    for row in data["categories"]:
+        if row["category"] != category:
+            category = row["category"]
+            print(t(f"categories.{category}"))
+        print("  " + row.get("name", row.get("label", "")))
+        if row["category_action"] == "notice":
+            print("  " + t("categories.notice"))
     print(t("suggest.assertions"))
     for row in data["assertions"]:
         print(row["line"])

@@ -73,7 +73,7 @@ async def test_tui_action_contract(case, page, button, machine, monkeypatch, cap
         from travel_mode.i18n import set_language
 
         set_language("zh")
-    app = tui(return_class=True)()
+    app = tui(return_class=True)(scenario="away")
     async with app.run_test(size=(140, 55)) as pilot:
         await app.workers.wait_for_complete()
         await pilot.pause()

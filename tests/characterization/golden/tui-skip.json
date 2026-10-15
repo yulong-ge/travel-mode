@@ -5,6 +5,7 @@
   "exit_code": null,
   "labels": [
     "Default actions come from config.toml",
+    "Other configured items",
     "Quit Demo [dim]CPU 1.0% · default quit[/]",
     "Ask Demo [dim]CPU 1.0% · default ask[/]",
     "[dim]○ Freeze Demo skipped[/]",

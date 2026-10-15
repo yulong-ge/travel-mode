@@ -2,6 +2,19 @@
   "active": "p-dash",
   "commands": [
     [
+      "launchctl",
+      "list"
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,%cpu=,command="
+    ],
+    [
       "pmset",
       "-g",
       "custom"
@@ -511,6 +524,7 @@
       "<ROOT>/Applications/Remote Demo.app"
     ],
     "saved_at": "<TIME>",
+    "scenario": "away",
     "sleepdisabled": "",
     "spotlight_off": "1",
     "unloaded_svcs": [

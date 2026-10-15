@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from travel_mode import i18n
-from travel_mode.system import apps, brightness, daemon_discovery, platform
+from travel_mode.system import apps, brightness, daemon_discovery, launchd, platform
 from travel_mode.system.shell import CmdResult, set_runner, subprocess_runner
 from user_data_snapshot import assert_unchanged, snapshot_user_data
 
@@ -209,6 +209,7 @@ def isolated_user_paths(real_user_data_guard, hermetic_environment, tmp_path, mo
         "XDG_DATA_DIRS": "xdg-data-dirs",
     }.items():
         monkeypatch.setenv(variable, str(tmp_path / directory))
+    monkeypatch.setattr(launchd, "agent_directories", lambda: (Path.home() / "Library/LaunchAgents",))
     monkeypatch.setattr(apps, "APP_DIRS", [str(tmp_path / "Applications")])
     monkeypatch.setattr(daemon_discovery, "app_directories", lambda: (Path.home() / "Applications",))
     monkeypatch.setattr(

@@ -103,6 +103,7 @@ class AppsConfig:
     skip: tuple[str, ...] = ()
     ask: tuple[str, ...] = ()
     with_daemon: tuple[DaemonApp, ...] = ()
+    configured_actions: tuple[str, ...] = ()
 
     @property
     def actions(self) -> dict[str, str]:
@@ -135,6 +136,13 @@ class OptionsConfig:
     aggressive: bool = False
     language: str = "auto"
     interface: str = "tui"
+    scenario: str = "ask"
+
+
+@dataclass(frozen=True)
+class CategoriesConfig:
+    pause: tuple[str, ...] = ("sync", "backup", "updater")
+    ignore: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -150,6 +158,7 @@ class Config:
     power_overrides: dict[str, str] = field(default_factory=dict)
     options: OptionsConfig = field(default_factory=OptionsConfig)
     profiles: dict[str, Profile] = field(default_factory=dict)
+    categories: CategoriesConfig = field(default_factory=CategoriesConfig)
 
     @classmethod
     def defaults(cls) -> Config:
@@ -161,7 +170,7 @@ class Config:
         )
 
 
-_TOP_KEYS = {"apps", "network", "services", "power", "options", "profiles"}
+_TOP_KEYS = {"apps", "network", "services", "power", "options", "profiles", "categories"}
 _APP_KEYS = {"default", "watch", "ignore", "quit", "freeze", "skip", "ask", "with_daemon"}
 _ACTIONS = ("quit", "freeze", "skip", "ask")
 
@@ -238,6 +247,8 @@ def load_config(path: str | Path | None = None) -> Config:
             data = tomllib.load(fh)
     except tomllib.TOMLDecodeError as exc:
         raise ConfigError(target, "<toml>", str(exc), cause=exc) from exc
+    except (OSError, UnicodeError) as exc:
+        raise ConfigError(target, "<read>", str(exc), cause=exc) from exc
     if not isinstance(data, dict):
         raise _error(target, "<root>", t("config.expected_a_toml_table"))
     _check_keys(data, _TOP_KEYS, target, "")
@@ -257,6 +268,7 @@ def load_config(path: str | Path | None = None) -> Config:
                 )
             seen[name] = action
     app_config = AppsConfig(
+        configured_actions=tuple(seen),
         default=default,
         watch=_strings(apps.get("watch", []), target, "apps.watch"),
         ignore=_strings(apps.get("ignore", []), target, "apps.ignore"),
@@ -288,13 +300,21 @@ def load_config(path: str | Path | None = None) -> Config:
         overrides[key] = str(value)
 
     options = _table(data, "options", target)
-    _check_keys(options, {"aggressive", "language", "interface"}, target, "options")
+    _check_keys(options, {"aggressive", "language", "interface", "scenario"}, target, "options")
     aggressive, language = options.get("aggressive", False), options.get("language", "auto")
     if not isinstance(aggressive, bool):
         raise _error(target, "options.aggressive", t("config.expected_a_boolean"))
-    if language not in {"auto", "zh", "en"}:
+    if language not in ("auto", "zh", "en"):
         raise _error(target, "options.language", t("config.must_be_auto_zh_or_en"))
     interface = validate_interface(options.get("interface", "tui"), target)
+    scenario = options.get("scenario", "ask")
+    if scenario not in ("ask", "work", "away"):
+        raise _error(target, "options.scenario", t("scenario.invalid"))
+    categories = _table(data, "categories", target)
+    _check_keys(categories, {"pause", "ignore"}, target, "categories")
+    pause = _strings(categories.get("pause", ["sync", "backup", "updater"]), target, "categories.pause")
+    if set(pause) - {"sync", "backup", "updater", "vm"}:
+        raise _error(target, "categories.pause", t("categories.invalid"))
 
     raw_profiles = data.get("profiles", {})
     if not isinstance(raw_profiles, dict):
@@ -305,8 +325,11 @@ def load_config(path: str | Path | None = None) -> Config:
         network=network_config,
         services=service_config,
         power_overrides=overrides,
-        options=OptionsConfig(aggressive, language, interface),
+        options=OptionsConfig(aggressive, language, interface, scenario),
         profiles=profiles,
+        categories=CategoriesConfig(
+            pause, _strings(categories.get("ignore", []), target, "categories.ignore")
+        ),
     )
 
 
@@ -416,6 +439,7 @@ def migrate_legacy(config_path_value=None, state_path_value=None) -> list[str]:
 __all__ = [
     "CONF_PATH",
     "AppsConfig",
+    "CategoriesConfig",
     "Config",
     "ConfigError",
     "DaemonApp",

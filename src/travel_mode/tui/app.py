@@ -18,10 +18,11 @@ from travel_mode import snapshots
 from travel_mode import state as state_api
 from travel_mode.actions.base import Context
 from travel_mode.actions.executor import Executor
+from travel_mode.config import load_config
 from travel_mode.flows import check as flow_check
 from travel_mode.flows import common
 from travel_mode.i18n import t
-from travel_mode.profiles import active_values
+from travel_mode.profiles import active_name, active_scenario, active_values, profile_scope
 from travel_mode.system import apps as system_apps
 from travel_mode.system import launchd, pmset, spotlight
 from travel_mode.system import network as system_network
@@ -44,6 +45,8 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
     AUTO_FOCUS = "#body"
 
     BINDINGS: ClassVar = [
+        Binding("w", "select_scenario('work')", "", show=False),
+        Binding("a", "select_scenario('away')", "", show=False),
         Binding("q", "quit", t("impl.quit_2")),
         Binding("l", "toggle_language", t("language.current")),
         Binding("r", "refresh", t("impl.refresh")),
@@ -56,14 +59,21 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
 
     CSS_PATH = str(Path(__file__).with_name("style.tcss"))
 
-    def __init__(self, dry_run=False):
+    def __init__(self, dry_run=False, *, scenario=None):
         super().__init__()
         self._dry_run = dry_run
         self.profile_values = active_values()
+        self.scenario = scenario or active_scenario()
+        self.config = load_config()
+        self.profile_name = active_name() or None
+        if self.scenario != "ask":
+            with self.scenario_scope():
+                self.profile_values = active_values()
         self.sub_title = (
             t("impl.travel_mode_dry_run") if self._dry_run or is_dry_run() else t("impl.travel_mode")
         )
-        self.st, self.merged = snapshots.snapshot_origin()
+        self.st, self.merged = state_api.new_state(), False
+        self.origin_ready = False
         self.scan = {"running": [], "nobundle": []}
         self.svc = {"unloadable": [], "kept": []}
         self.pw_boxes = []  # (key, rec, checkbox)
@@ -82,7 +92,6 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
         self._transaction_view = None
 
     def execute(self, action):
-
         return self.executor.execute(action, Context(self.st, self.save))
 
     def _disable_mutation_button(self, button):
@@ -151,7 +160,8 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
             )
             self._translate_bindings()
             self.refresh_bindings()
-            self.action_refresh()
+            if self.scenario != "ask":
+                self.action_refresh()
 
     def _translate_bindings(self):
         from dataclasses import replace
@@ -176,136 +186,168 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
 
     @work(exclusive=True, group="dash")
     async def refresh_dash(self):
-        from textual.worker import get_current_worker
+        with self.scenario_scope():
+            from textual.worker import get_current_worker
 
-        from travel_mode.network_apps import network_scan
-        from travel_mode.system.app_snapshot import AppSnapshot, snapshot_scope
-        from travel_mode.system.platform import supported_pmset_keys
+            from travel_mode.network_apps import network_scan
+            from travel_mode.system.app_snapshot import AppSnapshot, snapshot_scope
+            from travel_mode.system.platform import supported_pmset_keys
 
-        worker = get_current_worker()
-        generation = self._refresh_generation
-        dash_values = None
-        self.pages_ready = set()
-        self.refresh_complete = False
+            worker = get_current_worker()
+            generation = self._refresh_generation
+            dash_values = None
+            self.pages_ready = set()
+            self.refresh_complete = False
 
-        async def apply(page, build, *args):
-            async with self._refresh_lock:
-                if worker.is_cancelled or generation != self._refresh_generation:
-                    return
-                # 每页原子挂载；其它页无需等待慢扫描结束。
-                with self.batch_update():
-                    await build(*args)
-                    if not worker.is_cancelled and generation == self._refresh_generation:
-                        self.pages_ready.add(page)
-                        if page in {"p-apps", "p-svc"} and "p-dash" in self.pages_ready:
-                            await self.build_dash(*dash_values)
-                from travel_mode.tui.messages import PageRefreshed
+            async def apply(page, build, *args):
+                async with self._refresh_lock:
+                    if worker.is_cancelled or generation != self._refresh_generation:
+                        return
+                    # 每页原子挂载；其它页无需等待慢扫描结束。
+                    with self.batch_update():
+                        await build(*args)
+                        if not worker.is_cancelled and generation == self._refresh_generation:
+                            self.pages_ready.add(page)
+                            if page in {"p-apps", "p-svc"} and "p-dash" in self.pages_ready:
+                                await self.build_dash(*dash_values)
+                    from travel_mode.tui.messages import PageRefreshed
 
-                self.post_message(PageRefreshed(page))
+                    self.post_message(PageRefreshed(page))
 
-        async def dash():
-            nonlocal dash_values
-            blocks, ac, batt, spot = await asyncio.to_thread(
-                lambda: (
-                    flow_check.blockers_lines(),
-                    pmset.on_ac_power(),
-                    pmset.battery_line(),
-                    spotlight.spotlight_on(),
+            async def dash():
+                nonlocal dash_values
+                blocks, ac, batt, spot = await asyncio.to_thread(
+                    lambda: (
+                        flow_check.blockers_lines(),
+                        pmset.on_ac_power(),
+                        pmset.battery_line(),
+                        spotlight.spotlight_on(),
+                    )
                 )
+                dash_values = blocks, ac, batt, spot
+                await apply("p-dash", self.build_dash, *dash_values)
+
+            async def power():
+                profs, supported = await asyncio.to_thread(
+                    lambda: (pmset.pmset_custom(), supported_pmset_keys())
+                )
+                await apply("p-power", self.build_power, profs, supported)
+
+            async def services():
+                svc, spot = await asyncio.to_thread(lambda: (launchd.svc_scan(), spotlight.spotlight_on()))
+
+                async def build():
+                    self.svc = svc
+                    await self.build_svc(spot)
+
+                await apply("p-svc", build)
+
+            # 应用和网络页只共享本轮索引/进程快照，不共享完成时序。
+            snapshot_task = asyncio.create_task(
+                asyncio.to_thread(AppSnapshot.capture, system_apps.app_directories())
             )
-            dash_values = blocks, ac, batt, spot
-            await apply("p-dash", self.build_dash, *dash_values)
 
-        async def power():
-            profs, supported = await asyncio.to_thread(lambda: (pmset.pmset_custom(), supported_pmset_keys()))
-            await apply("p-power", self.build_power, profs, supported)
+            async def sample_apps(fn):
+                snapshot = await asyncio.shield(snapshot_task)
 
-        async def services():
-            svc, spot = await asyncio.to_thread(lambda: (launchd.svc_scan(), spotlight.spotlight_on()))
+                def sample():
+                    with snapshot_scope(snapshot):
+                        return fn()
 
-            async def build():
-                self.svc = svc
-                await self.build_svc(spot)
+                return await asyncio.to_thread(sample)
 
-            await apply("p-svc", build)
+            async def apps():
+                scan = await sample_apps(system_apps.scan_apps)
 
-        # 应用和网络页只共享本轮索引/进程快照，不共享完成时序。
-        snapshot_task = asyncio.create_task(
-            asyncio.to_thread(AppSnapshot.capture, system_apps.app_directories())
-        )
+                async def build():
+                    self.scan = scan
+                    await self.build_apps()
 
-        async def sample_apps(fn):
-            snapshot = await asyncio.shield(snapshot_task)
+                await apply("p-apps", build)
 
-            def sample():
-                with snapshot_scope(snapshot):
-                    return fn()
+            async def network():
+                rows = await sample_apps(network_scan)
 
-            return await asyncio.to_thread(sample)
+                def connections():
+                    dev = system_network.wifi_dev()
+                    return (
+                        dev,
+                        system_network.wifi_powered(dev) if dev else None,
+                        system_network.bt_powered() if shutil.which("blueutil") else None,
+                    )
 
-        async def apps():
-            scan = await sample_apps(system_apps.scan_apps)
+                dev, wifi, bluetooth = await asyncio.to_thread(connections)
+                await apply("p-net", self.build_net, rows, dev, wifi, bluetooth)
 
-            async def build():
-                self.scan = scan
-                await self.build_apps()
-
-            await apply("p-apps", build)
-
-        async def network():
-            rows = await sample_apps(network_scan)
-
-            def connections():
-                dev = system_network.wifi_dev()
-                return (
-                    dev,
-                    system_network.wifi_powered(dev) if dev else None,
-                    system_network.bt_powered() if shutil.which("blueutil") else None,
-                )
-
-            dev, wifi, bluetooth = await asyncio.to_thread(connections)
-            await apply("p-net", self.build_net, rows, dev, wifi, bluetooth)
-
-        tasks = [asyncio.create_task(fn()) for fn in (dash, power, services, apps, network)]
-        try:
-            await asyncio.gather(*tasks)
-            if not worker.is_cancelled and generation == self._refresh_generation:
-                self.refresh_complete = True
-        except Exception as e:
-            self.logline("bad", t("impl.refresh_failed", v0=type(e).__name__, v1=e))
-            self.notify(t("impl.refresh_failed_2", v0=e), severity="error")
-            raise RuntimeError(t("impl.tui_refresh_failed", v0=e)) from e
-        finally:
-            # 取消所有待回填页；线程返回后也不能污染语言重组后的页面。
-            for task in tasks:
-                task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
-            snapshot_task.cancel()
-            await asyncio.gather(snapshot_task, return_exceptions=True)
+            tasks = [asyncio.create_task(fn()) for fn in (dash, power, services, apps, network)]
+            try:
+                await asyncio.gather(*tasks)
+                if not worker.is_cancelled and generation == self._refresh_generation:
+                    self.refresh_complete = True
+            except Exception as e:
+                self.logline("bad", t("impl.refresh_failed", v0=type(e).__name__, v1=e))
+                self.notify(t("impl.refresh_failed_2", v0=e), severity="error")
+                raise RuntimeError(t("impl.tui_refresh_failed", v0=e)) from e
+            finally:
+                # 取消所有待回填页；线程返回后也不能污染语言重组后的页面。
+                for task in tasks:
+                    task.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
+                snapshot_task.cancel()
+                await asyncio.gather(snapshot_task, return_exceptions=True)
 
     @work(thread=True, exclusive=True, group="audit")
     def refresh_audit_detail(self):
-        from textual.worker import get_current_worker
+        with self.scenario_scope():
+            from textual.worker import get_current_worker
 
-        worker = get_current_worker()
+            worker = get_current_worker()
 
-        async def apply():
-            async with self._refresh_lock:
+            async def apply():
+                async with self._refresh_lock:
+                    if not worker.is_cancelled:
+                        self.query_one("#dash-audit", Static).update("\n".join(lines))
+
+            try:
+                lines = flow_check.audit_lines()
                 if not worker.is_cancelled:
-                    self.query_one("#dash-audit", Static).update("\n".join(lines))
-
-        try:
-            lines = flow_check.audit_lines()
-            if not worker.is_cancelled:
-                self.call_from_thread(apply)
-        except Exception as e:
-            self.call_from_thread(self.logline, "bad", t("impl.audit_failed", v0=type(e).__name__, v1=e))
-            self.call_from_thread(self.notify, t("impl.audit_failed_2", v0=e), severity="error")
-            raise RuntimeError(t("impl.tui_audit_failed", v0=e)) from e
+                    self.call_from_thread(apply)
+            except Exception as e:
+                self.call_from_thread(self.logline, "bad", t("impl.audit_failed", v0=type(e).__name__, v1=e))
+                self.call_from_thread(self.notify, t("impl.audit_failed_2", v0=e), severity="error")
+                raise RuntimeError(t("impl.tui_audit_failed", v0=e)) from e
 
     def on_mount(self):
         self._translate_bindings()
         self.refresh_bindings()
+        if self.scenario == "ask":
+            self.query_one("#scenario-work").focus()
+            return
+        self.initialize_origin()
+
+    def scenario_scope(self):
+        return profile_scope(self.config, self.profile_name, scenario=self.scenario)
+
+    @work(exclusive=True, group="origin")
+    async def initialize_origin(self):
+        with self.scenario_scope() as config:
+            self.st, self.merged = await asyncio.to_thread(snapshots.snapshot_origin)
+            self.st["scenario"] = config.options.scenario
+            self.origin_ready = True
+            self.start_pages()
+
+    async def choose_scenario(self, scenario):
+        self.scenario = scenario
+        with self.scenario_scope():
+            self.profile_values = active_values()
+        await self.recompose()
+        self.initialize_origin()
+
+    async def action_select_scenario(self, scenario):
+        if self.scenario == "ask":
+            await self.choose_scenario(scenario)
+
+    def start_pages(self):
         if self.merged:
             age = snapshots.anchor_age_hours(self.st)
             age_s = t("impl.hours_ago", v0=age) if age is not None else ""
@@ -325,6 +367,8 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
         self.refresh_audit_detail()
 
     def action_refresh(self):
+        if self.scenario == "ask" or not self.origin_ready:
+            return
         self._refresh_generation += 1
         self.refresh_complete = False
         self.logline("dim", t("impl.refresh"))
@@ -332,6 +376,8 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
         self.refresh_audit_detail()
 
     def action_goto(self, pane: str):
+        if self.scenario == "ask":
+            return
         self.query_one(TabbedContent).active = pane
 
     def on_tabbed_content_tab_activated(self, event):

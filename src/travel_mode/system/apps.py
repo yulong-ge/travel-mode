@@ -150,26 +150,58 @@ def scan_apps():
     from ..system.app_snapshot import snapshot_scope
 
     with snapshot_scope() as snapshot:
-        app_action, default = load_conf()
-        app_names = load_config().apps.all
-        running, nobundle = [], []
-        for name in app_names:
+        from ..categories import app_action, identify, ignored, metadata
+
+        config = load_config()
+        running, nobundle, seen = [], [], set()
+        for name in config.apps.all:
             p = app_path(name)
             if p:
-                if app_running(p):
-                    act = app_action.get(name, default or "ask")
-                    running.append({"name": name, "path": p, "cpu": snapshot.cpu_for(name, p), "defact": act})
+                if app_running(p) and p not in seen:
+                    rule = identify(name=name, bundle_id=app_bid(p))
+                    running.append(
+                        {
+                            "name": name,
+                            "path": p,
+                            "cpu": snapshot.cpu_for(name, p),
+                            "defact": app_action(name, rule, config),
+                            **metadata(rule),
+                        }
+                    )
+                    if rule:
+                        running[-1].update(bundle_id=app_bid(p), category_ignored=ignored(rule, config))
+                    seen.add(p)
             else:
                 hits = [f"{proc.pid} {proc.command}" for proc in snapshot.matching(name)]
                 if hits:
                     nobundle.append(
-                        t(
-                            "impl.processes_for_were_found_but_its",
-                            v0=name,
-                            v1="; ".join(hits[:2])[:90],
-                        )
+                        t("impl.processes_for_were_found_but_its", v0=name, v1="; ".join(hits[:2])[:90])
                     )
-        return {"running": running, "nobundle": nobundle}
+        for p in snapshot.index.paths:
+            name = Path(p).stem
+            if p in seen or name in config.apps.ignore or not app_running(p):
+                continue
+            bid = app_bid(p)
+            rule = identify(name=name, bundle_id=bid)
+            if rule:
+                running.append(
+                    {
+                        "name": name,
+                        "path": p,
+                        "cpu": snapshot.cpu_for(name, p),
+                        "bundle_id": bid,
+                        "defact": app_action(name, rule, config),
+                        "category_ignored": ignored(rule, config),
+                        **metadata(rule),
+                    }
+                )
+                seen.add(p)
+        notices = []
+        for process in snapshot.processes:
+            rule = identify(executable=process.command)
+            if rule and rule["action"] == "notice":
+                notices.append({"name": rule["name"], "pid": process.pid, **metadata(rule)})
+        return {"running": running, "nobundle": nobundle, "notices": notices}
 
 
 def main_proc_alive(p):

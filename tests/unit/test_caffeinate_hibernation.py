@@ -63,7 +63,7 @@ def test_caffeinate_pid_reuse_refuses_signal(fake_runner, replacement):
 
 
 async def test_hib25_alone_when_original_equals_recommendation(monkeypatch):
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
         await app.workers.wait_for_complete()
         for _, _, checkbox in app.pw_boxes:
@@ -87,7 +87,7 @@ async def test_hib25_hidden_when_key_unsupported(fake_runner):
     fake_runner.responses[("pmset", "-g", "custom")] = CmdResult(
         re.sub(r"(?m)^.*hibernatemode.*\n?", "", custom), "", 0
     )
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
         await app.workers.wait_for_complete()
         await pilot.pause()
@@ -153,7 +153,7 @@ async def test_tui_has_one_button_per_holder_and_terminates_only_selected(fake_r
     from textual.widgets import Button
 
     two_assertion_holders(fake_runner)
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
         await app.workers.wait_for_complete()
         await pilot.pause()

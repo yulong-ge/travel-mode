@@ -28,7 +28,7 @@ def test_dry_run_main_returns_zero(argv, monkeypatch, tmp_paths, fake_runner, ca
     previous_language = get_language()
     monkeypatch.setenv("TRAVEL_MODE_LANG", "en")
     try:
-        assert main(argv) == 0
+        assert main([*argv, "--scenario", "away"]) == 0
 
         assert "commands would be executed" in capsys.readouterr().out
         assert shell.get_runner() is fake_runner

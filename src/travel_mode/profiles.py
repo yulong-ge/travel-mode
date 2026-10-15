@@ -19,6 +19,7 @@ def builtin_profiles() -> dict[str, Profile]:
         "flight": Profile(
             {
                 "description": t("profiles.flight"),
+                "scenario": "away",
                 "aggressive": True,
                 "power": {"battery": {"hibernatemode": 25, "displaysleep": 2}},
                 "apps": {"default": "quit"},
@@ -32,14 +33,17 @@ def builtin_profiles() -> dict[str, Profile]:
         "overnight": Profile(
             {
                 "description": t("profiles.overnight"),
+                "scenario": "away",
                 "power": {"battery": {"tcpkeepalive": 1, "powernap": 0, "standby": 1}},
             }
         ),
-        "cafe": Profile(
+        "work": Profile(
             {
-                "description": t("profiles.cafe"),
-                "power": {"battery": {"displaysleep": 3, "lowpowermode": 1}},
+                "description": t("profiles.work"),
+                "scenario": "work",
+                "power": {"battery": {"lowpowermode": 1}},
                 "wifi": "keep",
+                "bluetooth": "keep",
             }
         ),
     }
@@ -72,12 +76,15 @@ def parse_profiles(raw: dict, path) -> dict[str, Profile]:
             "bluetooth",
             "spotlight",
             "brightness",
+            "scenario",
         }
         for key, item in value.items():
             location = f"{prefix}.{key}"
             if key not in allowed:
                 invalid(location)
             if key == "description" and not isinstance(item, str):
+                invalid(location)
+            if key == "scenario" and item not in ("work", "away"):
                 invalid(location)
             if key == "aggressive" and not isinstance(item, bool):
                 invalid(location)
@@ -127,17 +134,32 @@ def active_values() -> dict:
     return config.profiles[active_name()].values if config and active_name() else {}
 
 
+def active_scenario() -> str:
+    from .config import load_config
+
+    return load_config().options.scenario
+
+
 @contextmanager
-def profile_scope(config: Config, name: str | None, *, aggressive=False):
+def profile_scope(config: Config, name: str | None, *, aggressive=False, scenario: str | None = None):
     if name is not None and name not in config.profiles:
         raise ConfigError("<cli>", "--profile", t("profiles.unknown", name=name))
+    if scenario not in (None, "ask", "work", "away"):
+        raise ConfigError("<cli>", "--scenario", t("scenario.invalid"))
+    selected = scenario or config.options.scenario
+    if name is None and selected == "work":
+        name = "work"
     values = (
         _merge(builtin_profiles().get(name, Profile()).values, config.profiles.get(name, Profile()).values)
         if name
         else {}
     )
+    profile_scenario = values.get("scenario", "away" if name else selected)
+    if scenario in ("work", "away") and name and profile_scenario != scenario:
+        raise ConfigError("<cli>", "--scenario/--profile", t("scenario.conflict"))
     effective = replace(
         config,
+        profiles={**config.profiles, **({name: Profile(values)} if name else {})},
         apps=replace(config.apps, default=values.get("apps", {}).get("default", config.apps.default)),
         power_overrides={
             **config.power_overrides,
@@ -146,6 +168,7 @@ def profile_scope(config: Config, name: str | None, *, aggressive=False):
         options=replace(
             config.options,
             aggressive=aggressive or values.get("aggressive", config.options.aggressive),
+            scenario=profile_scenario,
         ),
     )
     token = _active.set((effective, name or ""))

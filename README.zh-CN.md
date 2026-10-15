@@ -1,20 +1,20 @@
 # travel-mode
 
-[![CI](https://github.com/yulong-ge/travel-mode/actions/workflows/ci.yml/badge.svg)](https://github.com/yulong-ge/travel-mode/actions/workflows/ci.yml) [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.13-blue)](https://www.python.org/) [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)](https://www.apple.com/macos/)
+**[English](README.md) | 简体中文**
 
-[English](README.md) | **简体中文**
+`travel-mode` 调整 macOS 电源设置并暂停选定的后台程序，通过快照恢复本工具所做的修改。
 
-`travel-mode` 是 macOS 省电助手，提供 Textual 终端交互界面（TUI）、恢复快照和恢复命令。
+## 适用场景
 
-![总览](docs/assets/dashboard.zh.png)
-![电源](docs/assets/power.zh.png)
-![应用](docs/assets/apps.zh.png)
-![后台服务](docs/assets/services.zh.png)
-![网络](docs/assets/network.zh.png)
+**断电工作（`work`）。** 适合会议、会场等没有充电器的地方。在保留屏幕与网络的同时，暂停已识别的同步、备份、更新程序及用户明确配置的重型应用。默认电源动作只开启电池低电量模式。显示器与系统睡眠计时、休眠模式、AC 设置、Wi-Fi、蓝牙和亮度保留现有配置。工具不会启动进程来阻止屏幕休眠。Spotlight 索引停止是可选项，需勾选或确认。
+
+**合盖外出 / 过夜（`away`）。** 使用现有的睡眠省电建议，为合盖外出或过夜休眠做准备。应用、服务与网络动作需要在执行前检查。`flight` 和 `overnight` profile 属于这一场景；`flight` 还请求断网、hibernatemode 25、降低亮度和停止索引。
+
+工具仅在命令或终端用户界面（TUI）打开期间工作，不安装常驻服务、守护进程或定时轮询任务。续航受硬件、电池状况和前台负载影响，尚未验证连续工作 7–8 小时的续航。
 
 ## 安装
 
-选择一种安装方式：
+选择一种方式安装：
 
 ```bash
 uv tool install git+https://github.com/yulong-ge/travel-mode
@@ -24,140 +24,134 @@ uv tool install git+https://github.com/yulong-ge/travel-mode
 pipx install git+https://github.com/yulong-ge/travel-mode
 ```
 
-Homebrew 和 PyPI 包**尚未发布**。支持 Python 3.10–3.13。蓝牙控制可选依赖 `blueutil`；界面会说明不可用的能力。从源码开发见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+支持 Python 3.10–3.13 与 macOS。以上命令从仓库安装。蓝牙控制可选使用 `blueutil`；亮度控制使用可用的亮度适配器。界面会说明缺少的能力。开发环境见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 30 秒上手
 
 ```bash
 travel-mode check
-travel-mode --dry-run --yes
+travel-mode on --scenario work --dry-run --yes
 travel-mode
 travel-mode off
 ```
 
-`check` 只观察机器。dry-run 预览脚本执行计划，但可能执行下述 sudo 认证。在终端运行 `travel-mode` 打开 TUI；应用前先检查勾选项。`off` 恢复已记录的更改。没有交互终端时，裸命令改为运行 `check`。
+直接运行后，首屏显示两个场景按钮。选择“断电工作”或“合盖外出 / 过夜”，检查动作，再执行选中的分组。`--scenario work|away` 与 `--profile NAME` 跳过这一首屏。`check` 只读检查机器；`off` 恢复已记录的修改。非交互终端中，直接运行会转为 `check`。
 
-## 修改范围、权限和安全
+## 不喜欢 TUI 的用法
 
-按选择执行的动作包括：修改电池档位和 AC `powernap`/`womp`，修复全局 `disablesleep`，退出或冻结应用，卸载配置中的 launchd 服务，停止 Spotlight 索引，关闭 Wi-Fi/蓝牙，降低亮度，终止选定的 `caffeinate` 防睡断言持有者，或立即关屏。应用前先保存工作。强制退出可能丢失未保存数据；冻结后应用仍可能持有防睡断言；网络动作可能中断远程连接。
+```bash
+travel-mode --no-tui
+travel-mode on --scenario work --yes
+travel-mode config set-interface cli
+travel-mode --tui --scenario away
+```
 
-`--yes` 接受 CLI 默认动作，包括按配置退出/冻结应用、退出失败后的强制退出、服务卸载和 AC 改动。它不保证执行无害。`--aggressive` 额外允许脚本断网、关闭蓝牙、hibernatemode 25、亮度、Spotlight、终止 `caffeinate` 和立即关屏。配置和 profile 也可以请求动作；修改后须重新检查 dry-run。TUI 按钮执行所选动作。
+当 `options.scenario` 为 `"ask"` 时，CLI 第一题选择场景。`--yes` 要求提供 `--scenario`、`--profile` 或预先配置场景，不会自动代选。work 下，`--yes` 跳过动作设为 `ask` 的应用和可选 Spotlight；明确配置的退出、冻结仍会执行。work 批量动作不会自动强退；退出失败会停止该批次。
 
-电源键写入、全局睡眠修复、系统 launchd 操作、Spotlight、Wi-Fi 写入需要 sudo；向 root 所有的进程发信号也需要 sudo。用户 LaunchAgent、普通应用操作、蓝牙和亮度通常不需要。程序先用 `sudo -n -l <command>` 检查完整特权命令的权限；只有需要且 stdin 是终端时才获取凭据。仅打开 TUI 不会主动请求 sudo。特权只读查询使用 `sudo -n`，不等待密码输入。首次优雅退出应用可能需要 macOS「自动化」授权。
+界面优先级依次为 `--tui` / `--no-tui`、`TRAVEL_MODE_INTERFACE=cli|tui`、`options.interface`（默认 `"tui"`）。非交互终端回退到 `check`；显式 `--no-tui` 与 `--yes` 则请求执行流程。
 
-`--dry-run` 记录修改命令而不执行。它把配置、状态和旧版输入复制到临时目录；配置写入、迁移和恢复记账都留在隔离目录。它仍会执行观察。如果交互终端中的特权查询缺少凭据，可能真实执行 `sudo -v`。非交互终端下，无法读取的项目保留「无法确认（需要 sudo）」状态，计划以非零退出码结束。需要时先自行在终端运行 `sudo -v`，再重试预览。dry-run 不能证明后续写入必定成功。
+## 修改范围与安全
 
-## 命令
+work 默认开启电池低电量模式、选择配置的类别、卸载明确配置的用户 LaunchAgent，并执行明确配置的应用退出或冻结动作。前台应用默认选择和网络保持可用。profile 可配置 0 到 1 的目标亮度；普通 work 默认不改亮度。work 的电源建议忽略睡眠、显示器睡眠和休眠模式覆写。电源页和网络页仍提供需要单独选择的手动动作。
+
+away 动作可修改电池设置、AC 的 `powernap` / `womp`、全局 `disablesleep`、应用、launchd 服务、索引、Wi-Fi / 蓝牙和亮度，也可终止选中的 `caffeinate` 断言持有进程或立即关闭屏幕。`--yes` 接受默认动作，包括 AC 修改和现有的强制退出回退；`--aggressive` 还允许 CLI 中可选的激进动作。profile 可以独立请求动作。修改配置后应检查 dry-run。退出前保存文档；强退可能丢失内容，冻结可能保留防睡断言，断网可能中断远程会话。
+
+工具仅在动作需要时请求 sudo，例如电源写入、全局睡眠修复、系统服务、索引、Wi-Fi 或向 root 进程发信号。工具先用非交互 sudo 检查精确命令的权限。打开 TUI 不请求凭据。通过 AppleEvent 正常退出应用时，macOS 可能要求自动化权限。
+
+`--dry-run` 记录修改命令，并把配置、迁移和恢复写入隔离到临时目录。它仍执行只读观测；交互终端中的特权观测可能请求 sudo 凭据。无法读取的观测会明确标为不确定，并返回非零状态。预览通过不表示之后的真实操作一定成功。
+
+## 命令表
 
 | 命令 | 用途 |
 | --- | --- |
-| `travel-mode on` | 打开 TUI；加 `--no-tui` 使用 CLI 问答 |
+| `travel-mode` / `travel-mode on` | 选择场景后进入选定界面 |
 | `travel-mode off` / `travel-mode restore` | 恢复尚未完成的恢复记录 |
-| `travel-mode check` | 只读审计 |
-| `travel-mode report` | 只读睡眠/DarkWake 报告 |
-| `travel-mode config path` | 打印配置路径 |
-| `travel-mode config init` | 创建带注释的模板；`--force` 覆盖已有文件 |
+| `travel-mode check` / `travel-mode check --json` | 只读检查；JSON 包含当前已保存的生效场景 |
+| `travel-mode report` / `travel-mode report --json` | 只读睡眠 / DarkWake 报告 |
+| `travel-mode config path` | 显示配置和状态路径 |
+| `travel-mode config init` | 写入模板；`--force` 覆盖已有文件 |
 | `travel-mode config validate` | 校验配置 |
-| `travel-mode config edit` | 用配置的编辑器打开配置 |
-| `travel-mode config set-language en` / `zh` | 保存界面语言 |
+| `travel-mode config edit` | 用 `$VISUAL` 或 `$EDITOR` 打开，然后校验 |
+| `travel-mode config set-language en` / `zh` | 保存语言 |
 | `travel-mode config set-interface cli` / `tui` | 保存默认界面 |
-| `travel-mode thaw` / `travel-mode thaw --all` | 恢复已记录的冻结应用 / 所有停止的应用进程 |
-| `travel-mode profiles` | 列出内置和自定义 profile |
-| `travel-mode suggest` | 只读生成能耗与应用守护建议 |
+| `travel-mode thaw` / `travel-mode thaw --all` | 恢复记录的应用 / 检查全部停止的应用进程 |
+| `travel-mode profiles` | 列出 profile |
+| `travel-mode suggest --samples 3` | 只读能耗与类别建议 |
+| `travel-mode suggest --json` | 结构化建议 |
+| `travel-mode suggest --write` | 确认后添加应用、服务或守护程序配置 |
 
-`thaw --all` 可能恢复由其他工具停止的应用；须检查提示。全局选项包括 `--dry-run`、`--yes`、`--aggressive`、`--profile NAME`、`--json`、`--force`、`--no-tui`、`--lang en|zh`、`--help` 和 `--version`。`off --force` 即使恢复失败也丢弃快照。TUI 按 `L` 切换语言；保存 `options.language` 时保留 TOML 注释。`TRAVEL_MODE_LANG` 优先于配置语言。隐藏的 `--demo` 用于夹具截图，不能用于真机效果验证。
+其他参数：`--scenario work|away`、`--profile NAME`、`--dry-run`、`--yes` / `-y`、`--aggressive`、`--lang en|zh`、`--help`、`--version`。`off --force` 即使恢复失败也会丢弃剩余记录。`thaw --all` 可能恢复本工具之外停止的应用。TUI 按 `L` 切换语言并保留 TOML 注释。隐藏的 `--demo` 用测试数据生成截图。
 
-## Profile、建议和 JSON
+## 配置与类别
 
-内置 profile 为 `flight`、`overnight` 和 `cafe`。预览示例：
+默认路径为 `~/.config/travel-mode/config.toml` 和 `~/.local/state/travel-mode/state.json`。通过 `TRAVEL_MODE_CONFIG` 和 `TRAVEL_MODE_STATE` 覆盖；同时支持 XDG 根目录。见[完整示例](examples/config.toml)。
 
-```bash
-travel-mode --dry-run on --profile flight --yes
+```toml
+[options]
+scenario = "ask" # ask | work | away
+interface = "tui" # tui | cli
+language = "auto" # auto | en | zh
+
+[categories]
+pause = ["sync", "backup", "updater"]
+ignore = [] # categories.toml 中的规则 id 或公开名称
+
+[services]
+unload = []
+keep = []
+
+[apps]
+default = "ask"
+quit = []
+freeze = []
+skip = []
+
+[profiles.work]
+# brightness = 0.5
 ```
 
-所选 profile 提供的字段覆盖普通配置；自定义 `[profiles.NAME]` 覆盖同名内置 profile。其余设置保留普通配置或默认值。`suggest` 采样 `top`、防睡断言及 `/Library/LaunchDaemons`、`/Library/LaunchAgents`、`~/Library/LaunchAgents` 中的 plist。它按可执行文件路径、关联 Bundle ID 或 Bundle ID 前缀匹配活跃应用守护，并报告置信度、依据和坏 plist 警告。低置信度匹配须人工复核。
+随包分发的[类别识别库](src/travel_mode/categories.toml) 定义 `sync`、`backup`、`updater`、`vm`，逐条记录公开依据。匹配依据包括 launchd Label、bundle id、精确应用名和可执行路径。`suggest`、后台服务页和应用页按类别分组显示识别项。类别卸载只面向 `~/Library/LaunchAgents` 与 `/Library/LaunchAgents` 中已加载且有 plist 的 LaunchAgent，不会自动卸载系统 LaunchDaemon。识别到产品不表示可以暂停它的全部组件。
 
-```bash
-travel-mode suggest --samples 3
-travel-mode suggest --write
-travel-mode check --json
-travel-mode report --json
-travel-mode suggest --json
-```
+`categories.pause` 选择 work 的自动类别动作；`vm` 需主动加入。两个场景的类别按钮都提供“暂停同步与备份”和“暂停更新器”。work 总览默认勾选类别组，并遵循 `pause` 中各类别的选择。iCloud 与 Time Machine 仅展示。部分备份产品和嵌入式更新器规则只识别，请在产品内管理。类别退出使用正常退出，不强退。
 
-`--write` 在交互确认后才添加推荐的 `[[apps.with_daemon]]` 条目。它保留注释和格式，跳过同名条目。JSON 模式保持 stdout 可供程序读取。Schema：[check](docs/json-schema/check.schema.json)、[suggest](docs/json-schema/suggest.schema.json)。
+类别动作补充 `services.unload` 和明确的 `apps.quit` / `apps.freeze`；同一批次内重复身份只处理一次。`services.keep` 优先于卸载选择器和类别动作。`apps.skip` 与 `apps.ignore` 保护应用及匹配的类别服务。包括 `ask` 在内的明确应用动作优先于类别默认动作。`categories.ignore` 禁止自动类别动作与类别按钮处理，但明确的应用、服务配置仍生效。只识别规则不会变成类别动作。现有 `apps.with_daemon` 仍是需要单独明确配置的机制。
 
-### 不喜欢 TUI？
+内置 profile 为 `work`、`flight`、`overnight`。`cafe` 已合并到 `work` 并删除，不保留别名。profile 提供的字段覆盖普通配置；自定义 `[profiles.NAME]` 覆盖同名内置值。自定义 profile 默认属于 away，除非设置 `scenario = "work"`。显式 `--scenario` 与 profile 场景冲突会报错。快照记录最后应用的场景，同时保留首次原值用于恢复。没有已保存场景时，包括旧快照，`check --json` 输出 null。
 
-```bash
-travel-mode --no-tui                  # 本次使用 CLI 问答
-travel-mode --yes                     # 跳过所有提问，只执行安全默认
-travel-mode config set-interface cli  # 默认使用 CLI 问答（tui 恢复默认）
-```
+`TRAVEL_MODE_LANG` 覆盖配置语言。`TRAVEL_MODE_APP_DIRS` 添加以冒号分隔的绝对应用目录，空项或相对路径会报错。`suggest --write` 请求确认、保留注释，并在替换配置前校验。JSON schema：[check](docs/json-schema/check.schema.json)、[suggest](docs/json-schema/suggest.schema.json)。可选集成：[Shortcuts](integrations/shortcuts.md)、[菜单插件](integrations/swiftbar/travel-mode.10s.sh)、[sudoers](docs/sudoers.md)。
 
-`options.interface` 默认为 `"tui"`。优先级：`--tui` / `--no-tui` > `TRAVEL_MODE_INTERFACE=cli|tui` > 配置 > 默认。`travel-mode` 和 `travel-mode on` 使用所选界面；非交互终端降级为 `check`。显式 `--no-tui` 和 `--yes` 保留原有执行行为。`--tui` 可在本次强制打开 TUI。
+## 恢复机制
 
-## 配置和集成
+可恢复动作在修改前保存恢复意图。电源记录仅包含实际修改的键，分别记录电池与 AC。`off` 恢复原值、继续运行记录的进程身份、重新加载卸载的服务、重新打开退出的应用，并恢复修改过的网络、亮度与索引设置。LaunchAgent 使用 unload/load，不使用 launchctl 的 disable 机制。
 
-默认文件为 `~/.config/travel-mode/config.toml` 和 `~/.local/state/travel-mode/state.json`。`TRAVEL_MODE_CONFIG`、`TRAVEL_MODE_STATE` 可覆盖路径。[配置示例](examples/config.toml) 展示 `apps.default`（`quit`、`freeze`、`skip`、`ask`）、应用分组、守护 plist、服务选择器、电池键覆盖和 `options.language`（`auto`、`en`、`zh`）。默认卸载服务列表为空。自动执行前先定制应用选择。
+每成功恢复一项就保存进度。失败记录保留，供下次 `off` 重试。重新打开应用无法恢复未保存文档或精确窗口状态。已终止的 `caffeinate` 和立即关闭屏幕无法撤销。超过 24 小时的快照会提示，因为恢复可能覆盖后来对已记录键所做的修改。当前没有跨进程锁，一次只运行一个修改实例。
 
-`TRAVEL_MODE_APP_DIRS` 将冒号分隔的绝对应用目录加入标准目录之前；空项和相对路径会报错。电源页和 `check` 解释支持的取值与代价。网络和服务页保留缺失/停止项目并说明原因；Time Machine 状态只读。
+没有快照时，非交互 `off` 会失败，不重置设置。交互 `off` 提供需要单独确认的出厂电源重置。保留损坏快照，修复所示问题后重试。用 `travel-mode thaw` 恢复已记录的冻结应用；恢复其他停止的进程前先检查身份。无法恢复亮度时可使用系统设置。
 
-可使用 [SwiftBar/xbar 插件](integrations/swiftbar/travel-mode.10s.sh)、[快捷指令指南](integrations/shortcuts.md) 和可选的 [sudoers 说明](docs/sudoers.md)。
+## 退出码
 
-## 电源键
-
-| 键 | 推荐值 | 含义 / 代价 |
-| --- | ---: | --- |
-| `lowpowermode` | `1` | 降低 CPU/GPU 性能和能耗 |
-| `sleep` | `5` | 系统闲置后睡眠的分钟数 |
-| `displaysleep` | `3` | 显示器闲置后睡眠的分钟数 |
-| `powernap` | `0` | 关闭后台唤醒；更新可能延迟 |
-| `tcpkeepalive` | `1` | 保留 Find My 支持，但消耗电量 |
-| `womp` | `0` | 关闭网络唤醒 |
-| `standby` | `1` | 深度待机；唤醒可能变慢 |
-| `hibernatemode` | `3` | 内存/磁盘休眠；可选 `25` 唤醒较慢 |
-| `ttyskeepawake` | `1` | 活跃终端可以阻止睡眠 |
-| `disksleep` | `10` | 磁盘闲置超时分钟数 |
-| `lessbright` | `1` | 电池供电时降低亮度 |
-| `networkoversleep` | `0` | 睡眠时关闭网络活动 |
-
-推荐值按 `pmset -g cap` 和 `pmset -g custom` 报告的键过滤。适配层处理使用等价 `powermode` 的硬件。电池和 AC 档位分别恢复。
-
-## 恢复与手动救援
-
-可恢复的更改在修改前保存恢复意图。电源恢复记录只包含实际改过的键的原值，而非完整档位。`off` 恢复这些键，按已记录的 PID 身份解冻，重载已记录服务，重开退出的应用，并恢复改过的网络、亮度和索引设置。它不会重启已终止的 `caffeinate`，也不会撤销立即关屏。重开应用不能找回未保存文档或精确的窗口状态。每个成功恢复项立即落盘；失败项保留，供下次 `off` 重试。快照超过 24 小时会警告，因为恢复可能覆盖之后对已记录键的外部改动。程序没有跨进程锁；不要同时运行多个修改实例。
-
-没有快照时，非交互 `off` 报错且不重置设置。交互 `off` 会提供需单独确认的出厂电源重置。优先正常恢复；`--force` 会丢弃恢复失败的记录。
-
-下列手动恢复示例**会修改系统**。须换成记录中的设备、PID 和 plist；发信号前检查进程身份。尽可能按已记录原值恢复单个电源键；出厂重置会丢失自定义电源偏好。
-
-| 恢复项目 | 命令 |
+| 退出码 | 含义 |
 | --- | --- |
-| 冻结进程 | `travel-mode thaw`；复核后可用 `travel-mode thaw --all` |
-| 已核验的单个停止 PID | `kill -CONT <pid>` |
-| 用户 LaunchAgent | `launchctl load <agent.plist>` |
-| 系统服务 | `sudo launchctl load <daemon.plist>` |
-| Wi-Fi | `sudo networksetup -setairportpower <device> on` |
-| 蓝牙（需 `blueutil`） | `blueutil -p 1` |
-| Spotlight 索引 | `sudo mdutil -i on /` |
-| 出厂电源默认值（最后手段） | `sudo pmset restoredefaults` |
+| 0 | 命令完成 |
+| 1 | 操作失败、恢复尚未完成，或出现未预期异常 |
+| 2 | 配置或参数错误；也用于不支持的平台或缺少平台能力 |
+| 3 | 恢复状态非法、不可读或不可写 |
 
-快照无法恢复亮度时，在系统设置中调整。错误会显示失败操作和退出码；丢弃状态前先解决错误。
+配置与状态错误只输出一行诊断，包含路径、相关键或原因及修复提示，不打印 Python traceback。设置 `TRAVEL_MODE_DEBUG=1` 后保留完整 traceback 和异常链。未预期异常保留正常 traceback。外部编辑器可以返回自己的退出码。
 
 ## 兼容性与验证边界
 
-**2026-10-15** 只读环境检查：macOS **27.0.1**、**arm64**，命令为 `sw_vers -productVersion` 和 `uname -m`。下列真机结果来自维护者同日在该机器上的先前运行记录；本次公开整理没有重跑系统修改。
+仓库记录了维护者在 2026-10-15 的早期真机检查：macOS 27.0.1、arm64。这是历史结果；本轮场景与类别改动没有重新执行系统修改。
 
-| 使用临时夹具完成的真机验证 | 覆盖范围 |
+| 早期使用临时夹具完成的真机验证 | 范围 |
 | --- | --- |
-| 应用与服务 | AppleEvent 优雅退出且无需信号兜底；精确进程强制退出；主/辅助进程冻结和恢复；用户 LaunchAgent 卸载/重载；重开应用 |
-| 电源与恢复 | 电池档位往返；AC `powernap`/`womp`；全局 `disablesleep`；`hibernatemode=25`；完整电源原始输出恢复 |
-| 解冻与亮度 | CLI `thaw --all`；原生亮度设置和恢复往返 |
-| 交互界面 | 实际 CLI 问答及 TUI 键盘/鼠标应用和恢复交互 |
+| 应用与服务 | AppleEvent 正常退出、精确进程强退、主进程与辅助进程冻结 / 恢复、用户 LaunchAgent 卸载 / 重载、重开应用 |
+| 电源与恢复 | 电池往返恢复、AC powernap / womp、全局 disablesleep、hibernatemode 25、原始电源输出恢复 |
+| 恢复与亮度 | CLI thaw --all、亮度修改与恢复 |
+| 界面 | CLI 问答和 TUI 键盘 / 鼠标执行与恢复 |
 
-**尚未真机验证：** Wi-Fi 修改、蓝牙修改、Spotlight 修改、立即关屏、终止 `caffeinate`、AC `sleep`/`displaysleep`。自动化测试使用隔离的 FakeRunner 夹具，不能据此声称这些真机效果通过。声明支持 Python 3.10–3.13 和 Textual 8.x；CI 在 macOS 和 Linux 上使用模拟系统命令覆盖 Python 版本。Linux 不属于支持的运行平台。其他 macOS 版本和硬件尚未验证。
+Wi-Fi、蓝牙、Spotlight、立即关闭屏幕、caffeinate 终止及 AC 睡眠计时尚未真机验证。work 与类别行为使用隔离 FakeRunner 和演示夹具测试，没有验证真实产品暂停或电池续航。CI 覆盖 Ubuntu 与 macOS 上的 Python 3.10–3.13；Linux 仅作为测试主机，不是支持的运行平台。其他硬件和 macOS 版本仍未验证。
 
-## 贡献与许可证
+## 贡献与许可
 
-见 [CONTRIBUTING.md](CONTRIBUTING.md)、[SECURITY.md](SECURITY.md) 和 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)。采用 [MIT](LICENSE) 许可证。
+[CONTRIBUTING.md](CONTRIBUTING.md)、[SECURITY.md](SECURITY.md)、[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)。[MIT](LICENSE)。

@@ -10,7 +10,7 @@ from travel_mode.profiles import builtin_profiles, profile_scope
 
 def test_builtin_profiles_are_available():
     profiles = builtin_profiles()
-    assert set(profiles) == {"flight", "overnight", "cafe"}
+    assert set(profiles) == {"flight", "overnight", "work"}
     assert profiles["flight"].values["power"]["battery"]["hibernatemode"] == 25
 
 
@@ -18,13 +18,13 @@ def test_profile_merge_user_then_cli_precedence(tmp_path):
     path = tmp_path / "config.toml"
     path.write_text(
         "[options]\naggressive = false\n[profiles.flight]\naggressive = false\n"
-        "[profiles.cafe.power.battery]\ndisplaysleep = 1\n",
+        "[profiles.work.power.battery]\ndisplaysleep = 1\n",
         "utf-8",
     )
     config = load_config(path)
     with profile_scope(config, "flight", aggressive=True) as active:
         assert active.options.aggressive is True
-    with profile_scope(config, "cafe") as active:
+    with profile_scope(config, "work") as active:
         assert active.power_overrides["displaysleep"] == "1"
 
 

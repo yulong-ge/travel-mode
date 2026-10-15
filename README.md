@@ -1,20 +1,20 @@
 # travel-mode
 
-[![CI](https://github.com/yulong-ge/travel-mode/actions/workflows/ci.yml/badge.svg)](https://github.com/yulong-ge/travel-mode/actions/workflows/ci.yml) [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.13-blue)](https://www.python.org/) [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)](https://www.apple.com/macos/)
-
 **English | [简体中文](README.zh-CN.md)**
 
-`travel-mode` is a macOS battery-saving assistant with a Textual terminal user interface (TUI), a recovery snapshot and a restore command.
+`travel-mode` adjusts macOS power settings and pauses selected background programs, with a snapshot for restoring its changes.
 
-![Dashboard](docs/assets/dashboard.png)
-![Power](docs/assets/power.png)
-![Applications](docs/assets/apps.png)
-![Background services](docs/assets/services.png)
-![Network](docs/assets/network.png)
+## Use cases
+
+**Work on battery (`work`).** For meetings, venues and other places without a charger, keep the screen and network available while pausing recognized sync, backup and update programs and explicitly configured heavy apps. Default power changes enable battery Low Power Mode only. Existing display/system sleep timers, hibernation mode, AC settings, Wi-Fi, Bluetooth and brightness remain as configured. No process is started to keep the display awake. Spotlight indexing is optional and requires selection or confirmation.
+
+**Away / overnight (`away`).** Prepare for lid-closed travel or overnight sleep using the existing sleep-oriented power recommendations. Review app, service and network actions before applying them. The `flight` and `overnight` profiles belong to this scenario; `flight` also requests network disconnection, hibernatemode 25, lower brightness and stopped indexing.
+
+The tool does work while a command or the terminal user interface (TUI) is open. It installs no resident service, daemon or periodic polling task. Battery life depends on hardware, battery condition and foreground workload; no 7–8-hour runtime has been established.
 
 ## Install
 
-Choose one installer:
+Install with one of these alternatives:
 
 ```bash
 uv tool install git+https://github.com/yulong-ge/travel-mode
@@ -24,140 +24,134 @@ uv tool install git+https://github.com/yulong-ge/travel-mode
 pipx install git+https://github.com/yulong-ge/travel-mode
 ```
 
-Homebrew and PyPI packages are **not yet published**. Python 3.10–3.13 is supported. Bluetooth control optionally requires `blueutil`; unavailable capabilities are reported in the interface. For development from a checkout, see [CONTRIBUTING.md](CONTRIBUTING.md).
+Python 3.10–3.13 and macOS are supported. The commands above install from the repository. Bluetooth control optionally uses `blueutil`; brightness control uses the available brightness adapter. Missing capabilities are shown in the interface. Development setup: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## 30-second start
 
 ```bash
 travel-mode check
-travel-mode --dry-run --yes
+travel-mode on --scenario work --dry-run --yes
 travel-mode
 travel-mode off
 ```
 
-`check` observes the machine. The dry run previews the scripted plan; it can authenticate with sudo as described below. In a terminal, `travel-mode` opens the TUI: review selections before applying them. `off` restores recorded changes. Without an interactive terminal, the bare command runs `check` instead.
+The bare command first shows two scenario buttons. Select Work on battery or Away / overnight, review the actions, then apply selected groups. `--scenario work|away` and `--profile NAME` skip this screen. `check` observes the machine; `off` restores recorded changes. Without an interactive terminal, the bare command runs `check`.
+
+## Use CLI prompts
+
+```bash
+travel-mode --no-tui
+travel-mode on --scenario work --yes
+travel-mode config set-interface cli
+travel-mode --tui --scenario away
+```
+
+The first CLI question selects the scenario when `options.scenario` is `"ask"`. `--yes` requires `--scenario`, `--profile`, or a configured scenario; it does not silently choose one. In work mode, `ask` apps and optional Spotlight are skipped by `--yes`. Explicit quit/freeze app settings still apply. Work batches do not force quit automatically; a failed quit stops the batch.
+
+Interface priority is `--tui` / `--no-tui`, then `TRAVEL_MODE_INTERFACE=cli|tui`, then `options.interface` (default `"tui"`). A non-interactive terminal falls back to `check`, except explicit `--no-tui` and `--yes`, which request the apply flow.
 
 ## Changes, permissions and safety
 
-Selected actions can change battery power settings and AC `powernap`/`womp`, repair global `disablesleep`, quit or freeze apps, unload configured launchd services, stop Spotlight indexing, disable Wi-Fi/Bluetooth, lower brightness, terminate selected `caffeinate` assertion holders, or turn off the display immediately. Save your work before applying actions. Force quit can lose unsaved data. Freezing can leave sleep assertions active. Network actions can disconnect remote sessions.
+Work defaults enable battery Low Power Mode, select configured categories, unload explicitly configured user LaunchAgents, and apply explicit app quit/freeze choices. They preserve foreground app defaults and network availability. A profile can supply a brightness target between 0 and 1; ordinary work brightness is unchanged. Work power recommendations ignore sleep/display/hibernation overrides. The Power and Network pages still expose separately selected manual actions.
 
-`--yes` accepts default CLI actions, including configured app quit/freeze, a force-quit fallback, service unloading and AC changes. It is not a guarantee of harmless execution. `--aggressive` additionally permits scripted network disconnection, Bluetooth, hibernatemode 25, brightness, Spotlight, `caffeinate` termination and immediate display sleep. Configuration and profiles can also request actions; inspect the dry run after changing them. TUI buttons apply the action you select.
+Away actions can change battery settings, AC `powernap`/`womp`, global `disablesleep`, apps, launchd services, indexing, Wi-Fi/Bluetooth and brightness. They can also terminate selected `caffeinate` assertion holders or sleep the display. `--yes` accepts defaults, including AC changes and the existing force-quit fallback. `--aggressive` additionally permits the optional aggressive CLI actions. Profiles can request actions independently. Review a dry run after changing configuration. Save documents before quitting; force quit can lose work, freezing can retain sleep assertions, and network changes can disconnect remote sessions.
 
-Sudo is needed for power-setting writes, global sleep repair, system launchd operations, Spotlight and Wi-Fi writes; signaling a root-owned process also needs sudo. User LaunchAgents, ordinary app operations, Bluetooth and brightness normally do not. The program checks permission for the exact privileged command using `sudo -n -l <command>`. It requests credentials only when needed and stdin is a terminal. It does not request sudo just to open the TUI. Privileged observations use `sudo -n` and never wait for a password prompt. Graceful app quit can require macOS Automation permission on first use.
+Sudo is requested only for operations that require it, such as power writes, global sleep repair, system-service operations, indexing, Wi-Fi and signaling root-owned processes. The tool checks permission for the exact command with non-interactive sudo. Opening the TUI does not request credentials. Graceful app quit may need macOS Automation permission.
 
-`--dry-run` records mutation commands instead of executing them. It copies config/state and legacy inputs to a temporary directory, so configuration changes, migration and recovery bookkeeping stay isolated. It still performs observations. If a privileged observation needs credentials in an interactive terminal, it can really run `sudo -v`. In a non-interactive terminal, unreadable items remain “Unable to confirm (requires sudo)” and the plan exits nonzero. If needed, run `sudo -v` yourself in a terminal and repeat the preview. A dry run does not prove an eventual write will succeed.
+`--dry-run` records mutation commands and isolates configuration, migration and recovery writes in a temporary directory. It still performs observations and can request sudo credentials for a privileged observation in an interactive terminal. Unreadable observations are reported as uncertain and produce a nonzero result. A preview does not establish that a later real operation will succeed.
 
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
-| `travel-mode on` | Open the TUI; with `--no-tui`, use CLI prompts |
+| `travel-mode` / `travel-mode on` | Select a scenario, then use the chosen interface |
 | `travel-mode off` / `travel-mode restore` | Restore outstanding recovery records |
-| `travel-mode check` | Read-only audit |
-| `travel-mode report` | Read-only sleep/DarkWake report |
-| `travel-mode config path` | Print config path |
-| `travel-mode config init` | Create the commented template; `--force` overwrites it |
+| `travel-mode check` / `travel-mode check --json` | Read-only audit, including the effective saved scenario in JSON |
+| `travel-mode report` / `travel-mode report --json` | Read-only sleep / DarkWake report |
+| `travel-mode config path` | Show configuration and state paths |
+| `travel-mode config init` | Write the template; `--force` overwrites it |
 | `travel-mode config validate` | Validate configuration |
-| `travel-mode config edit` | Open configuration in the configured editor |
-| `travel-mode config set-language en` / `zh` | Save interface language |
-| `travel-mode config set-interface cli` / `tui` | Save the default interface |
-| `travel-mode thaw` / `travel-mode thaw --all` | Resume recorded frozen apps / all stopped app processes |
-| `travel-mode profiles` | List built-in and custom profiles |
-| `travel-mode suggest` | Read-only energy and app-daemon suggestions |
+| `travel-mode config edit` | Open `$VISUAL` or `$EDITOR`, then validate |
+| `travel-mode config set-language en` / `zh` | Save language |
+| `travel-mode config set-interface cli` / `tui` | Save interface |
+| `travel-mode thaw` / `travel-mode thaw --all` | Resume recorded apps / review all stopped app processes |
+| `travel-mode profiles` | List profiles |
+| `travel-mode suggest --samples 3` | Read-only energy and category suggestions |
+| `travel-mode suggest --json` | Structured suggestions |
+| `travel-mode suggest --write` | Confirm additions to app/service/daemon configuration |
 
-`thaw --all` can resume apps stopped outside travel-mode; review its prompts. Global options include `--dry-run`, `--yes`, `--aggressive`, `--profile NAME`, `--json`, `--force`, `--no-tui`, `--lang en|zh`, `--help` and `--version`. `--force` with `off` discards the snapshot even if restoration fails. The TUI switches language with `L`, preserving TOML comments when saving `options.language`. `TRAVEL_MODE_LANG` overrides the configured language. Hidden `--demo` is for fixture screenshots, not system validation.
+Other options: `--scenario work|away`, `--profile NAME`, `--dry-run`, `--yes` / `-y`, `--aggressive`, `--lang en|zh`, `--help`, `--version`. `--force` with `off` discards outstanding recovery records even after a restore failure. `thaw --all` can resume apps stopped outside this tool. The TUI switches language with `L` and preserves TOML comments. Hidden `--demo` uses fixtures for screenshots.
 
-## Profiles, suggestions and JSON
+## Configuration and categories
 
-Built-in profiles are `flight`, `overnight` and `cafe`. Preview one:
+Paths default to `~/.config/travel-mode/config.toml` and `~/.local/state/travel-mode/state.json`. Override them with `TRAVEL_MODE_CONFIG` and `TRAVEL_MODE_STATE`; XDG roots are supported. See the [complete example](examples/config.toml).
 
-```bash
-travel-mode --dry-run on --profile flight --yes
+```toml
+[options]
+scenario = "ask" # ask | work | away
+interface = "tui" # tui | cli
+language = "auto" # auto | en | zh
+
+[categories]
+pause = ["sync", "backup", "updater"]
+ignore = [] # rule ids or public names from categories.toml
+
+[services]
+unload = []
+keep = []
+
+[apps]
+default = "ask"
+quit = []
+freeze = []
+skip = []
+
+[profiles.work]
+# brightness = 0.5
 ```
 
-The selected profile overrides ordinary configuration for fields it supplies. Custom `[profiles.NAME]` values override that built-in profile; other settings keep their ordinary configuration or defaults. `suggest` samples `top`, sleep assertions and plist files in `/Library/LaunchDaemons`, `/Library/LaunchAgents` and `~/Library/LaunchAgents`. It matches active app daemons by executable path, associated bundle ID or bundle ID prefix, and reports confidence, evidence and malformed-plist warnings. Low-confidence matches need manual review.
+The packaged [category registry](src/travel_mode/categories.toml) defines `sync`, `backup`, `updater` and `vm`, with public source references for each rule. It matches launchd labels, bundle IDs, exact app names and executable paths. `suggest`, the Services page and the Apps page group recognized items by category. Only loaded plist-backed LaunchAgents in `~/Library/LaunchAgents` and `/Library/LaunchAgents` are category unload targets. System LaunchDaemons are not automatically unloaded by categories. Recognizing a product does not establish that all of its components can be paused.
 
-```bash
-travel-mode suggest --samples 3
-travel-mode suggest --write
-travel-mode check --json
-travel-mode report --json
-travel-mode suggest --json
-```
+`categories.pause` selects automatic category actions in work mode; `vm` is opt-in. Category buttons provide Pause sync and backups and Pause updaters in either scenario. The work overview checks category groups by default. Individual category selections in `pause` are respected by that overview. iCloud and Time Machine are observation only. Some backup products and embedded updaters are identification-only rules; manage those within the product. Category quit is graceful and does not force quit.
 
-`--write` asks for interactive confirmation before adding recommended `[[apps.with_daemon]]` entries. It preserves comments/layout and skips duplicate names. JSON mode keeps stdout machine-readable. Schemas: [check](docs/json-schema/check.schema.json) and [suggest](docs/json-schema/suggest.schema.json).
+Category actions supplement `services.unload` and explicit `apps.quit` / `apps.freeze`; repeated identities are processed once per batch. `services.keep` wins over unload selectors and category actions. `apps.skip` and `apps.ignore` protect apps and matching category agents. Explicit app actions, including `ask`, take priority over category defaults. `categories.ignore` suppresses automatic category actions and category buttons, while explicit service/app settings still apply. Identification-only rules never become category actions. Existing `apps.with_daemon` configuration remains an explicit, separately configured mechanism.
 
-### Prefer CLI prompts?
+Built-ins are `work`, `flight` and `overnight`. `cafe` was merged into `work` and removed, with no alias. A profile overrides ordinary settings for its supplied fields; custom `[profiles.NAME]` values override the matching built-in. A custom profile defaults to away unless it sets `scenario = "work"`. Conflicting explicit `--scenario` and profile scenarios are errors. Snapshots record the last applied scenario while keeping the first original values for recovery. `check --json` uses null when no saved scenario exists, including older snapshots.
 
-```bash
-travel-mode --no-tui                  # Use CLI prompts for this run
-travel-mode --yes                     # Skip all questions; apply safe defaults
-travel-mode config set-interface cli  # Use CLI prompts by default (tui to reset)
-```
+`TRAVEL_MODE_LANG` overrides configured language. `TRAVEL_MODE_APP_DIRS` adds colon-separated absolute app directories; empty/relative entries are errors. `suggest --write` requests confirmation, preserves comments and validates before replacing configuration. JSON schemas: [check](docs/json-schema/check.schema.json), [suggest](docs/json-schema/suggest.schema.json). Optional integrations: [Shortcuts](integrations/shortcuts.md), [menu plugin](integrations/swiftbar/travel-mode.10s.sh), [sudoers](docs/sudoers.md).
 
-`options.interface` defaults to `"tui"`. Priority: `--tui` / `--no-tui` > `TRAVEL_MODE_INTERFACE=cli|tui` > configuration > default. `travel-mode` and `travel-mode on` use the selected interface; a non-interactive terminal falls back to `check`. Explicit `--no-tui` and `--yes` retain their existing apply behavior. Use `--tui` to open the TUI for one run.
+## Restore and recovery
 
-## Configuration and integrations
+Recoverable actions save recovery intent before mutation. Power records contain only the keys actually changed, separately for battery and AC. `off` restores those values, resumes recorded process identities, reloads unloaded services, reopens quit apps and restores changed network/brightness/indexing settings. LaunchAgents use unload/load; the tool does not use launchctl's disable mechanism.
 
-Default files are `~/.config/travel-mode/config.toml` and `~/.local/state/travel-mode/state.json`. `TRAVEL_MODE_CONFIG` and `TRAVEL_MODE_STATE` override these paths. The [configuration example](examples/config.toml) shows `apps.default` (`quit`, `freeze`, `skip`, `ask`), app groups, daemon plists, service selectors, battery overrides and `options.language` (`auto`, `en`, `zh`). Service unload defaults are empty. Customize app choices before automation.
+Each successful restore is checkpointed. Failed records remain for another `off`. Reopening an app does not recover unsaved documents or exact window state. Terminated `caffeinate` processes and immediate display sleep are not reversed. Snapshots older than 24 hours warn because recovery can overwrite later changes to recorded keys. There is no cross-process lock; use one modifying instance at a time.
 
-`TRAVEL_MODE_APP_DIRS` adds colon-separated absolute app search directories before standard locations. Empty or relative entries are errors. The Power page and `check` explain supported values and trade-offs. Network and service pages retain missing/stopped items with a reason; Time Machine status is observation only.
+Without a snapshot, non-interactive `off` fails without resetting settings. Interactive `off` offers a separately confirmed factory power reset. Preserve damaged snapshots and repair the indicated issue before retrying. Use `travel-mode thaw` for recorded frozen apps; resume other stopped processes only after reviewing their identity. If brightness recovery is unavailable, use System Settings.
 
-Use the [SwiftBar/xbar plugin](integrations/swiftbar/travel-mode.10s.sh), [Shortcuts guide](integrations/shortcuts.md), or optional [sudoers guidance](docs/sudoers.md).
+## Exit codes
 
-## Power settings
-
-| Key | Recommended | Meaning / trade-off |
-| --- | ---: | --- |
-| `lowpowermode` | `1` | Lower CPU/GPU performance and energy use |
-| `sleep` | `5` | Idle minutes before system sleep |
-| `displaysleep` | `3` | Idle minutes before display sleep |
-| `powernap` | `0` | Disable background wake work; updates may be delayed |
-| `tcpkeepalive` | `1` | Preserve Find My support at an energy cost |
-| `womp` | `0` | Disable network wake |
-| `standby` | `1` | Deep standby; waking can be slower |
-| `hibernatemode` | `3` | RAM/disk sleep; optional `25` can wake slowly |
-| `ttyskeepawake` | `1` | Active terminals can prevent sleep |
-| `disksleep` | `10` | Disk idle timeout in minutes |
-| `lessbright` | `1` | Dim display on battery |
-| `networkoversleep` | `0` | Disable networking during sleep |
-
-Recommendations are filtered using keys reported by `pmset -g cap` and `pmset -g custom`. Equivalent `powermode` hardware is handled by the adapter. Battery and AC profiles are restored separately.
-
-## Restore and manual recovery
-
-Recoverable changes save recovery intent before mutation. Power recovery records contain original values for the keys actually changed, not the entire profile. `off` restores those keys, resumes recorded PID identities, reloads recorded services, reopens quit apps, and restores changed network/brightness/indexing settings. It does not restart terminated `caffeinate` processes or undo immediate display sleep. Reopening an app cannot recover unsaved documents or its exact previous window state. Each successful restore is checkpointed; failures retain outstanding records for another `off`. A snapshot older than 24 hours warns because later external changes to recorded keys can be overwritten. There is no cross-process lock: do not run multiple modifying instances together.
-
-When the snapshot is missing, non-interactive `off` fails without resetting settings. Interactive `off` offers a separately confirmed factory power reset. Prefer normal recovery; `--force` throws away failed recovery records.
-
-Manual recovery examples below **change the system**. Substitute the recorded device, PID and plist. Check process identity before sending a signal. Restore individual power keys from your recorded originals when possible; the factory reset loses custom power preferences.
-
-| Recovery | Command |
+| Code | Meaning |
 | --- | --- |
-| Frozen processes | `travel-mode thaw` or, after review, `travel-mode thaw --all` |
-| One verified stopped PID | `kill -CONT <pid>` |
-| User LaunchAgent | `launchctl load <agent.plist>` |
-| System service | `sudo launchctl load <daemon.plist>` |
-| Wi-Fi | `sudo networksetup -setairportpower <device> on` |
-| Bluetooth (`blueutil` required) | `blueutil -p 1` |
-| Spotlight indexing | `sudo mdutil -i on /` |
-| Factory power defaults (last resort) | `sudo pmset restoredefaults` |
+| 0 | Command completed |
+| 1 | Operation failed, restoration remains incomplete, or an unexpected exception occurred |
+| 2 | Configuration / argument error; also unsupported platform or missing platform capabilities |
+| 3 | Invalid, unreadable or unwritable recovery state |
 
-Restore brightness in System Settings if snapshot recovery is unavailable. Errors include the failed operation and return code; resolve them before discarding state.
+Configuration and state errors print one diagnostic line with a path, relevant key/reason and repair guidance, without a Python traceback. Set `TRAVEL_MODE_DEBUG=1` to retain the full traceback and exception chain. Unexpected exceptions retain their normal traceback. An external editor can return its own exit code.
 
 ## Compatibility and verification limits
 
-Read-only environment check on **2026-10-15**: macOS **27.0.1**, **arm64**, using `sw_vers -productVersion` and `uname -m`. The following hardware results come from earlier maintainer runs on that machine on the same date; this publication cleanup did not repeat system mutations.
+The repository records earlier maintainer hardware checks on 2026-10-15: macOS 27.0.1, arm64. These are historical results; this scenario/category revision does not repeat system mutations.
 
-| Hardware-verified with temporary fixtures | Coverage |
+| Previously hardware-verified with temporary fixtures | Coverage |
 | --- | --- |
-| Apps and services | Graceful AppleEvent quit without signal fallback; exact-process force quit; freeze/resume of main/helper processes; user LaunchAgent unload/reload; app reopen |
-| Power and restore | Battery profile round trip; AC `powernap`/`womp`; global `disablesleep`; `hibernatemode=25`; complete original power output restored |
-| Recovery and brightness | CLI `thaw --all`; native brightness set/restore round trip |
-| Interfaces | Actual CLI prompt flow and TUI keyboard/mouse apply/restore interaction |
+| Apps and services | Graceful AppleEvent quit, exact-process force quit, main/helper freeze/resume, user LaunchAgent unload/reload, app reopen |
+| Power and restore | Battery round trip, AC powernap/womp, global disablesleep, hibernatemode 25, original power output restoration |
+| Recovery and brightness | CLI thaw --all, brightness set/restore |
+| Interfaces | CLI prompts and TUI keyboard/mouse apply/restore |
 
-**Not hardware-verified:** Wi-Fi changes, Bluetooth changes, Spotlight changes, immediate display sleep, terminating `caffeinate`, and AC `sleep`/`displaysleep`. Automated tests use isolated FakeRunner fixtures; they do not establish these hardware effects. Python 3.10–3.13 and Textual 8.x are the declared targets; CI covers Python versions on macOS and Linux with mocked system commands. Linux is not a supported runtime. Other macOS versions and hardware remain unverified.
+Wi-Fi, Bluetooth, Spotlight, immediate display sleep, caffeinate termination and AC sleep/display timers were not hardware-verified. Work/category behavior is tested with isolated FakeRunner and demo fixtures, not actual product suspension or battery endurance. CI covers Python 3.10–3.13 on Ubuntu and macOS; Linux is a test host, not a supported runtime. Other hardware and macOS versions remain unverified.
 
 ## Contributing and license
 
-See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Licensed under [MIT](LICENSE).
+[CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). [MIT](LICENSE).

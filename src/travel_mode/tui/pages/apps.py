@@ -16,6 +16,7 @@ from travel_mode.actions.apps import (
     ThawApp,
     configured_daemon,
 )
+from travel_mode.categories import grouped
 from travel_mode.i18n import t
 from travel_mode.system import apps as system_apps
 from travel_mode.tui.widgets import Button, _ellip
@@ -40,7 +41,12 @@ class AppsPage:
             w.append(Label(t("impl.skipped_2", v0=escape(msg)), classes="srow"))
         if not running:
             w.append(Label(t("impl.no_listed_high_energy_apps_are_2"), classes="srow"))
-        for i, app in enumerate(running):
+        category = None
+        for i, app in enumerate(grouped(running)):
+            group = app.get("category", "other")
+            if group != category:
+                w.append(Label(t(f"categories.{group}"), classes="hint"))
+                category = group
             name, dfl = app["name"], app["defact"]
             frozen = app["path"] in st.get("frozen_apps", [])
             state_s = t("impl.frozen") if frozen else ""
@@ -55,7 +61,8 @@ class AppsPage:
                 classes="grow",
             )
             if dfl == "skip":
-                w.append(Label(f"○ {escape(name)} [dim]({t('impl.skip')})[/]", classes="srow"))
+                reason = t("categories.notice") if app.get("category_action") == "notice" else t("impl.skip")
+                w.append(Label(f"○ {escape(name)} [dim]({reason})[/]", classes="srow"))
                 continue
             bq = Button(
                 t("impl.quit_2"),
@@ -72,6 +79,7 @@ class AppsPage:
             bs = Button(t("impl.skip"), id=f"btn-{i}-s", classes="btn")
             w.append(ItemGrid(lab, bq, bf, bs, classes="row"))
             self.app_rows[i] = {
+                "defact": dfl,
                 "name": name,
                 "path": app["path"],
                 "label": lab,
@@ -80,6 +88,13 @@ class AppsPage:
                 "kill": False,
                 "frozen": frozen,
             }
+        for notice in grouped(self.scan.get("notices", [])):
+            w.append(
+                Label(
+                    f"{t('categories.' + notice['category'])}: {notice['name']} — " + t("categories.notice"),
+                    classes="srow",
+                )
+            )
         await box.mount(*w)
 
     def mark_row_done(self, i, text, style="green", expected_path=None):
@@ -96,14 +111,13 @@ class AppsPage:
         rows = tuple((i, dict(row)) for i, row in self.app_rows.items())
 
         def flow():
-            conf, default_act = system_apps.load_conf()
             nq = nf = 0
             ask_pending = []
             for i, row in rows:
                 if row["done"]:
                     continue
                 name, path = row["name"], row["path"]
-                act = conf.get(name, default_act or "ask")
+                act = row["defact"]
                 if act == "skip":
                     continue
                 if act == "ask":
@@ -122,7 +136,9 @@ class AppsPage:
                                 self.mark_row_done, i, t("impl.quit_3", v0=name), expected_path=path
                             )
                         continue
-                    if self.execute(QuitApp(path, name)) or self.execute(ForceQuitApp(path)):
+                    if self.execute(QuitApp(path, name)) or (
+                        self.scenario != "work" and self.execute(ForceQuitApp(path))
+                    ):
                         self.save()
                         nq += 1
                         self.call_from_thread(
@@ -131,6 +147,8 @@ class AppsPage:
                         self.tlog("ok", t("impl.quit", v0=name))
                     else:
                         self.tlog("warn", t("impl.did_not_quit", v0=name))
+                        if self.scenario == "work":
+                            raise RuntimeError(t("impl.did_not_quit", v0=name))
                 elif act == "freeze":
                     for _line in system_apps.app_sleep_assertions(name)[:1]:
                         self.tlog("warn", t("impl.holds_a_sleep_assertion_freezing_will_2", v0=name))

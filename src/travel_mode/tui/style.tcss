@@ -45,3 +45,9 @@ Button { height: 3; border: solid $primary; min-width: 9; }
 
 .status-icon { width: 2; height: auto; padding: 0; }
 .status-line { height: auto; min-height: 1; align-vertical: middle; }
+
+#scenario-picker { padding: 1 3; }
+.scenario-title { text-style: bold; margin-bottom: 1; }
+.scenario-card { height: auto; margin-bottom: 1; padding: 1; border: round $primary; }
+.scenario-card Button { width: 100%; height: 3; margin-bottom: 1; }
+.scenario-card Label { width: 100%; height: auto; }

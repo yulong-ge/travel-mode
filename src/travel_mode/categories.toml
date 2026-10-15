@@ -1,0 +1,367 @@
+# Public product identities only. No machine-specific paths or labels.
+# Matching is case-insensitive glob matching; app names are exact unless a glob is present.
+# action applies to apps; matching non-Apple user LaunchAgents use unload unless action=notice.
+# restic/borg/kopia/rclone label substring selectors are a product requirement, not vendor labels.
+# notice means identification only: no action, including explicit category selection.
+version = 1
+
+# Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/g/google-drive.rb
+# Public identity: com.google.drivefs, Google Drive
+[[rules]]
+id = "google-drive"
+category = "sync"
+name = "Google Drive"
+action = "quit"
+apps = ["Google Drive"]
+bundle_ids = ["com.google.drivefs"]
+labels = []
+executables = []
+
+# Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/d/dropbox.rb
+# Public identity: com.getdropbox.dropbox, Dropbox
+[[rules]]
+id = "dropbox"
+category = "sync"
+name = "Dropbox"
+action = "quit"
+apps = ["Dropbox"]
+bundle_ids = ["com.getdropbox.dropbox"]
+labels = []
+executables = []
+
+# Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/o/onedrive.rb
+# Public identity: com.microsoft.OneDrive, OneDrive
+[[rules]]
+id = "onedrive"
+category = "sync"
+name = "OneDrive"
+action = "quit"
+apps = ["OneDrive"]
+bundle_ids = ["com.microsoft.OneDrive"]
+labels = []
+executables = []
+
+# Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/b/box-drive.rb
+# Public identity: com.box.desktop, Box
+[[rules]]
+id = "box"
+category = "sync"
+name = "Box Drive"
+action = "quit"
+apps = ["Box"]
+bundle_ids = ["com.box.desktop"]
+labels = []
+executables = []
+
+# Source: https://www.pcloud.com/release-notes/mac-os.html
+# Public identity: pCloud Drive (app name only; no unverified bundle id or label)
+[[rules]]
+id = "pcloud"
+category = "sync"
+name = "pCloud"
+action = "quit"
+apps = ["pCloud Drive"]
+bundle_ids = []
+labels = []
+executables = []
+
+# Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/n/nextcloud.rb
+# Public identity: com.nextcloud.desktopclient, com.nextcloud.desktopclient, Nextcloud
+[[rules]]
+id = "nextcloud"
+category = "sync"
+name = "Nextcloud"
+action = "quit"
+apps = ["Nextcloud"]
+bundle_ids = ["com.nextcloud.desktopclient"]
+labels = ["com.nextcloud.desktopclient"]
+executables = []
+
+# Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/s/syncthing-app.rb
+# Homebrew service naming: https://github.com/Homebrew/brew/blob/master/Library/Homebrew/formula.rb (plist_name)
+# Public identity: com.github.xor-gate.syncthing-macosx, homebrew.mxcl.syncthing, Syncthing
+[[rules]]
+id = "syncthing"
+category = "sync"
+name = "Syncthing"
+action = "quit"
+apps = ["Syncthing"]
+bundle_ids = ["com.github.xor-gate.syncthing-macosx"]
+labels = ["homebrew.mxcl.syncthing"]
+executables = []
+
+# Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/r/resilio-sync.rb
+# Public identity: com.resilio.Sync, Resilio Sync
+[[rules]]
+id = "resilio-sync"
+category = "sync"
+name = "Resilio Sync"
+action = "quit"
+apps = ["Resilio Sync"]
+bundle_ids = ["com.resilio.Sync"]
+labels = []
+executables = []
+
+# Source: https://support.apple.com/guide/mac-help/store-files-in-icloud-drive-mchle5a61431/mac
+# Public identity: com.apple.bird, com.apple.cloudd, /System/Library/PrivateFrameworks/CloudDocsDaemon.framework/Versions/*/Support/bird, /System/Library/PrivateFrameworks/CloudKitDaemon.framework/Versions/*/Support/cloudd
+[[rules]]
+id = "icloud"
+category = "sync"
+name = "iCloud"
+action = "notice"
+apps = []
+bundle_ids = []
+labels = ["com.apple.bird", "com.apple.cloudd"]
+executables = ["/System/Library/PrivateFrameworks/CloudDocsDaemon.framework/Versions/*/Support/bird", "/System/Library/PrivateFrameworks/CloudKitDaemon.framework/Versions/*/Support/cloudd"]
+
+# Source: https://formulae.brew.sh/api/cask/backblaze.json
+# Public identity: Backblaze, com.backblaze.bzbmenu, com.backblaze.bzserv
+[[rules]]
+id = "backblaze"
+category = "backup"
+name = "Backblaze"
+action = "notice"
+apps = ["Backblaze"]
+bundle_ids = []
+labels = ["com.backblaze.bzbmenu", "com.backblaze.bzserv"]
+executables = []
+
+# Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/a/arq.rb
+# Public identity: com.haystacksoftware.Arq, com.haystacksoftware.arqagent, com.haystacksoftware.ArqMonitor, Arq
+[[rules]]
+id = "arq"
+category = "backup"
+name = "Arq"
+action = "notice"
+apps = ["Arq"]
+bundle_ids = ["com.haystacksoftware.Arq"]
+labels = ["com.haystacksoftware.arqagent", "com.haystacksoftware.ArqMonitor"]
+executables = []
+
+# Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/c/crashplan.rb
+# Public identity: com.crashplan.app, com.crashplan.engine, CrashPlan
+[[rules]]
+id = "crashplan"
+category = "backup"
+name = "CrashPlan"
+action = "notice"
+apps = ["CrashPlan"]
+bundle_ids = ["com.crashplan.app"]
+labels = ["com.crashplan.engine"]
+executables = []
+
+# Source: https://formulae.brew.sh/api/cask/carbon-copy-cloner.json
+# Public identity: Carbon Copy Cloner, com.bombich.ccc, com.bombich.cccuseragent
+[[rules]]
+id = "carbon-copy-cloner"
+category = "backup"
+name = "Carbon Copy Cloner"
+action = "notice"
+apps = ["Carbon Copy Cloner"]
+bundle_ids = ["com.bombich.ccc", "com.bombich.cccuseragent"]
+labels = []
+executables = []
+
+# Source: https://formulae.brew.sh/api/cask/chronosync.json
+# Public identity: ChronoSync, com.econtechnologies.chronosync, com.econtechnologies.backgrounder.chronosync
+[[rules]]
+id = "chronosync"
+category = "backup"
+name = "ChronoSync"
+action = "notice"
+apps = ["ChronoSync"]
+bundle_ids = ["com.econtechnologies.chronosync", "com.econtechnologies.backgrounder.chronosync"]
+labels = []
+executables = []
+
+# Source: https://restic.readthedocs.io/en/stable/
+# Public identity: *restic*
+[[rules]]
+id = "restic"
+category = "backup"
+name = "restic"
+action = "unload"
+apps = []
+bundle_ids = []
+labels = ["*restic*"]
+executables = []
+
+# Source: https://borgbackup.readthedocs.io/en/stable/
+# Public identity: *borg*
+[[rules]]
+id = "borg"
+category = "backup"
+name = "borg"
+action = "unload"
+apps = []
+bundle_ids = []
+labels = ["*borg*"]
+executables = []
+
+# Source: https://kopia.io/docs/
+# Public identity: *kopia*
+[[rules]]
+id = "kopia"
+category = "backup"
+name = "kopia"
+action = "unload"
+apps = []
+bundle_ids = []
+labels = ["*kopia*"]
+executables = []
+
+# Source: https://rclone.org/docs/
+# Public identity: *rclone*
+[[rules]]
+id = "rclone"
+category = "backup"
+name = "rclone"
+action = "unload"
+apps = []
+bundle_ids = []
+labels = ["*rclone*"]
+executables = []
+
+# Source: https://support.apple.com/guide/mac-help/back-up-files-mh35860/mac
+# Public identity: com.apple.backupd, com.apple.backupd-helper
+[[rules]]
+id = "time-machine"
+category = "backup"
+name = "Time Machine"
+action = "notice"
+apps = []
+bundle_ids = []
+labels = ["com.apple.backupd", "com.apple.backupd-helper"]
+executables = []
+
+# Source: https://chromium.googlesource.com/chromium/src/+/main/chrome/updater/docs/user_manual.md
+# Public identity: com.google.GoogleUpdater, com.google.GoogleUpdater.wake, com.google.GoogleUpdater.wake.*, GoogleUpdater
+[[rules]]
+id = "google-updater"
+category = "updater"
+name = "Google Updater"
+action = "quit"
+apps = ["GoogleUpdater"]
+bundle_ids = ["com.google.GoogleUpdater"]
+labels = ["com.google.GoogleUpdater.wake", "com.google.GoogleUpdater.wake.*"]
+executables = []
+
+# Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/g/google-drive.rb
+# Public identity: com.google.Keystone.Agent, com.google.keystone.agent, com.google.keystone.xpcservice, GoogleSoftwareUpdateAgent
+[[rules]]
+id = "google-keystone"
+category = "updater"
+name = "Google Keystone"
+action = "quit"
+apps = ["GoogleSoftwareUpdateAgent"]
+bundle_ids = ["com.google.Keystone.Agent"]
+labels = ["com.google.keystone.agent", "com.google.keystone.xpcservice"]
+executables = []
+
+# Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/m/microsoft-auto-update.rb
+# Public identity: com.microsoft.autoupdate2, com.microsoft.update.agent, Microsoft AutoUpdate
+[[rules]]
+id = "microsoft-autoupdate"
+category = "updater"
+name = "Microsoft AutoUpdate"
+action = "quit"
+apps = ["Microsoft AutoUpdate"]
+bundle_ids = ["com.microsoft.autoupdate2"]
+labels = ["com.microsoft.update.agent"]
+executables = []
+
+# Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/a/adobe-creative-cloud.rb
+# Public identity: com.adobe.acc.installer, com.adobe.acc.installer.v2, com.adobe.ccxprocess, com.adobe.CCXProcess.*, CCXProcess
+[[rules]]
+id = "adobe-updater"
+category = "updater"
+name = "Adobe updater / CCXProcess"
+action = "quit"
+apps = ["CCXProcess"]
+bundle_ids = []
+labels = ["com.adobe.acc.installer", "com.adobe.acc.installer.v2", "com.adobe.ccxprocess", "com.adobe.CCXProcess.*"]
+executables = []
+
+# Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/z/zoom.rb
+# Public identity: us.zoom.updater, us.zoom.updater.login.check
+[[rules]]
+id = "zoom-updater"
+category = "updater"
+name = "Zoom updater"
+action = "unload"
+apps = []
+bundle_ids = []
+labels = ["us.zoom.updater", "us.zoom.updater.login.check"]
+executables = []
+
+# Source: https://sparkle-project.github.io/documentation/upgrading/
+# Public identity: org.sparkle-project.Sparkle.Updater, */Sparkle.framework/Versions/*/Updater.app/Contents/MacOS/Updater, */Sparkle.framework/Updater.app/Contents/MacOS/Updater
+[[rules]]
+id = "sparkle"
+category = "updater"
+name = "Sparkle updater"
+action = "notice"
+apps = []
+bundle_ids = ["org.sparkle-project.Sparkle.Updater"]
+labels = []
+executables = ["*/Sparkle.framework/Versions/*/Updater.app/Contents/MacOS/Updater", "*/Sparkle.framework/Updater.app/Contents/MacOS/Updater"]
+
+# Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/d/docker-desktop.rb
+# Public identity: com.docker.docker, com.electron.dockerdesktop, Docker, Docker Desktop
+[[rules]]
+id = "docker"
+category = "vm"
+name = "Docker Desktop"
+action = "quit"
+apps = ["Docker", "Docker Desktop"]
+bundle_ids = ["com.docker.docker", "com.electron.dockerdesktop"]
+labels = []
+executables = []
+
+# Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/o/orbstack.rb
+# Public identity: dev.kdrag0n.MacVirt, OrbStack
+[[rules]]
+id = "orbstack"
+category = "vm"
+name = "OrbStack"
+action = "quit"
+apps = ["OrbStack"]
+bundle_ids = ["dev.kdrag0n.MacVirt"]
+labels = []
+executables = []
+
+# Source: https://formulae.brew.sh/api/cask/parallels.json
+# Public identity: Parallels Desktop, com.parallels.desktop.console
+[[rules]]
+id = "parallels"
+category = "vm"
+name = "Parallels Desktop"
+action = "quit"
+apps = ["Parallels Desktop"]
+bundle_ids = ["com.parallels.desktop.console"]
+labels = []
+executables = []
+
+# Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/u/utm.rb
+# Public identity: com.utmapp.UTM, UTM
+[[rules]]
+id = "utm"
+category = "vm"
+name = "UTM"
+action = "quit"
+apps = ["UTM"]
+bundle_ids = ["com.utmapp.UTM"]
+labels = []
+executables = []
+
+# Source: https://knowledge.broadcom.com/external/article/323184/vm-shows-black-screen-after-mac-os-x-upg.html
+# Public identity: com.vmware.fusion, VMware Fusion
+[[rules]]
+id = "vmware-fusion"
+category = "vm"
+name = "VMware Fusion"
+action = "quit"
+apps = ["VMware Fusion"]
+bundle_ids = ["com.vmware.fusion"]
+labels = []
+executables = []

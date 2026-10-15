@@ -31,6 +31,7 @@
   "exit_code": null,
   "labels": [
     "Default actions come from config.toml",
+    "Other configured items",
     "Quit Demo [dim]CPU 1.0% · default quit[/]",
     "[green]✔ Ask Demo frozen (1 processes; off resumes them)[/]",
     "Freeze Demo [dim]CPU 1.0% · default freeze · [cyan]❄ Frozen[/][/]",
@@ -82,6 +83,7 @@
     "profile": "",
     "quit_apps": [],
     "saved_at": "<TIME>",
+    "scenario": "away",
     "sleepdisabled": "",
     "spotlight_off": "",
     "unloaded_svcs": [],

@@ -61,6 +61,8 @@ class PowerPage:
         w.append(Label(t("power.profile_intro"), classes="hint"))
         overrides = config_api.load_config().power_overrides
         for key, _desc, rec in pmset.POWER_KEYS:
+            if self.scenario == "work" and key != "lowpowermode":
+                continue
             rec = overrides.get(key, rec)
             actual = map_pmset_key(key, supported)
             cur = pmset.pmget(actual, "b", profs) if actual else None
@@ -133,7 +135,9 @@ class PowerPage:
             )
         if bright_wanted:
             orig = await asyncio.to_thread(brightness.current_brightness)
-            _, rcb = await asyncio.to_thread(self.execute, SetBrightness(0.15))
+            _, rcb = await asyncio.to_thread(
+                self.execute, SetBrightness(self.profile_values.get("brightness", 0.15))
+            )
             if rcb == 0:
                 # 只记录首次原始值 (同 run_restore 语义, 见文本模式同段注释)
                 self.save()

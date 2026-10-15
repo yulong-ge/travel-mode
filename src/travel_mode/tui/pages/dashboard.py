@@ -19,9 +19,12 @@ from travel_mode.actions.apps import (
 )
 from travel_mode.actions.network import BluetoothOff, WifiOff
 from travel_mode.actions.power import (
+    SetBrightness,
     SetPowerProfile,
     StopSpotlight,
 )
+from travel_mode.categories import pause_categories
+from travel_mode.config import load_config
 from travel_mode.flows import check as flow_check
 from travel_mode.i18n import t
 from travel_mode.system import apps as system_apps
@@ -53,6 +56,18 @@ class DashboardPage:
                 classes="scope",
             )
             yield Checkbox(t("impl.unload_configured_background_agents"), True, id="q-svc", classes="scope")
+            yield Checkbox(
+                t("categories.pause_sync"),
+                self.scenario == "work" and bool({"sync", "backup"} & set(self.config.categories.pause)),
+                id="q-sync",
+                classes="scope",
+            )
+            yield Checkbox(
+                t("categories.pause_updater"),
+                self.scenario == "work" and "updater" in self.config.categories.pause,
+                id="q-updater",
+                classes="scope",
+            )
             yield Checkbox(
                 t("impl.stop_spotlight_indexing"),
                 self.profile_values.get("spotlight") == "off",
@@ -142,13 +157,30 @@ class DashboardPage:
 
     async def act_quick(self, btn):
         scope = {
-            k: self.query_one(f"#q-{k}", Checkbox).value for k in ("power", "apps", "svc", "spot", "net")
+            k: self.query_one(f"#q-{k}", Checkbox).value
+            for k in ("power", "apps", "svc", "spot", "net", "sync", "updater")
         }
         if not any(scope.values()):
             self.notify(t("impl.no_action_groups_selected"), severity="warning")
             return
 
         def flow():
+            config = load_config()
+            categories = set()
+            if scope["sync"]:
+                categories.update({"sync", "backup"} & set(config.categories.pause))
+            if scope["updater"] and "updater" in config.categories.pause:
+                categories.add("updater")
+            if categories:
+                service_scan = launchd.svc_scan()
+                pause_categories(
+                    categories,
+                    system_apps.scan_apps()["running"],
+                    service_scan.get("recognized", service_scan["unloadable"]),
+                    self.execute,
+                    self.save,
+                    self.st,
+                )
             if scope["power"]:
                 self.tlog("dim", t("impl.applying_recommended_power_settings"))
                 chg = []
@@ -164,11 +196,30 @@ class DashboardPage:
                 )
                 if rc == 0:
                     self.save()  # 电源变更落盘 (否则 off 无法回滚且污染下次锚点)
+                target = self.profile_values.get("brightness")
+                if target is not None:
+                    from travel_mode.system.brightness import available
+
+                    if not available():
+                        raise RuntimeError(
+                            t("impl.brightness_is_not_installed_restore_brightness", v0=target)
+                        )
+                    _, rc = self.execute(SetBrightness(target))
+                    if rc:
+                        raise RuntimeError(t("impl.changing_brightness_failed"))
+                    self.save()
             if scope["apps"]:
                 nq = nf = 0
                 ask_pending = []
                 for app in system_apps.scan_apps()["running"]:
                     name, path, dfl = app["name"], app["path"], app["defact"]
+                    if path in (*self.st.get("quit_apps", []), *self.st.get("frozen_apps", [])):
+                        continue
+                    if (
+                        app.get("category") in {"sync", "backup", "updater"}
+                        and name not in config.apps.configured_actions
+                    ):
+                        continue
                     if dfl == "ask":
                         # conf 的 ask = "问我" — 一键流程无人应答, 跳过并列出, 绝不强杀
                         ask_pending.append(name)
@@ -181,12 +232,16 @@ class DashboardPage:
                             self.tlog("ok" if okq else "warn", msg)
                             nq += int(okq)
                             continue
-                        if self.execute(QuitApp(path, name)) or self.execute(ForceQuitApp(path)):
+                        if self.execute(QuitApp(path, name)) or (
+                            self.scenario != "work" and self.execute(ForceQuitApp(path))
+                        ):
                             self.save()
                             nq += 1
                             self.tlog("ok", t("impl.quit", v0=name))
                         else:
                             self.tlog("warn", t("impl.did_not_quit", v0=name))
+                            if self.scenario == "work":
+                                raise RuntimeError(t("impl.did_not_quit", v0=name))
                     elif dfl == "freeze":
                         for _line in system_apps.app_sleep_assertions(name)[:1]:
                             self.tlog("warn", t("impl.holds_a_sleep_assertion_freezing_will_2", v0=name))
@@ -206,6 +261,8 @@ class DashboardPage:
             if scope["svc"]:
                 n = 0
                 for s in launchd.svc_scan()["unloadable"]:
+                    if s["plist_path"] in self.st.get("unloaded_svcs", []):
+                        continue
                     _, rc = self.execute(UnloadAgent(s["plist_path"]))
                     if rc == 0:
                         self.save()
@@ -241,6 +298,8 @@ class DashboardPage:
                             self.tlog("ok", t("impl.quit", v0=name))
                         else:
                             self.tlog("warn", t("impl.did_not_quit", v0=name))
+                            if self.scenario == "work":
+                                raise RuntimeError(t("impl.did_not_quit", v0=name))
                 dev = system_network.wifi_dev()
                 if dev:
                     if not system_network.wifi_powered(dev):

@@ -173,4 +173,6 @@ def power_recommendations():
         "powernap": "Power Nap",
     }
     recommendations = [(key, desc, overrides.get(key, rec)) for key, desc, rec in POWER_KEYS]
+    if load_config().options.scenario == "work":
+        recommendations = [row for row in recommendations if row[0] == "lowpowermode"]
     return [(key, descriptions.get(key, desc), rec) for key, desc, rec in filter_power_keys(recommendations)]

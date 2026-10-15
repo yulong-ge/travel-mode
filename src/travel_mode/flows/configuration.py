@@ -6,7 +6,7 @@ import argparse
 import os
 import sys
 
-from travel_mode.config import ConfigError, load_config, write_interface, write_language
+from travel_mode.config import load_config, write_interface, write_language
 from travel_mode.i18n import t
 from travel_mode.paths import config_path, state_path
 
@@ -35,11 +35,7 @@ def _config_command(args) -> int:
         print(t("cli.configuration_template_written", v0=target))
         return 0
     if args.config_cmd == "validate":
-        try:
-            config = load_config()
-        except ConfigError as exc:
-            print(exc, file=sys.stderr)
-            return 2
+        config = load_config()
         counts = {action: len(getattr(config.apps, action)) for action in ("quit", "freeze", "skip", "ask")}
         print(
             t("cli.configuration_valid")
@@ -49,12 +45,8 @@ def _config_command(args) -> int:
         return 0
     if args.config_cmd in {"set-language", "set-interface"}:
         option = args.config_cmd.removeprefix("set-")
-        try:
-            writer = write_language if option == "language" else write_interface
-            writer(args.value)
-        except ConfigError as exc:
-            print(exc, file=sys.stderr)
-            return 2
+        writer = write_language if option == "language" else write_interface
+        writer(args.value)
         if option == "language":
             print(t("language.saved", language=args.value, path=target))
         else:

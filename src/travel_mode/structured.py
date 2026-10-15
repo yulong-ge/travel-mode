@@ -76,6 +76,7 @@ def check_data() -> dict:
     state = load_state()
     return {
         "version": __version__.split(".dev", 1)[0],
+        "scenario": state.get("scenario") or None if state else None,
         "battery": {"percent": int(match[1]) if match else None, "source": source, "raw": raw},
         "blockers": blockers,
         "power": power,

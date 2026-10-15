@@ -217,11 +217,16 @@ def assert_golden(name, value, root):
             raise RuntimeError(f"Golden is tracked; initial recording cannot recreate it: {target}")
         target.parent.mkdir(exist_ok=True)
         target.write_text(actual)
+    if not target.exists():
+        diagnostic = Path("/tmp/tm-verify/golden-actual")
+        diagnostic.mkdir(parents=True, exist_ok=True)
+        (diagnostic / target.name).write_text(actual)
+        raise FileNotFoundError(f"Missing characterization golden: {target}; actual saved to {diagnostic}")
     expected = target.read_text()
     if expected != actual:
         # Diagnostic artifact only; never update an expected golden here.
-        diagnostic = Path("/tmp/travel-mode-golden-actual")
-        diagnostic.mkdir(exist_ok=True)
+        diagnostic = Path("/tmp/tm-verify/golden-actual")
+        diagnostic.mkdir(parents=True, exist_ok=True)
         (diagnostic / target.name).write_text(actual)
     assert expected == actual
 

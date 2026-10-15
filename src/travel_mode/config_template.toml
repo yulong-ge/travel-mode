@@ -24,11 +24,19 @@ keep = []
 [power.battery]
 # displaysleep = 3
 
+[categories]
+# Category actions supplement services.unload and apps actions; keep/skip take priority.
+pause = ["sync", "backup", "updater"]
+# Match a rule id or its public product name.
+ignore = []
+
 [options]
 aggressive = false
 language = "auto"
 # Default interface: "tui" or "cli"; overridden by TRAVEL_MODE_INTERFACE, then --tui / --no-tui.
 interface = "tui"
+# Ask at startup, or choose work / away. --scenario and --profile skip the picker.
+scenario = "ask"
 
 [profiles.flight]
 # Add profile-specific values in a future release.

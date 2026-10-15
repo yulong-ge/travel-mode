@@ -74,18 +74,44 @@ def _configure_demo_views() -> None:
     apps.app_path = lambda name: f"/Demo/{name}.app" if name in {"Clash Party", "aTrust", "UURemote"} else ""
     apps.scan_apps = lambda: {
         "running": [
-            {"name": "Demo Editor", "path": "/Demo/Demo Editor.app", "cpu": "1.2", "defact": "freeze"}
+            {
+                "name": "Google Drive",
+                "path": "/Demo/Google Drive.app",
+                "cpu": "1.2",
+                "defact": "quit",
+                "category": "sync",
+                "rule_id": "google-drive",
+                "category_action": "quit",
+            },
+            {
+                "name": "Docker",
+                "path": "/Demo/Docker.app",
+                "cpu": "0.8",
+                "defact": "ask",
+                "category": "vm",
+                "rule_id": "docker",
+                "category_action": "quit",
+            },
+            {"name": "Demo Editor", "path": "/Demo/Demo Editor.app", "cpu": "0.5", "defact": "ask"},
         ],
         "nobundle": [],
     }
     launchd.svc_scan = lambda config=None: {
         "unloadable": [
             {
+                "category": "backup",
                 "label": "com.demo.backup",
                 "pid": "123",
                 "cpu": "0.4",
                 "plist_path": "/tmp/demo.plist",
-            }
+            },
+            {
+                "category": "updater",
+                "label": "com.google.keystone.agent",
+                "pid": "-",
+                "cpu": "",
+                "plist_path": "/tmp/demo-updater.plist",
+            },
         ],
         "kept": ["com.demo.keep"],
         "candidates": [

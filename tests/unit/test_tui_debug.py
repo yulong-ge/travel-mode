@@ -204,7 +204,7 @@ async def test_debug_scroll_updates_widget_coordinates(debug_modules, tmp_path, 
         lambda: flow_check.BlockerLines([], [("warn", f"Demo warning {i}") for i in range(40)]),
     )
     telemetry = tmp_path / "layout.json"
-    app = debug.DebugApp(telemetry)
+    app = debug.DebugApp(telemetry, scenario="away")
     async with app.run_test(size=(120, 36)) as pilot:
         await pilot.pause()
         await app.workers.wait_for_complete()
@@ -238,7 +238,7 @@ async def test_debug_scrolled_page_bottom_is_not_blank(
     monkeypatch.setattr(system_apps, "scan_apps", lambda: {"running": [], "nobundle": []})
     monkeypatch.setattr(launchd, "svc_scan", lambda: {"unloadable": [], "kept": []})
     telemetry = tmp_path / "layout.json"
-    app = debug.DebugApp(telemetry)
+    app = debug.DebugApp(telemetry, scenario="away")
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
         await app.workers.wait_for_complete()

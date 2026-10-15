@@ -27,57 +27,67 @@ class Dispatch:
         from travel_mode.actions.journal import mutation_scope
         from travel_mode.state import StateError, _path
 
-        if ev.button.id in {"b-dash-apps", "b-dash-svc"}:
-            await self._dispatch_button(ev)
+        if ev.button.id in {"scenario-work", "scenario-away"}:
+            await self.choose_scenario(ev.button.id.removeprefix("scenario-"))
             return
-        if self._mutation_lock.locked() or ev.button.disabled:
+
+        if not self.origin_ready:
+            self.notify(t("scenario.preparing"), severity="warning")
             return
-        if getattr(ev, "travel_generation", self._mutation_generation) != self._mutation_generation:
-            return
-        loop = asyncio.get_running_loop()
+        with self.scenario_scope():
+            if ev.button.id in {"b-dash-apps", "b-dash-svc"}:
+                await self._dispatch_button(ev)
+                return
+            if self._mutation_lock.locked() or ev.button.disabled:
+                return
+            if getattr(ev, "travel_generation", self._mutation_generation) != self._mutation_generation:
+                return
+            loop = asyncio.get_running_loop()
 
-        async def acquire():
-            from travel_mode.system.sudo import SudoKeepAlive
+            async def acquire():
+                from travel_mode.system.sudo import SudoKeepAlive
 
-            self.logline("dim", t("impl.sudo_required_enter_your_password_in"))
-            with self.suspend():
-                keepalive = await asyncio.to_thread(SudoKeepAlive().__enter__)
-            self.logline("ok", t("impl.sudo_credentials_acquired"))
-            return keepalive
+                self.logline("dim", t("impl.sudo_required_enter_your_password_in"))
+                with self.suspend():
+                    keepalive = await asyncio.to_thread(SudoKeepAlive().__enter__)
+                self.logline("ok", t("impl.sudo_credentials_acquired"))
+                return keepalive
 
-        def authenticate():
-            return asyncio.run_coroutine_threadsafe(acquire(), loop).result()
+            def authenticate():
+                return asyncio.run_coroutine_threadsafe(acquire(), loop).result()
 
-        async with self.executor.transaction(
-            self._mutation_lock, self.st, self.merged, self.save, authenticate
-        ):
-            if self.merged and not _path().exists():
-                raise StateError(t("impl.snapshot_deleted_externally_possibly_by_off"))
-            from travel_mode.state import state_snapshot
+            async with self.executor.transaction(
+                self._mutation_lock, self.st, self.merged, self.save, authenticate
+            ):
+                if self.merged and not _path().exists():
+                    raise StateError(t("impl.snapshot_deleted_externally_possibly_by_off"))
+                from travel_mode.state import state_snapshot
 
-            self._transaction_view = state_snapshot(self.st)
-            self._mutation_action = str(ev.button.label)
-            self.sub_title = t("impl.executing_action", action=self._mutation_action)
-            self.logline("dim", self.sub_title)
-            for button in self.query(Button):
-                self._disable_mutation_button(button)
-            try:
-                if ev.button.id == "b-off":
-                    await self._dispatch_button(ev)
-                else:
-                    with mutation_scope(self.st, self.save):
+                self._transaction_view = state_snapshot(self.st)
+                self._mutation_action = str(ev.button.label)
+                self.sub_title = t("impl.executing_action", action=self._mutation_action)
+                self.logline("dim", self.sub_title)
+                for button in self.query(Button):
+                    self._disable_mutation_button(button)
+                try:
+                    if ev.button.id == "b-off":
                         await self._dispatch_button(ev)
-            finally:
-                self._mutation_action = None
-                self._transaction_view = None
-                self._mutation_generation += 1
-                for button, disabled in self._disabled_buttons.items():
-                    if button.is_attached:
-                        button.disabled = disabled or button._mutation_done
-                self._disabled_buttons.clear()
-                self.sub_title = (
-                    t("impl.travel_mode_dry_run") if self._dry_run or is_dry_run() else t("impl.travel_mode")
-                )
+                    else:
+                        with mutation_scope(self.st, self.save):
+                            await self._dispatch_button(ev)
+                finally:
+                    self._mutation_action = None
+                    self._transaction_view = None
+                    self._mutation_generation += 1
+                    for button, disabled in self._disabled_buttons.items():
+                        if button.is_attached:
+                            button.disabled = disabled or button._mutation_done
+                    self._disabled_buttons.clear()
+                    self.sub_title = (
+                        t("impl.travel_mode_dry_run")
+                        if self._dry_run or is_dry_run()
+                        else t("impl.travel_mode")
+                    )
 
     async def _dispatch_button(self, ev):
         bid = ev.button.id or ""
@@ -108,6 +118,9 @@ class Dispatch:
             await self.act_power()
         elif bid == "b-apps-all":
             await self.act_apps_all(ev.button)
+        elif bid in {"b-category-sync", "b-category-updater"}:
+            categories = {"sync", "backup"} if bid == "b-category-sync" else {"updater"}
+            await self.act_category(categories, ev.button)
         elif bid == "b-svc-all":
             await self.act_svc_all(ev.button)
         elif bid.startswith("btn-"):

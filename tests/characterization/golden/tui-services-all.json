@@ -11,6 +11,7 @@
   "exit_code": null,
   "labels": [
     "launchd is macOS's service manager for background agents. Unloaded LaunchAgents are restored by off",
+    "Other configured items",
     "org.demo.worker [dim]pid -[/]",
     "Time Machine: unavailable",
     "Managed by macOS; never unload it. Adjust it with tmutil or System Settings."
@@ -50,6 +51,7 @@
     "profile": "",
     "quit_apps": [],
     "saved_at": "<TIME>",
+    "scenario": "away",
     "sleepdisabled": "",
     "spotlight_off": "",
     "unloaded_svcs": [

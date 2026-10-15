@@ -14,7 +14,7 @@ import travel_mode.flows.thaw as flow_thaw
 
 from . import demo
 from .actions.runtime import command_lifecycle
-from .config import load_config, migrate_legacy, select_interface
+from .config import ConfigError, load_config, migrate_legacy, select_interface
 from .flows import configuration
 from .i18n import select_language, set_language, t
 
@@ -49,6 +49,7 @@ def _main(argv=None):
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--aggressive", action="store_true")
     parser.add_argument("--profile")
+    parser.add_argument("--scenario", choices=["work", "away"], help=t("scenario.help"))
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--samples", type=int, default=3)
@@ -148,7 +149,19 @@ def _main(argv=None):
     from .profiles import profile_scope
 
     if args.yes or args.interface is not None or args.cmd in (None, "on"):
-        with profile_scope(load_config(), args.profile, aggressive=args.aggressive):
+        config = load_config()
+        scenario = args.scenario
+        if (
+            args.yes
+            or args.interface == "cli"
+            or (interface == "cli" and sys.stdin.isatty() and sys.stdout.isatty())
+        ) and not args.profile:
+            scenario = scenario or config.options.scenario
+            if scenario == "ask":
+                if args.yes:
+                    raise ConfigError("<cli>", "--scenario", t("scenario.required"))
+                scenario = ask_scenario()
+        with profile_scope(config, args.profile, aggressive=args.aggressive, scenario=scenario):
             if args.yes or args.interface == "cli":
                 return mode_apply(yes=args.yes, aggressive=args.aggressive, dry_run=args.dry_run)
             if not sys.stdin.isatty() or not sys.stdout.isatty():
@@ -160,6 +173,9 @@ def _main(argv=None):
                 from .actions.runtime import _prepare_dry_run
 
                 _prepare_dry_run(True)
+            from .state import load_state
+
+            load_state()  # Validate before Textual can wrap startup errors in a worker exception.
             return tui(dry_run=args.dry_run)
     raise RuntimeError("unhandled travel-mode command")
 
@@ -168,4 +184,31 @@ __all__ = ["main"]
 
 
 def main(argv=None):
-    return command_lifecycle(list(sys.argv[1:] if argv is None else argv), _main)
+    from .paths import state_path
+    from .state import StateError
+
+    try:
+        return command_lifecycle(list(sys.argv[1:] if argv is None else argv), _main)
+    except (ConfigError, StateError) as exc:
+        if os.environ.get("TRAVEL_MODE_DEBUG") == "1":
+            raise
+        detail = " ".join(str(exc).splitlines())
+        if isinstance(exc, ConfigError):
+            print(f"{detail}. {t('errors.config_hint')}", file=sys.stderr)
+            return 2
+        location = "" if str(state_path()) in detail else f"{state_path()}: "
+        print(f"{location}{detail}. {t('errors.state_hint')}", file=sys.stderr)
+        return 3
+
+
+def ask_scenario():
+    print(t("scenario.prompt"))
+    print(f"  work: {t('scenario.work_desc')}")
+    print(f"  away: {t('scenario.away_desc')}")
+    try:
+        answer = input("  [work/away] ").strip().lower()
+    except EOFError as exc:
+        raise ConfigError("<cli>", "--scenario", t("scenario.required")) from exc
+    if answer not in ("work", "away"):
+        raise ConfigError("<cli>", "--scenario", t("scenario.invalid"))
+    return answer

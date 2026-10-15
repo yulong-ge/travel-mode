@@ -68,7 +68,10 @@ def load_state(path=None):
     target = _path(path)
     if not target.exists():
         return None
-    text = target.read_text(encoding="utf-8")
+    try:
+        text = target.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise StateError(f"{target}: read: {exc}") from exc
     try:
         raw = json.loads(text)
     except json.JSONDecodeError as json_error:
@@ -92,11 +95,14 @@ def load_state(path=None):
         if not isinstance(value, list) or any(not isinstance(item, str) or not item for item in value):
             raise StateError(t("state.state_file_must_be_a_list", v0=target, v1=key))
         result[key] = list(value)
-    for key in (*STR_KEYS, "saved_at", "profile"):
+    for key in (*STR_KEYS, "saved_at", "profile", "scenario"):
         value = raw.get(key, "")
         if not isinstance(value, str):
             raise StateError(t("safety.expected_string", path=target, field=key, kind=type(value).__name__))
-        result[key] = value
+        if key != "scenario" or value:
+            result[key] = value
+    if result.get("scenario", "") not in ("", "work", "away"):
+        raise StateError(f"{target}: scenario: expected work or away")
     origins = raw.get("power_origin", {})
     if not isinstance(origins, dict) or any(
         not isinstance(key, str) or not isinstance(value, str) for key, value in origins.items()

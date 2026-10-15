@@ -120,6 +120,7 @@ async def test_tui_power_selection_uses_actual_key_and_override(monkeypatch):
         query_one=lambda *args: Box(),
         query=lambda *args: [],
         profile_values={},
+        scenario="away",
         _update_power_btn=lambda: None,
     )
     await TravelApp.build_power(app, {"b": {"powermode": "1"}}, frozenset({"powermode"}))
@@ -179,7 +180,7 @@ async def test_tui_batch_completion_does_not_mark_replacement_row(monkeypatch, t
             await asyncio.sleep(0.01)
 
     monkeypatch.setattr(system_apps, "freeze_app", freeze)
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     async with app.run_test(size=(110, 30)) as pilot:
         await pilot.pause()
         await app.workers.wait_for_complete()
@@ -229,7 +230,7 @@ async def test_tui_removed_snapshot_preflight_prevents_mutation(
     fake_runner.responses[("blueutil", "-p", "0")] = CmdResult("", "", 0)
     fake_runner.responses[("open",)] = CmdResult("", "", 0)
     fake_runner.responses[("sudo", "-n", "launchctl", "list")] = CmdResult("PID\tStatus\tLabel\n", "", 0)
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
         await pilot.pause()
         await app.workers.wait_for_complete()
@@ -274,7 +275,7 @@ async def test_tui_apps_daemon_batch_dispatches_configured_spec(quick, monkeypat
         "grace_quit",
         lambda *args: pytest.fail("daemon app bypassed configured service shutdown"),
     )
-    app = TravelApp()
+    app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
         await pilot.pause()
         await app.workers.wait_for_complete()

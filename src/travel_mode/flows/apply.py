@@ -82,6 +82,7 @@ def mode_apply(yes=False, aggressive=False, dry_run=False):
 
     config = config_api.load_config()
     profile = active_values()
+    work = config.options.scenario == "work"
     aggressive = aggressive or config.options.aggressive
     profile_disconnect = profile.get("network", {}).get("disconnect", False)
     profile_wifi_off = profile.get("wifi") == "off"
@@ -99,6 +100,8 @@ def mode_apply(yes=False, aggressive=False, dry_run=False):
         c.print(f"{mark} {msg}")
 
     st, merged = snapshots.snapshot_origin()
+    if config.options.scenario != "ask":
+        st["scenario"] = config.options.scenario
     from ..actions.journal import mutation_scope
 
     with mutation_scope(st):
@@ -111,45 +114,46 @@ def mode_apply(yes=False, aggressive=False, dry_run=False):
         if system_apps.ensure_conf() and not yes:
             emit("dim", t("impl.created_default_action_configuration_editable", v0=common.CONF_PATH))
 
-        c.rule(t("impl.sleep_blockers_highest_priority"))
         fixsleep_applied = False
-        if pmset.sleep_disabled() == "1":
-            emit("bad", t("impl.sleepdisabled_sleep_disabled_globally_closing_the_2"))
-            if ask(t("impl.fix_pmset_disablesleep"), yes=yes):
-                _, rc = execute(EnableSleep())
-                fixsleep_applied = rc == 0
-                emit(
-                    "ok" if rc == 0 else "warn",
-                    t("impl.sleep_enabled") if rc == 0 else t("impl.fixing_disablesleep_failed"),
-                )
+        if not work:
+            c.rule(t("impl.sleep_blockers_highest_priority"))
+            if pmset.sleep_disabled() == "1":
+                emit("bad", t("impl.sleepdisabled_sleep_disabled_globally_closing_the_2"))
+                if ask(t("impl.fix_pmset_disablesleep"), yes=yes):
+                    _, rc = execute(EnableSleep())
+                    fixsleep_applied = rc == 0
+                    emit(
+                        "ok" if rc == 0 else "warn",
+                        t("impl.sleep_enabled") if rc == 0 else t("impl.fixing_disablesleep_failed"),
+                    )
+                else:
+                    emit("warn", t("impl.keeping_sleep_disabled"))
             else:
-                emit("warn", t("impl.keeping_sleep_disabled"))
-        else:
-            emit("ok", "SleepDisabled=0")
-        for target in processes.caffeinate_procs():
-            emit("warn", t("impl.caffeinate_prevents_sleep_2", v0=target.describe()))
-            if ask(
-                t("caffeinate.confirm", pid=target.process.pid),
-                yes=yes,
-                risk="aggressive",
-                aggressive=aggressive,
-                emit=emit,
-            ):
-                execute(KillCaffeinate(target))
-                emit("ok", t("impl.terminated"))
-        rows = pmset.configured_sleep_blocking_assertions()
-        if rows:
-            emit("warn", t("impl.system_sleep_blocking_assertions_found"))
-            if ask(t("impl.quit_the_configured_daemon_app"), yes=yes):
-                _, okq, msg = execute(QuitConfiguredDaemons(st))
-                emit("ok" if okq else "warn", t("impl.daemon_app", v0=msg))
-        else:
-            emit("ok", t("impl.no_system_sleep_blocking_assertions"))
-        au = pmset.audio_assertion()
-        if au:
-            emit("warn", t("impl.audio_assertion_quit_the_app_playing", v0=au.split("named: ")[-1]))
-        else:
-            emit("ok", t("impl.no_audio_assertions"))
+                emit("ok", "SleepDisabled=0")
+            for target in processes.caffeinate_procs():
+                emit("warn", t("impl.caffeinate_prevents_sleep_2", v0=target.describe()))
+                if ask(
+                    t("caffeinate.confirm", pid=target.process.pid),
+                    yes=yes,
+                    risk="aggressive",
+                    aggressive=aggressive,
+                    emit=emit,
+                ):
+                    execute(KillCaffeinate(target))
+                    emit("ok", t("impl.terminated"))
+            rows = pmset.configured_sleep_blocking_assertions()
+            if rows:
+                emit("warn", t("impl.system_sleep_blocking_assertions_found"))
+                if ask(t("impl.quit_the_configured_daemon_app"), yes=yes):
+                    _, okq, msg = execute(QuitConfiguredDaemons(st))
+                    emit("ok" if okq else "warn", t("impl.daemon_app", v0=msg))
+            else:
+                emit("ok", t("impl.no_system_sleep_blocking_assertions"))
+            au = pmset.audio_assertion()
+            if au:
+                emit("warn", t("impl.audio_assertion_quit_the_app_playing", v0=au.split("named: ")[-1]))
+            else:
+                emit("ok", t("impl.no_audio_assertions"))
 
         c.rule(t("impl.power_settings_battery_profile"))
         profs = pmset.pmset_custom()
@@ -162,7 +166,7 @@ def mode_apply(yes=False, aggressive=False, dry_run=False):
                 continue
             if ask(t("impl.set_current_recommended", v0=key, v1=rec, v2=cur, v3=rec, v4=desc), yes=yes):
                 chg += [key, rec]
-        if ask(
+        if not work and ask(
             t("impl.use_hibernatemode_write_ram_to_disk"),
             default="n",
             yes=yes,
@@ -193,12 +197,15 @@ def mode_apply(yes=False, aggressive=False, dry_run=False):
                 )
             else:
                 emit("warn", t("impl.applying_pmset_batch_failed", v0=" ".join(chg)))
-        brightness_requested = profile_brightness is not None or ask(
-            t("impl.reduce_brightness_to_off_restores_the"),
-            yes=yes,
-            risk="aggressive",
-            aggressive=aggressive,
-            emit=emit,
+        brightness_requested = profile_brightness is not None or (
+            not work
+            and ask(
+                t("impl.reduce_brightness_to_off_restores_the"),
+                yes=yes,
+                risk="aggressive",
+                aggressive=aggressive,
+                emit=emit,
+            )
         )
         from ..system.brightness import available as brightness_available
 
@@ -217,9 +224,10 @@ def mode_apply(yes=False, aggressive=False, dry_run=False):
         elif profile_brightness is not None:
             emit("warn", t("impl.brightness_is_not_installed_restore_brightness", v0=profile_brightness))
 
-        c.rule(t("impl.b_ac_profile_also_applies_while"))
+        if not work:
+            c.rule(t("impl.b_ac_profile_also_applies_while"))
         ac_applied = False
-        if ask(t("impl.reduce_ac_activity_too_disable_powernap"), default="n", yes=yes):
+        if not work and ask(t("impl.reduce_ac_activity_too_disable_powernap"), default="n", yes=yes):
             _, rc = execute(SetPowerProfile(["powernap", "0", "womp", "0"], "-c"))
             ac_applied = rc == 0
             emit(
@@ -239,7 +247,10 @@ def mode_apply(yes=False, aggressive=False, dry_run=False):
             if app["defact"] == "skip":
                 emit("dim", t("impl.keeping_skip", v0=name))
                 continue
-            default_act = "quit" if app["defact"] == "ask" else app["defact"]
+            if work and app["defact"] == "ask" and yes:
+                emit("dim", t("impl.default_action_for_is_ask_skipped", v0=name))
+                continue
+            default_act = ("skip" if work else "quit") if app["defact"] == "ask" else app["defact"]
             act = ask_qf(f"{name} (CPU {cpu}%)", default_act, yes=yes)
             spec = configured_daemon(name)
             if spec is not None and act == "quit":
@@ -250,13 +261,17 @@ def mode_apply(yes=False, aggressive=False, dry_run=False):
                 if execute(QuitApp(path, name)):
                     emit("ok", t("impl.quit", v0=name))
                     state_api.save_state(st)
-                elif ask(t("impl.has_not_quit_possible_unsaved_dialog", v0=name), yes=yes) and execute(
-                    ForceQuitApp(path)
+                elif (
+                    not work
+                    and ask(t("impl.has_not_quit_possible_unsaved_dialog", v0=name), yes=yes)
+                    and execute(ForceQuitApp(path))
                 ):
                     emit("ok", t("impl.force_quit", v0=name))
                     state_api.save_state(st)
                 else:
                     emit("warn", t("impl.did_not_quit", v0=name))
+                    if work:
+                        raise RuntimeError(t("impl.did_not_quit", v0=name))
             elif act == "freeze":
                 for line in system_apps.app_sleep_assertions(name)[:1]:
                     emit("warn", t("impl.holds_a_sleep_assertion_freezing_will", v0=name, v1=line[:90]))
@@ -284,13 +299,17 @@ def mode_apply(yes=False, aggressive=False, dry_run=False):
                     state_api.save_state(st)
                 else:
                     emit("warn", t("impl.unloading_failed", v0=s["label"]))
-        if spotlight.spotlight_on():
-            if profile_spotlight_off or ask(
-                t("impl.stop_spotlight_indexing_mdutil_i_off"),
-                yes=yes,
-                risk="aggressive",
-                aggressive=aggressive,
-                emit=emit,
+        if profile.get("spotlight") != "keep" and spotlight.spotlight_on():
+            if profile_spotlight_off or (
+                not (work and yes)
+                and ask(
+                    t("impl.stop_spotlight_indexing_mdutil_i_off"),
+                    default="n",
+                    yes=yes if not work else False,
+                    risk="aggressive",
+                    aggressive=aggressive,
+                    emit=emit,
+                )
             ):
                 _, rc = execute(StopSpotlight())
                 if rc == 0:
@@ -301,15 +320,19 @@ def mode_apply(yes=False, aggressive=False, dry_run=False):
         else:
             emit("ok", t("impl.spotlight_indexing_already_disabled"))
 
-        c.rule(t("impl.remote_network_apps_kept_by_default"))
+        if not work:
+            c.rule(t("impl.remote_network_apps_kept_by_default"))
         names = ", ".join(network_api.configured_names())
-        if profile_disconnect or ask(
-            t("impl.disconnect_completely_quit_configured_network_apps", v0=names),
-            default="n",
-            yes=yes,
-            risk="aggressive",
-            aggressive=aggressive,
-            emit=emit,
+        if not work and (
+            profile_disconnect
+            or ask(
+                t("impl.disconnect_completely_quit_configured_network_apps", v0=names),
+                default="n",
+                yes=yes,
+                risk="aggressive",
+                aggressive=aggressive,
+                emit=emit,
+            )
         ):
             for name in network_api.configured_names():
                 p = system_apps.app_path(name)
@@ -370,17 +393,18 @@ def mode_apply(yes=False, aggressive=False, dry_run=False):
                 emit("dim", t("impl.brew_install_blueutil_enables_bluetooth_control"))
             emit("warn", t("impl.configured_launchagents_must_be_unloaded_to"))
 
-        c.rule(t("impl.final_assertion_audit"))
-        for line in pmset.pmset_assertions():
-            if re.search(r"PreventUserIdle(System|Display)Sleep.*named", line):
-                c.print(f"  {line.strip()}", highlight=False)
-        sd = pmset.sleep_disabled()
-        emit(
-            "ok" if sd != "1" else "bad",
-            t("impl.sleepdisabled_lid_close_sleep_available")
-            if sd != "1"
-            else t("impl.sleepdisabled_is_still_closing_the_lid"),
-        )
+        if not work:
+            c.rule(t("impl.final_assertion_audit"))
+            for line in pmset.pmset_assertions():
+                if re.search(r"PreventUserIdle(System|Display)Sleep.*named", line):
+                    c.print(f"  {line.strip()}", highlight=False)
+            sd = pmset.sleep_disabled()
+            emit(
+                "ok" if sd != "1" else "bad",
+                t("impl.sleepdisabled_lid_close_sleep_available")
+                if sd != "1"
+                else t("impl.sleepdisabled_is_still_closing_the_lid"),
+            )
         bl = pmset.battery_line()
         if bl:
             c.print(f"  {bl}", highlight=False)
@@ -402,7 +426,7 @@ def mode_apply(yes=False, aggressive=False, dry_run=False):
         else:
             # 幽灵锚点防护: 什么都没改就不落盘, 否则一个空锚点会成为未来会话的合并基底
             emit("dim", t("impl.no_changes_made_no_snapshot_created"))
-        if ask(
+        if not work and ask(
             t("impl.turn_off_the_display_now_pmset"),
             yes=yes,
             risk="aggressive",

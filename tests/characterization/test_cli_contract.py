@@ -15,7 +15,7 @@ from .conftest import artifact, assert_golden
 
 
 def legacy_template_contract(result):
-    """Keep the original template contract; test the additive option explicitly."""
+    """Retain the existing interface normalization; scenario/category changes stay visible."""
     addition = (
         '# Default interface: "tui" or "cli"; overridden by TRAVEL_MODE_INTERFACE, then --tui / --no-tui.\n'
         'interface = "tui"\n'
@@ -25,7 +25,7 @@ def legacy_template_contract(result):
     return result
 
 
-@pytest.mark.parametrize("case", ["yes", "aggressive", "flight", "overnight", "cafe", "all", "none", "mixed"])
+@pytest.mark.parametrize("case", ["yes", "aggressive", "flight", "overnight", "work", "all", "none", "mixed"])
 def test_apply_contract(case, machine, monkeypatch, capsys):
     def answer(prompt):
         print(prompt, end="")
@@ -36,7 +36,7 @@ def test_apply_contract(case, machine, monkeypatch, capsys):
         return "y"
 
     monkeypatch.setattr("builtins.input", answer)
-    with profile_scope(load_config(), case if case in {"flight", "overnight", "cafe"} else None):
+    with profile_scope(load_config(), case if case in {"flight", "overnight", "work"} else None):
         rc = flow_apply.mode_apply(yes=case not in {"all", "none", "mixed"}, aggressive=case == "aggressive")
     captured = capsys.readouterr()
     assert_golden(f"apply-{case}", artifact(machine, rc, captured.out + captured.err), machine["root"])

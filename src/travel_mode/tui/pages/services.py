@@ -9,6 +9,7 @@ from textual.widgets import Label
 from travel_mode.actions.apps import (
     UnloadAgent,
 )
+from travel_mode.categories import grouped, pause_categories
 from travel_mode.i18n import t
 from travel_mode.tui.widgets import Button
 
@@ -21,6 +22,8 @@ class ServicesPage:
                 classes="grow",
             )
             yield Button(t("impl.unload_all"), id="b-svc-all", variant="primary", classes="btn")
+        yield Button(t("categories.pause_sync"), id="b-category-sync", classes="scope")
+        yield Button(t("categories.pause_updater"), id="b-category-updater", classes="scope")
         yield Vertical(Label(t("impl.scanning"), classes="srow"), id="svc-box")
 
     async def build_svc(self, spot):
@@ -30,7 +33,13 @@ class ServicesPage:
         await box.remove_children()
         self.svc_btns = {}
         w = []
-        for i, s in enumerate(self.svc["unloadable"]):
+        category = None
+        for s in grouped(self.svc["unloadable"]):
+            i = self.svc["unloadable"].index(s)
+            group = s.get("category", "other")
+            if group != category:
+                w.append(Label(t(f"categories.{group}"), classes="hint"))
+                category = group
             cpu = f", CPU {s['cpu']}%" if s["cpu"] else ""
             lab = Label(f"{escape(s['label'])} [dim]pid {s['pid']}{cpu}[/]", classes="grow")
             b = Button(t("impl.unload"), id=f"svc-{i}", classes="btn")
@@ -52,13 +61,25 @@ class ServicesPage:
             self.logline("dim", detail)
         if self.svc.get("candidates"):
             w.append(Label(t("services.candidates_heading"), classes="hint"))
-            for row in self.svc["candidates"]:
+            category = None
+            for row in grouped(self.svc["candidates"]):
+                group = row.get("category", "other")
+                if group != category:
+                    w.append(Label(t(f"categories.{group}"), classes="hint"))
+                    category = group
                 w.append(
                     Label(
                         f"{row['label']} [dim]pid {row['pid']} CPU {row['cpu'] or '?'}%[/]",
                         classes="srow",
                     )
                 )
+        for row in self.svc.get("notices", []):
+            w.append(
+                Label(
+                    f"{t('categories.' + row['category'])}: {row['label']} — " + t("categories.notice"),
+                    classes="srow",
+                )
+            )
         await box.mount(*w)
 
     async def act_svc_all(self, btn):
@@ -88,3 +109,12 @@ class ServicesPage:
             btn._mutation_done = True
         else:
             self.logline("warn", t("impl.unloading_failed", v0=s["label"]))
+
+    async def act_category(self, categories, btn):
+        def flow():
+            scan = self.svc
+            rows = scan.get("recognized", scan["unloadable"] + scan.get("candidates", []))
+            pause_categories(categories, self.scan["running"], rows, self.execute, self.save, self.st)
+
+        await self.busy(btn, flow)
+        self.action_refresh()
