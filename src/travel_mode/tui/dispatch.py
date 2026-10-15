@@ -32,11 +32,21 @@ class Dispatch:
             return
 
         if not self.origin_ready:
+            if ev.button.id == "b-doctor" and self._origin_error is not None:
+                self.action_refresh()
+                return
+            if self._origin_error is not None:
+                self.notify(t("health.origin_failed", reason=self._origin_error), severity="error")
+                return
             self.notify(t("scenario.preparing"), severity="warning")
             return
         with self.scenario_scope():
             if ev.button.id == "b-energy":
                 self.refresh_audit_detail()
+                return
+            if ev.button.id == "b-doctor":
+                if not self._mutation_lock.locked():
+                    self.action_refresh()
                 return
             if ev.button.id in {"b-dash-apps", "b-dash-svc"}:
                 await self._dispatch_button(ev)
@@ -98,6 +108,8 @@ class Dispatch:
         self.query_one(TabbedContent).focus()
         if bid == "b-quick":
             await self.act_quick(ev.button)
+        elif bid.startswith("b-health-"):
+            await self.act_health(ev.button)
         elif bid == "b-reapply":
             from travel_mode.resurrection import reapply
 

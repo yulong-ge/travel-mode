@@ -11,18 +11,30 @@ from . import __version__
 from .config import load_config
 from .i18n import t
 from .state import load_state
+from .system.health import collect
 from .system.platform import map_pmset_key, supported_pmset_keys
-from .system.shell import run_rc
+from .system.shell import ReadError, run_rc
 
 
 def read_command(command: list[str], timeout=30) -> str:
     output, rc = run_rc(command, timeout=timeout)
     if rc:
-        raise RuntimeError(t("json.command_failed", command=" ".join(command), rc=rc, detail=output))
+        raise ReadError(t("json.command_failed", command=" ".join(command), rc=rc, detail=output))
     return output
 
 
 def check_data() -> dict:
+    report = collect()
+    try:
+        result = _audit_data()
+    except ReadError as exc:
+        # No fabricated legacy values: the incomplete audit is explicit and the
+        # nine independent health results are still returned in full.
+        result = {"version": __version__.split(".dev", 1)[0], "audit_error": str(exc)}
+    return {**result, "health": report}
+
+
+def _audit_data() -> dict:
     raw = read_command(["pmset", "-g", "batt"]).strip()
     match = re.search(r"(\d+)%;", raw)
     source = "ac" if pmset.on_ac_power() else "battery"

@@ -55,6 +55,10 @@ class SudoReadError(RuntimeError):
     """A privileged observation failed without prompting for credentials."""
 
 
+class ReadError(RuntimeError):
+    """An expected read-only command or its required output failed."""
+
+
 def dry_run_unknowns() -> tuple[str, ...]:
     return tuple(_dry_run_unknowns)
 
@@ -71,6 +75,22 @@ def _dry_run_readonly(cmd: list[str]) -> bool:
     if not cmd:
         return False
     base, args = cmd[0], cmd[1:]
+    if base == sys.executable:
+        return (
+            len(args) == 3
+            and args[:2] == ["-m", "travel_mode.system.health_native"]
+            and args[2] in {"displays", "brightness"}
+        )
+    if base == "tmutil":
+        return args == ["status"]
+    if base == "lsappinfo":
+        import re
+
+        return args == ["front"] or (
+            len(args) == 4
+            and args[:3] == ["info", "-only", "pid,bundleid"]
+            and bool(re.fullmatch(r"ASN:0x[0-9a-fA-F]+-0x[0-9a-fA-F]+:", args[3]))
+        )
     if base == "sudo":
         return (
             args[:2] == ["-n", "-l"]
@@ -234,5 +254,5 @@ def first_line(out):
 def _read(args, timeout=20, sudo=False):
     output, rc = run_rc(args, timeout=timeout, sudo=sudo)
     if rc:
-        raise RuntimeError(t("json.command_failed", command=shlex.join(args), rc=rc, detail=output))
+        raise ReadError(t("json.command_failed", command=shlex.join(args), rc=rc, detail=output))
     return output

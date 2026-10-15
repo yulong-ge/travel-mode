@@ -117,7 +117,7 @@ skip = []
 # brightness = 0.5
 ```
 
-The packaged [category registry](src/travel_mode/categories.toml) defines `sync`, `backup`, `updater` and `vm`, with public source references for each rule. It matches launchd labels, bundle IDs, exact app names and executable paths. `suggest`, the Services page and the Apps page group recognized items by category. Only loaded plist-backed LaunchAgents in `~/Library/LaunchAgents` and `/Library/LaunchAgents` are category unload targets. System LaunchDaemons are not automatically unloaded by categories. Recognizing a product does not establish that all of its components can be paused.
+The packaged [category registry](src/travel_mode/categories.toml) defines `sync`, `backup`, `updater`, `vm` and `keep-awake`, with public source references for each rule. It matches launchd labels, bundle IDs, exact app names and executable paths. `suggest`, the Services page and the Apps page group recognized items by category. Only loaded plist-backed LaunchAgents in `~/Library/LaunchAgents` and `/Library/LaunchAgents` are category unload targets. System LaunchDaemons are not automatically unloaded by categories. Recognizing a product does not establish that all of its components can be paused.
 
 `categories.pause` selects automatic category actions in work mode; `vm` is opt-in. Category buttons provide Pause sync and backups and Pause updaters in either scenario. The work overview checks category groups by default. Individual category selections in `pause` are respected by that overview. iCloud and Time Machine are observation only. Some backup products and embedded updaters are identification-only rules; manage those within the product. Category quit is graceful and does not force quit.
 
@@ -126,6 +126,28 @@ Category actions supplement `services.unload` and explicit `apps.quit` / `apps.f
 Built-ins are `work`, `flight` and `overnight`. `cafe` was merged into `work` and removed, with no alias. A profile overrides ordinary settings for its supplied fields; custom `[profiles.NAME]` values override the matching built-in. A custom profile defaults to away unless it sets `scenario = "work"`. Conflicting explicit `--scenario` and profile scenarios are errors. Snapshots record the last applied scenario while keeping the first original values for recovery. `check --json` uses null when no saved scenario exists, including older snapshots.
 
 `TRAVEL_MODE_LANG` overrides configured language. `TRAVEL_MODE_APP_DIRS` adds colon-separated absolute app directories; empty/relative entries are errors. `suggest --write` requests confirmation, preserves comments and validates before replacing configuration. JSON schemas: [check](docs/json-schema/check.schema.json), [suggest](docs/json-schema/suggest.schema.json). Optional integrations: [Shortcuts](integrations/shortcuts.md), [menu plugin](integrations/swiftbar/travel-mode.10s.sh), [sudoers](docs/sudoers.md).
+
+## Health check
+
+`travel-mode check` includes a read-only health section; `travel-mode check --json` exposes the same structured findings under `health`. The overview checks once when opened and on an explicit refresh. It shows each actionable finding with a button that uses the existing Action/Executor and recovery journal. No health timer, resident process or service is installed. The existing 30-second overview timer still reads only the battery.
+
+The nine checks cover global SleepDisabled, caffeinate and known keep-awake apps, non-system system-sleep assertion holders, online external displays, Spotlight CPU activity, a running Time Machine backup, battery Low Power Mode, native display brightness and background CPU activity. Each result contains a status, evidence, an impact explanation and a handling instruction. Failed or malformed reads show **Cannot check** with the command and reason; other checks continue. Each check has a two-second command deadline, within a fifteen-second total command budget. Reports include elapsed wall time. Parsing and rendering add a small amount of time outside command execution. If a shared read prevents the older audit from completing, JSON includes `audit_error` and the complete health report, without invented legacy values. A TUI recovery-snapshot read failure leaves the diagnostics available and disables handling actions until the error is fixed and the tool is reopened.
+
+The shared process snapshot uses one `ps` call, without `top` or a sampling delay. Its `%CPU` estimate is not instantaneous watts. Background CPU results exclude other users; executable paths under `/System`, `/usr`, `/bin`, `/sbin` and `/Library/Apple`; this tool and its ancestors; stopped processes; Terminal, iTerm/iTerm2, Warp, Alacritty and kitty; and the foreground app and helpers in its bundle. If foreground identification fails, that check reports an error. Up to five processes are listed with their known sync/backup/updater/vm category, where available. App targets use existing quit/freeze actions; other processes require inspection in Activity Monitor. Explicit app skip/ignore and category ignore settings suppress health action buttons too. Identification-only category rules remain observation only. Configured daemon apps use the existing daemon shutdown Action.
+
+Spotlight enabled alone is not a hit: the total reported CPU of `mds`, `mds_stores`, `mdworker` and `mdworker_shared` must reach the threshold. The stop-indexing action requests sudo only when selected. Assertion holders use quit rather than freeze because freezing does not release an assertion. caffeinate evidence includes its full command line and parent; termination also rechecks the existing exact PID identity and sleep assertion. A keep-awake app's presence does not prove its session is active. Names and public sources are recorded in the `keep-awake` category; this category is not paused by default.
+
+External displays use a short-lived, timeout-bounded CoreGraphics reader. Display IDs identify online non-built-in displays, including virtual displays; they do not prove that a physical dock is attached. Time Machine and displays have manual instructions only. Native brightness is checked only on battery; an unreadable native backend produces an error. Keyboard backlight and Bluetooth wake permissions are omitted because no reliable unprivileged reader was verified.
+
+```toml
+[health]
+brightness_threshold = 0.7
+brightness_target = 0.5
+cpu_threshold = 20
+spotlight_cpu_threshold = 20
+```
+
+Brightness thresholds and targets are fractions greater than zero and at most one; CPU thresholds are percentages greater than zero and at most 10000. A selected profile's brightness target takes precedence over `health.brightness_target`. Automatic buttons are optional; checks themselves do not change settings. `off` restores recorded changes, with the existing exception for terminated caffeinate processes.
 
 ## Power measurement
 

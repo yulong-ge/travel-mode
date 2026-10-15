@@ -147,6 +147,14 @@ class CategoriesConfig:
 
 
 @dataclass(frozen=True)
+class HealthConfig:
+    brightness_threshold: float = 0.7
+    brightness_target: float = 0.5
+    cpu_threshold: float = 20.0
+    spotlight_cpu_threshold: float = 20.0
+
+
+@dataclass(frozen=True)
 class Profile:
     values: dict[str, Any] = field(default_factory=dict)
 
@@ -161,6 +169,7 @@ class Config:
     profiles: dict[str, Profile] = field(default_factory=dict)
     categories: CategoriesConfig = field(default_factory=CategoriesConfig)
     measurement: Settings = field(default_factory=Settings)
+    health: HealthConfig = field(default_factory=HealthConfig)
 
     @classmethod
     def defaults(cls) -> Config:
@@ -172,7 +181,17 @@ class Config:
         )
 
 
-_TOP_KEYS = {"apps", "network", "services", "power", "options", "profiles", "categories", "measurement"}
+_TOP_KEYS = {
+    "apps",
+    "network",
+    "services",
+    "power",
+    "options",
+    "profiles",
+    "categories",
+    "measurement",
+    "health",
+}
 _APP_KEYS = {"default", "watch", "ignore", "quit", "freeze", "skip", "ask", "with_daemon"}
 _ACTIONS = ("quit", "freeze", "skip", "ask")
 
@@ -315,7 +334,7 @@ def load_config(path: str | Path | None = None) -> Config:
     categories = _table(data, "categories", target)
     _check_keys(categories, {"pause", "ignore"}, target, "categories")
     pause = _strings(categories.get("pause", ["sync", "backup", "updater"]), target, "categories.pause")
-    if set(pause) - {"sync", "backup", "updater", "vm"}:
+    if set(pause) - {"sync", "backup", "updater", "vm", "keep-awake"}:
         raise _error(target, "categories.pause", t("categories.invalid"))
 
     raw_profiles = data.get("profiles", {})
@@ -329,6 +348,14 @@ def load_config(path: str | Path | None = None) -> Config:
         validate_settings(settings)
     except ValueError as exc:
         raise ConfigError(target, "measurement", str(exc), cause=exc) from exc
+    health = _table(data, "health", target)
+    _check_keys(health, set(HealthConfig.__dataclass_fields__), target, "health")
+    import math
+
+    for key, value in health.items():
+        upper = 1 if key.startswith("brightness_") else 10000
+        if type(value) not in (int, float) or not math.isfinite(value) or not 0 < value <= upper:
+            raise _error(target, f"health.{key}", t("health.invalid_setting", upper=upper))
     return Config(
         apps=app_config,
         network=network_config,
@@ -336,6 +363,7 @@ def load_config(path: str | Path | None = None) -> Config:
         power_overrides=overrides,
         options=OptionsConfig(aggressive, language, interface, scenario),
         measurement=settings,
+        health=HealthConfig(**health),
         profiles=profiles,
         categories=CategoriesConfig(
             pause, _strings(categories.get("ignore", []), target, "categories.ignore")

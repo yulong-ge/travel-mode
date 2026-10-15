@@ -117,7 +117,7 @@ skip = []
 # brightness = 0.5
 ```
 
-随包分发的[类别识别库](src/travel_mode/categories.toml) 定义 `sync`、`backup`、`updater`、`vm`，逐条记录公开依据。匹配依据包括 launchd Label、bundle id、精确应用名和可执行路径。`suggest`、后台服务页和应用页按类别分组显示识别项。类别卸载只面向 `~/Library/LaunchAgents` 与 `/Library/LaunchAgents` 中已加载且有 plist 的 LaunchAgent，不会自动卸载系统 LaunchDaemon。识别到产品不表示可以暂停它的全部组件。
+随包分发的[类别识别库](src/travel_mode/categories.toml) 定义 `sync`、`backup`、`updater`、`vm`、`keep-awake`，逐条记录公开依据。匹配依据包括 launchd Label、bundle id、精确应用名和可执行路径。`suggest`、后台服务页和应用页按类别分组显示识别项。类别卸载只面向 `~/Library/LaunchAgents` 与 `/Library/LaunchAgents` 中已加载且有 plist 的 LaunchAgent，不会自动卸载系统 LaunchDaemon。识别到产品不表示可以暂停它的全部组件。
 
 `categories.pause` 选择 work 的自动类别动作；`vm` 需主动加入。两个场景的类别按钮都提供“暂停同步与备份”和“暂停更新器”。work 总览默认勾选类别组，并遵循 `pause` 中各类别的选择。iCloud 与 Time Machine 仅展示。部分备份产品和嵌入式更新器规则只识别，请在产品内管理。类别退出使用正常退出，不强退。
 
@@ -126,6 +126,28 @@ skip = []
 内置 profile 为 `work`、`flight`、`overnight`。`cafe` 已合并到 `work` 并删除，不保留别名。profile 提供的字段覆盖普通配置；自定义 `[profiles.NAME]` 覆盖同名内置值。自定义 profile 默认属于 away，除非设置 `scenario = "work"`。显式 `--scenario` 与 profile 场景冲突会报错。快照记录最后应用的场景，同时保留首次原值用于恢复。没有已保存场景时，包括旧快照，`check --json` 输出 null。
 
 `TRAVEL_MODE_LANG` 覆盖配置语言。`TRAVEL_MODE_APP_DIRS` 添加以冒号分隔的绝对应用目录，空项或相对路径会报错。`suggest --write` 请求确认、保留注释，并在替换配置前校验。JSON schema：[check](docs/json-schema/check.schema.json)、[suggest](docs/json-schema/suggest.schema.json)。可选集成：[Shortcuts](integrations/shortcuts.md)、[菜单插件](integrations/swiftbar/travel-mode.10s.sh)、[sudoers](docs/sudoers.md)。
+
+## 体检
+
+`travel-mode check` 新增只读体检段；`travel-mode check --json` 在 `health` 中输出相同的结构化结果。总览在打开和显式刷新时各检查一次。可自动处理的命中项提供按钮，复用现有 Action/Executor 与恢复日志。不安装体检定时器、常驻进程或服务。现有总览的 30 秒定时器仍只读取电池。
+
+九项检查覆盖全局 SleepDisabled、caffeinate 与已知防睡应用、非系统进程的系统防睡断言、在线外接显示器、Spotlight CPU 活动、正在运行的 Time Machine 备份、电池低电量模式、原生屏幕亮度与后台 CPU 活动。每项提供状态、证据、影响说明和处理方法。读取失败或格式异常时显示「无法检查」及命令和原因，其余项目继续检查。每项的命令截止时间为 2 秒，命令总预算为 15 秒。报告包含实际耗时；解析和渲染会在命令执行之外增加少量时间。共享读取导致原有审计无法完成时，JSON 提供 `audit_error` 和完整体检结果，不合成原有字段值。TUI 读取恢复快照失败时仍可查看诊断，但处理动作会禁用；修复读取错误后需重新打开工具。
+
+共享进程快照只调用一次 `ps`，不调用 `top`，不等待采样。其 `%CPU` 估计值不代表瞬时功率。后台 CPU 项排除其他用户；`/System`、`/usr`、`/bin`、`/sbin`、`/Library/Apple` 下的可执行文件；本工具及祖先进程；停止的进程；Terminal、iTerm/iTerm2、Warp、Alacritty、kitty；以及前台应用和同一 bundle 内的辅助进程。无法识别前台进程时，此项显示错误。最多列出五个进程，并标注已知的 sync/backup/updater/vm 类别。应用复用退出或冻结动作；其他进程需在「活动监视器」查看。显式 app skip/ignore 与 category ignore 配置同样阻止体检处理按钮出现。仅识别的类别规则仍只提示。已配置 daemon 的应用使用现有 daemon 关闭动作。
+
+Spotlight 仅开启索引时不算命中：`mds`、`mds_stores`、`mdworker`、`mdworker_shared` 的 CPU 读数总和须达到阈值。停止索引动作仅在用户选择时请求 sudo。防睡断言持有者使用退出动作，因为冻结不会释放断言。caffeinate 证据包含完整命令行与父进程；终止时还会按现有机制复核精确 PID 身份和防睡断言。防睡应用正在运行不代表防睡会话已开启。`keep-awake` 类别记录公开名称与来源，默认不暂停该类别。
+
+外接显示器由短暂运行且有超时的 CoreGraphics 读取进程检测。显示器 ID 表示在线的非内置显示器，也可能是虚拟显示器，不代表已连接物理扩展坞。Time Machine 和显示器只提供手动步骤。原生亮度仅在电池供电时检查；原生后端不可读时显示错误。键盘背光与蓝牙唤醒权限未找到经过验证的可靠免 sudo 读取方式，因此不检查。
+
+```toml
+[health]
+brightness_threshold = 0.7
+brightness_target = 0.5
+cpu_threshold = 20
+spotlight_cpu_threshold = 20
+```
+
+亮度阈值与目标值为大于 0 且不超过 1 的比例；CPU 阈值为大于 0 且不超过 10000 的百分数。所选 profile 的亮度目标优先于 `health.brightness_target`。用户可自行选择是否使用处理按钮；检查本身不改设置。`off` 恢复已记录的改动，但按现有规则不重建已终止的 caffeinate 进程。
 
 ## 功耗测量
 

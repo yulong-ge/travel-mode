@@ -59,6 +59,24 @@ def blockers_lines():
 def mode_check():
     from rich.console import Console
 
+    from ..system.shell import ReadError
+    from .doctor import collect, lines
+
+    report = collect()
+    try:
+        _mode_check()
+    except ReadError as exc:
+        Console().print(t("health.legacy_failed", reason=str(exc)), markup=False, highlight=False)
+    console = Console()
+    console.rule(t("health.title"))
+    for line in lines(report):
+        console.print(line, markup=False, highlight=False)
+    return 0
+
+
+def _mode_check():
+    from rich.console import Console
+
     c = Console()
 
     def emit(kind, msg):

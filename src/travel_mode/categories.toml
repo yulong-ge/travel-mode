@@ -365,3 +365,74 @@ apps = ["VMware Fusion"]
 bundle_ids = ["com.vmware.fusion"]
 labels = []
 executables = []
+# Source: https://apps.apple.com/us/app/amphetamine/id937984704
+# Public identity: app name Amphetamine; no unverified bundle identifier is assumed.
+[[rules]]
+id = "amphetamine"
+category = "keep-awake"
+name = "Amphetamine"
+action = "quit"
+apps = ["Amphetamine"]
+bundle_ids = []
+labels = []
+executables = []
+
+# Source: https://github.com/newmarcel/KeepingYouAwake
+# Public identity: app name KeepingYouAwake; no unverified bundle identifier is assumed.
+[[rules]]
+id = "keeping-you-awake"
+category = "keep-awake"
+name = "KeepingYouAwake"
+action = "quit"
+apps = ["KeepingYouAwake"]
+bundle_ids = []
+labels = []
+executables = []
+
+# Source: https://sindresorhus.com/lungo
+# Public identity: app name Lungo; no unverified bundle identifier is assumed.
+[[rules]]
+id = "lungo"
+category = "keep-awake"
+name = "Lungo"
+action = "quit"
+apps = ["Lungo"]
+bundle_ids = []
+labels = []
+executables = []
+
+# Source: https://formulae.brew.sh/cask/caffeine
+# Public identity: app name Caffeine; no unverified bundle identifier is assumed.
+[[rules]]
+id = "caffeine"
+category = "keep-awake"
+name = "Caffeine"
+action = "quit"
+apps = ["Caffeine"]
+bundle_ids = []
+labels = []
+executables = []
+
+# Source: https://appahead.studio/apps/theine/
+# Public identity: app name Theine; no unverified bundle identifier is assumed.
+[[rules]]
+id = "theine"
+category = "keep-awake"
+name = "Theine"
+action = "quit"
+apps = ["Theine"]
+bundle_ids = []
+labels = []
+executables = []
+
+# Source: https://apps.apple.com/us/app/sleepless/id926084628
+# Public identity: app name Sleepless; no unverified bundle identifier is assumed.
+[[rules]]
+id = "sleepless"
+category = "keep-awake"
+name = "Sleepless"
+action = "quit"
+apps = ["Sleepless"]
+bundle_ids = []
+labels = []
+executables = []

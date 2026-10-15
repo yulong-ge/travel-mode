@@ -13,6 +13,7 @@ def _configure_demo() -> None:
     from pathlib import Path
 
     from .state import set_state_path_override
+    from .system.health import PROCESS_COMMAND, native_command
     from .system.shell import CmdResult, set_runner
 
     fixture = Path(__file__).parent.parent.parent / "tests" / "fixtures"
@@ -30,6 +31,25 @@ def _configure_demo() -> None:
     class DemoRunner:
         def __call__(self, command, timeout=None, interactive=False):
             cmd = tuple(command)
+            if list(command) == native_command("displays"):
+                return CmdResult('[{"id": 99, "builtin": false}]', "", 0)
+            if list(command) == native_command("brightness"):
+                return CmdResult("0.85", "", 0)
+            if list(command) == PROCESS_COMMAND:
+                return CmdResult(
+                    f"900000 1 {os.getuid()} S 1 Thu Oct 15 12:00:00 2026 "
+                    "/Demo/Editor.app/Contents/MacOS/Editor\n"
+                    f"900001 1 {os.getuid()} S 35 Thu Oct 15 12:00:00 2026 "
+                    "/Demo/Docker.app/Contents/MacOS/Docker",
+                    "",
+                    0,
+                )
+            if cmd == ("tmutil", "status"):
+                return CmdResult("Backup session status:\n{ Running = 0; }", "", 0)
+            if cmd == ("lsappinfo", "front"):
+                return CmdResult("ASN:0x0-0x1:", "", 0)
+            if cmd[:2] == ("lsappinfo", "info"):
+                return CmdResult('pid = 900000\nbundleID="org.demo.editor"', "", 0)
             if cmd == ("ioreg", "-rn", "AppleSmartBattery"):
                 return CmdResult(
                     '"ExternalConnected" = No\n"IsCharging" = No\n"Voltage" = 12000\n'

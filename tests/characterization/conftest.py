@@ -44,7 +44,10 @@ def contract_root(request):
 
 @pytest.fixture
 def machine(contract_root, tmp_paths, darwin_platform, monkeypatch):
+    import os
     import plistlib
+
+    monkeypatch.setattr("travel_mode.system.health.monotonic", lambda: 0.0)
 
     root = contract_root
     monkeypatch.setenv("HOME", str(root))
@@ -100,7 +103,8 @@ def machine(contract_root, tmp_paths, darwin_platform, monkeypatch):
             ("brightness",): CmdResult("", "", 0),
             ("open",): CmdResult("", "", 0),
             ("fixture-editor",): CmdResult("", "", 0),
-            ("pmset", "-g"): CmdResult("SleepDisabled 1\n", "", 0),
+            ("pmset", "-g"): CmdResult("SleepDisabled 1\nlowpowermode 0\n", "", 0),
+            ("lsappinfo", "info"): CmdResult('pid = 919997\nbundleID="com.apple.Terminal"', "", 0),
             ("pmset", "-g", "cap"): CmdResult(
                 "sleep displaysleep lowpowermode powernap tcpkeepalive womp standby hibernatemode "
                 "ttyskeepawake disksleep lessbright networkoversleep",
@@ -108,6 +112,7 @@ def machine(contract_root, tmp_paths, darwin_platform, monkeypatch):
                 0,
             ),
             ("pmset", "-g", "assertions"): CmdResult(
+                "Assertion status system-wide:\n"
                 'pid 919999(caffeinate): PreventUserIdleDisplaySleep named: "caffeinate -d"\n'
                 'pid 910005(Remote Demo): PreventSystemSleep named: "Remote Demo"\n'
                 'pid 910001(Quit Demo): PreventUserIdleDisplaySleep named: "audio"\n',
@@ -136,7 +141,20 @@ def machine(contract_root, tmp_paths, darwin_platform, monkeypatch):
         bare = cmd[1:] if cmd[:1] == ("sudo",) else cmd
         if bare[:1] == ("-n",):
             bare = bare[1:]
-        if bare == ("ps", "-axo", "pid=,ppid=,stat=,lstart=,comm="):
+        if bare == ("ps", "-axo", "pid=,ppid=,uid=,stat=,%cpu=,lstart=,comm="):
+            responses[cmd] = CmdResult(
+                "\n".join(
+                    f"{pid} {919997 if pid == '919999' else 1} {os.getuid()} {stat} 1.0 "
+                    f"Thu Oct 15 12:00:00 2026 {path}"
+                    for pid, (stat, path) in processes.items()
+                ),
+                "",
+                0,
+            )
+        elif bare[:3] == ("ps", "-ww", "-p"):
+            pid = bare[3]
+            responses[cmd] = CmdResult(processes[pid][1] + (" -d" if pid == "919999" else ""), "", 0)
+        elif bare == ("ps", "-axo", "pid=,ppid=,stat=,lstart=,comm="):
             responses[cmd] = CmdResult(
                 "\n".join(
                     f"{pid} {919997 if pid == '919999' else 1} {stat} Thu Oct 15 12:00:00 2026 {path}"
@@ -192,11 +210,15 @@ def machine(contract_root, tmp_paths, darwin_platform, monkeypatch):
 
 
 def normalize(value, root):
+    import sys
+
     if isinstance(value, dict):
         return {key: normalize(item, root) for key, item in value.items()}
     if isinstance(value, (tuple, list)):
         return [normalize(item, root) for item in value]
     if isinstance(value, str):
+        if value == sys.executable:
+            return "<PYTHON>"
         value = value.replace(str(root), "<ROOT>")
         return re.sub(r"2026-10-15 12:00:00", "<TIME>", value)
     return value

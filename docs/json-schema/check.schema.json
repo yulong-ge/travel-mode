@@ -1,18 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": [
-    "version",
-    "battery",
-    "blockers",
-    "power",
-    "apps",
-    "services",
-    "spotlight_indexing",
-    "snapshot",
-    "scenario",
-    "resurrected"
-  ],
   "properties": {
     "version": {
       "type": "string"
@@ -206,6 +194,179 @@
           }
         }
       }
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checks",
+        "elapsed_seconds",
+        "budget_seconds",
+        "limitations"
+      ],
+      "properties": {
+        "elapsed_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "budget_seconds": {
+          "const": 15.0
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "status",
+              "evidence",
+              "impact",
+              "manual",
+              "actions",
+              "error",
+              "elapsed_seconds"
+            ],
+            "properties": {
+              "id": {
+                "enum": [
+                  "sleep_disabled",
+                  "keep_awake",
+                  "assertions",
+                  "displays",
+                  "spotlight",
+                  "backup",
+                  "low_power",
+                  "brightness",
+                  "high_cpu"
+                ]
+              },
+              "title": {
+                "type": "string"
+              },
+              "impact": {
+                "type": "string"
+              },
+              "manual": {
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "hit",
+                  "clear",
+                  "unknown"
+                ]
+              },
+              "error": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "elapsed_seconds": {
+                "type": "number",
+                "minimum": 0
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "actions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "kind"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "sleep",
+                        "quit",
+                        "freeze",
+                        "caffeinate",
+                        "spotlight",
+                        "low_power",
+                        "brightness"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "path": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "enum": [
+                        "powermode",
+                        "lowpowermode"
+                      ]
+                    },
+                    "value": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "process": {
+                      "type": "object"
+                    },
+                    "command_line": {
+                      "type": "string"
+                    },
+                    "parent": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "audit_error": {
+      "type": "string",
+      "minLength": 1
     }
-  }
+  },
+  "required": [
+    "version",
+    "health"
+  ],
+  "oneOf": [
+    {
+      "required": [
+        "battery",
+        "blockers",
+        "power",
+        "apps",
+        "services",
+        "spotlight_indexing",
+        "snapshot",
+        "scenario",
+        "resurrected"
+      ],
+      "not": {
+        "required": [
+          "audit_error"
+        ]
+      }
+    },
+    {
+      "required": [
+        "audit_error"
+      ]
+    }
+  ]
 }

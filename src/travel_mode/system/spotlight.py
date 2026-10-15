@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..i18n import t
-from .shell import _read
+from .shell import ReadError, _read
 
 
 def spotlight_on():
@@ -12,4 +12,4 @@ def spotlight_on():
         return True
     if "Indexing disabled" in out:
         return False
-    raise RuntimeError(t("safety.invalid_status", command="mdutil -s /", detail=out.strip()))
+    raise ReadError(t("safety.invalid_status", command="mdutil -s /", detail=out.strip()))

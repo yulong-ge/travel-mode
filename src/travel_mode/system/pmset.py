@@ -7,7 +7,7 @@ import shlex
 
 from ..config import load_config
 from ..i18n import t
-from .shell import _read
+from .shell import ReadError, _read
 
 POWER_KEYS = [
     ("lowpowermode", t("impl.low_power_mode_reduce_cpu_gpu"), "1"),
@@ -73,7 +73,7 @@ def pmset_custom():
             if len(parts) >= 2:
                 profs.setdefault(cur, {})[parts[0]] = parts[1]
     if not profs:
-        raise RuntimeError(t("safety.missing_power_profiles"))
+        raise ReadError(t("safety.missing_power_profiles"))
     return profs
 
 
@@ -95,7 +95,7 @@ def pmset_g():
 def sleep_disabled():
     value = pmset_g().get("SleepDisabled")
     if value not in {"0", "1"}:
-        raise RuntimeError(t("safety.missing_sleepdisabled"))
+        raise ReadError(t("safety.missing_sleepdisabled"))
     return value
 
 

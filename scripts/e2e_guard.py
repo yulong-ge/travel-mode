@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import re
 import shlex
 import subprocess
 from pathlib import Path
 
+from travel_mode.system.health import PROCESS_COMMAND, native_command
 from travel_mode.system.shell import CmdResult, subprocess_runner
 
 PROCESS_QUERY = ["ps", "-axo", "pid=,ppid=,stat=,lstart=,comm="]
@@ -134,6 +136,11 @@ class GuardRunner:
         if cmd[:1] == ["pmset"]:
             cmd = ["/usr/bin/pmset", *cmd[1:]]
         allowed = cmd in [
+            PROCESS_COMMAND,
+            native_command("displays"),
+            native_command("brightness"),
+            ["ioreg", "-rn", "AppleSmartBattery"],
+            ["lsappinfo", "front"],
             PROCESS_QUERY,
             STATUS_QUERY,
             ["ps", "-axo", "pid,stat,comm"],
@@ -152,6 +159,17 @@ class GuardRunner:
         allowed |= cmd in [
             ["/usr/bin/pmset", "-g", kind] for kind in ("custom", "cap", "ps", "assertions", "batt")
         ]
+        allowed |= (
+            len(cmd) == 5
+            and cmd[:4] == ["lsappinfo", "info", "-only", "pid,bundleid"]
+            and bool(re.fullmatch(r"ASN:0x[0-9a-fA-F]+-0x[0-9a-fA-F]+:", cmd[4]))
+        )
+        allowed |= (
+            len(cmd) == 6
+            and cmd[:3] == ["ps", "-ww", "-p"]
+            and cmd[3].isdigit()
+            and cmd[4:] == ["-o", "command="]
+        )
         allowed |= (
             len(cmd) == 5 and cmd[:2] == ["ps", "-p"] and cmd[2].isdigit() and cmd[3:] == ["-o", "%cpu="]
         )

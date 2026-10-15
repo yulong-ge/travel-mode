@@ -80,6 +80,7 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
         )
         self.st, self.merged = state_api.new_state(), False
         self.origin_ready = False
+        self._origin_error = None
         self.scan = {"running": [], "nobundle": []}
         self.svc = {"unloadable": [], "kept": []}
         self.pw_boxes = []  # (key, rec, checkbox)
@@ -101,6 +102,9 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
         return self.executor.execute(action, Context(self.st, self.save))
 
     def _disable_mutation_button(self, button):
+        if self._origin_error is not None and button.id != "b-doctor":
+            button.disabled = True
+            return
         if self._mutation_action is not None and button.id not in {"b-dash-apps", "b-dash-svc"}:
             self._disabled_buttons.setdefault(button, button.disabled)
             button.disabled = True
@@ -214,7 +218,11 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
                         await build(*args)
                         if not worker.is_cancelled and generation == self._refresh_generation:
                             self.pages_ready.add(page)
-                            if page in {"p-apps", "p-svc"} and "p-dash" in self.pages_ready:
+                            if (
+                                page in {"p-apps", "p-svc"}
+                                and "p-dash" in self.pages_ready
+                                and dash_values is not None
+                            ):
                                 await self.build_dash(*dash_values)
                     from travel_mode.tui.messages import PageRefreshed
 
@@ -241,6 +249,12 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
                     lambda: (pmset.pmset_custom(), supported_pmset_keys())
                 )
                 await apply("p-power", self.build_power, profs, supported)
+
+            async def health():
+                from travel_mode.system.health import collect
+
+                report = await asyncio.to_thread(collect)
+                await apply("health", self.build_health, report)
 
             async def services():
                 svc, spot = await asyncio.to_thread(lambda: (launchd.svc_scan(), spotlight.spotlight_on()))
@@ -288,7 +302,32 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
                 dev, wifi, bluetooth = await asyncio.to_thread(connections)
                 await apply("p-net", self.build_net, rows, dev, wifi, bluetooth)
 
-            tasks = [asyncio.create_task(fn()) for fn in (dash, power, services, apps, network)]
+            async def guarded(fn, page, selector):
+                from travel_mode.system.shell import ReadError
+
+                try:
+                    await fn()
+                except ReadError as exc:
+                    message = t("health.legacy_failed", reason=str(exc))
+
+                    async def failed():
+                        box = self.query_one(selector)
+                        await box.remove_children()
+                        await box.mount(Static(escape(message)))
+
+                    await apply(page, failed)
+
+            tasks = [
+                asyncio.create_task(guarded(fn, page, selector))
+                for fn, page, selector in (
+                    (dash, "p-dash", "#dash-status"),
+                    (power, "p-power", "#power-list"),
+                    (services, "p-svc", "#svc-box"),
+                    (apps, "p-apps", "#apps-box"),
+                    (network, "p-net", "#net-box"),
+                    (health, "health", "#dash-health"),
+                )
+            ]
             try:
                 await asyncio.gather(*tasks)
                 if not worker.is_cancelled and generation == self._refresh_generation:
@@ -360,7 +399,20 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
     @work(exclusive=True, group="origin")
     async def initialize_origin(self):
         with self.scenario_scope() as config:
-            self.st, self.merged = await asyncio.to_thread(snapshots.snapshot_origin)
+            from travel_mode.system.shell import ReadError
+
+            try:
+                self.st, self.merged = await asyncio.to_thread(snapshots.snapshot_origin)
+            except ReadError as exc:
+                self._origin_error = str(exc)
+                from .widgets import Button
+
+                for button in self.query(Button):
+                    self._disable_mutation_button(button)
+                self.logline("warn", t("health.origin_failed", reason=str(exc)))
+                self.refresh_dash()
+                self.refresh_battery()
+                return
             self.st["scenario"] = config.options.scenario
             self.origin_ready = True
             self.start_pages()
@@ -398,7 +450,7 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
             self._battery_timer = self.set_interval(30, self.refresh_battery)
 
     def action_refresh(self):
-        if self.scenario == "ask" or not self.origin_ready:
+        if self.scenario == "ask" or (not self.origin_ready and self._origin_error is None):
             return
         self._refresh_generation += 1
         self.refresh_complete = False

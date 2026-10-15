@@ -86,7 +86,9 @@ async def test_work_profile_brightness_is_opt_in_and_uses_configured_target(mach
         await app.workers.wait_for_complete()
         await pilot.pause()
         machine["fake"].calls.clear()
-        await pilot.click("#b-quick")
+        from tui_interaction import click_after_layout
+
+        await click_after_layout(pilot, "#b-quick")
         await app.workers.wait_for_complete()
         await pilot.pause()
         assert ("brightness", "0.42") in machine["fake"].calls

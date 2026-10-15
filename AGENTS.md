@@ -88,6 +88,7 @@ cli.py → flows/ (apply, restore, check, report, suggest, configuration, thaw)
 - `config.py` loads strict TOML from XDG paths (`config_template.toml` is the shipped template);
   `profiles.py` holds built-in profiles; `constants.py` holds generic default app lists.
 - `system/battery.py` reads ioreg without sudo; `measurement.py` uses finite windows. Only the open TUI owns a 30-second ioreg timer, stopped on exit; energy ranking is button-only, with no resident monitor.
+- `system/health.py` collects nine structured read-only checks once per command/open/explicit refresh (2 s per check, 15 s command budget); `health_native.py` isolates native reads under subprocess timeouts. `flows/doctor.py` maps findings to existing Actions; health has no timer or resident monitor.
 - Two scenarios select the profile and defaults: `work` (unplugged work: screen and network stay
   on, sync/backup/updater programs are paused) and `away` (lid closed / overnight).
 - `categories.toml` + `categories.py` are the built-in rules that recognise sync, backup, updater

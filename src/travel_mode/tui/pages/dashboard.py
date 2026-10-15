@@ -47,6 +47,10 @@ class DashboardPage:
         )
         self._dash_status.border_title = t("impl.status")
         yield self._dash_status
+        health = Vertical(Static(t("health.scanning")), id="dash-health", classes="card")
+        health.border_title = t("health.title")
+        yield health
+        yield Button(t("health.refresh"), id="b-doctor")
         quick = Vertical(classes="card")
         quick.border_title = t("impl.save_power_before_departure")
         with quick:
@@ -97,6 +101,40 @@ class DashboardPage:
             yield Button(t("impl.run_selected_actions"), id="b-quick", variant="success")
         yield Button(t("measurement.energy_button"), id="b-energy")
         yield Static(t("measurement.energy_hint"), id="dash-audit")
+
+    async def build_health(self, report):
+        from textual.containers import Horizontal
+
+        from travel_mode.flows.doctor import action_label
+
+        box = self.query_one("#dash-health", Vertical)
+        widgets = [
+            Static(t("health.timing", seconds=report["elapsed_seconds"], budget=report["budget_seconds"]))
+        ]
+        for row in report["checks"]:
+            widgets.append(Static(escape(f"{row['title']}: {t('health.' + row['status'])}")))
+            if row["error"]:
+                widgets.append(Static(escape(row["error"]), classes="health-detail"))
+            for evidence in row["evidence"]:
+                widgets.append(Static(escape(evidence), classes="health-detail"))
+            if row["status"] == "hit":
+                for line in [row["impact"], row["manual"]]:
+                    widgets.append(Static(escape(line), classes="health-detail"))
+            for i, descriptor in enumerate(row["actions"]):
+                button = Button(action_label(descriptor), id=f"b-health-{row['id']}-{i}")
+                # Store the observation on the widget. A recomposed page cannot retarget a queued click.
+                button.health_descriptor = descriptor
+                widgets.append(Horizontal(Static("", classes="grow"), button, classes="health-action"))
+        widgets.extend(Static(escape(line), classes="health-detail") for line in report["limitations"])
+        await box.remove_children()
+        await box.mount(*widgets)
+
+    async def act_health(self, button):
+        from travel_mode.flows.doctor import remediate
+
+        await self.busy(button, remediate, button.health_descriptor, self.execute, self.st, self.save)
+        button._mutation_done = True
+        self.action_refresh()
 
     async def build_dash(self, blocks, ac, batt, spot):
         from travel_mode.resurrection import describe

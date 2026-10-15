@@ -41,6 +41,14 @@ class FakeRunner:
 def _readonly_responses() -> dict[tuple[str, ...], CmdResult]:
     fixture = Path(__file__).parent / "fixtures"
     return {
+        ("ps", "-axo", "pid=,ppid=,uid=,stat=,%cpu=,lstart=,comm="): CmdResult(
+            "900000 1 0 S 0.0 Thu Oct 15 12:00:00 2026 /System/Library/CoreServices/loginwindow", "", 0
+        ),
+        (sys.executable, "-m", "travel_mode.system.health_native", "displays"): CmdResult("[]", "", 0),
+        (sys.executable, "-m", "travel_mode.system.health_native", "brightness"): CmdResult("0.5", "", 0),
+        ("tmutil", "status"): CmdResult("Backup session status:\n{ Running = 0; }", "", 0),
+        ("lsappinfo", "front"): CmdResult("ASN:0x0-0x1:", "", 0),
+        ("lsappinfo", "info"): CmdResult('bundleID="org.demo.front"\npid = 900000', "", 0),
         ("ioreg", "-rn", "AppleSmartBattery"): CmdResult(
             '"ExternalConnected" = Yes\n"IsCharging" = No\n', "", 0
         ),

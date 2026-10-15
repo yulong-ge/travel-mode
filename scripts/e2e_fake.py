@@ -1,10 +1,12 @@
 """Stateful command double shared by tmux demo and harness tests. Never invokes subprocesses."""
 
+import os
 import plistlib
 from pathlib import Path
 
 from e2e_guard import LABEL, PROCESS_QUERY, QUIT_EVENT, STATUS_QUERY
 
+from travel_mode.system.health import PROCESS_COMMAND, native_command
 from travel_mode.system.shell import CmdResult
 
 
@@ -49,6 +51,20 @@ class Machine:
         if interactive:
             raise RuntimeError("Fake machine never accepts interactive authentication")
         self.calls.append(tuple(cmd))
+        if cmd == native_command("displays"):
+            return CmdResult("[]", "", 0)
+        if cmd == native_command("brightness"):
+            return CmdResult("0.5", "", 0)
+        if cmd == ["tmutil", "status"]:
+            return CmdResult("Backup session status:\n{ Running = 0; }", "", 0)
+        if cmd == ["lsappinfo", "front"]:
+            return CmdResult("ASN:0x0-0x1:", "", 0)
+        if cmd[:2] == ["lsappinfo", "info"]:
+            return CmdResult('pid = 77\nbundleID="org.demo.foreground"', "", 0)
+        if cmd == PROCESS_COMMAND:
+            return CmdResult(
+                "\n".join(f"{p} 1 {os.getuid()} {s} 0.0 {b} {c}" for p, (s, b, c) in self.rows.items()), "", 0
+            )
         if cmd == ["ioreg", "-rn", "AppleSmartBattery"]:
             return CmdResult('"ExternalConnected" = Yes\n"IsCharging" = No\n', "", 0)
         if cmd[:3] == ["sudo", "-n", "-l"]:

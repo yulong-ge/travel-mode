@@ -13,7 +13,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover
     import tomli as tomllib
 
-CATEGORIES = ("sync", "backup", "updater", "vm")
+CATEGORIES = ("sync", "backup", "updater", "vm", "keep-awake")
 
 
 @lru_cache(maxsize=1)

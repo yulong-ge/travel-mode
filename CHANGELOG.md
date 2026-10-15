@@ -12,6 +12,8 @@ All notable changes follow Keep a Changelog.
 
 ### Added
 
+- Bounded on-demand health checks shared by check/JSON and the bilingual overview, with evidence, manual steps and existing Action remediation buttons.
+- Public keep-awake app recognition and configurable brightness/CPU health thresholds; individual read failures remain visible without stopping other checks.
 - On-demand battery power measurement, configurable finite windows, work before/after comparisons and saved session results.
 - Open-TUI battery readings every 30 seconds, button-only energy ranking and one-shot resurrection detection with existing Action remediation.
 - A read-only resource.getrusage overhead measurement script and battery/check JSON schema coverage.
