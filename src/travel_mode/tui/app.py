@@ -59,9 +59,15 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
 
     CSS_PATH = str(Path(__file__).with_name("style.tcss"))
 
-    def __init__(self, dry_run=False, *, scenario=None):
+    def __init__(self, dry_run=False, *, scenario=None, measure=None):
         super().__init__()
         self._dry_run = dry_run
+        self.measure_enabled = measure
+        import threading
+
+        self._measurement_cancelled = threading.Event()
+        self._battery_timer = None
+        self.resurrected = []
         self.profile_values = active_values()
         self.scenario = scenario or active_scenario()
         self.config = load_config()
@@ -225,6 +231,9 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
                     )
                 )
                 dash_values = blocks, ac, batt, spot
+                from travel_mode.resurrection import detect
+
+                self.resurrected = await asyncio.to_thread(detect, self.display_state())
                 await apply("p-dash", self.build_dash, *dash_values)
 
             async def power():
@@ -309,13 +318,33 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
                         self.query_one("#dash-audit", Static).update("\n".join(lines))
 
             try:
-                lines = flow_check.audit_lines()
+                from travel_mode.system.processes import power_top
+
+                lines = [
+                    t("impl.top_energy_consumers"),
+                    *(f"{power}  {command}" for power, command in power_top()),
+                ]
                 if not worker.is_cancelled:
                     self.call_from_thread(apply)
             except Exception as e:
                 self.call_from_thread(self.logline, "bad", t("impl.audit_failed", v0=type(e).__name__, v1=e))
                 self.call_from_thread(self.notify, t("impl.audit_failed_2", v0=e), severity="error")
                 raise RuntimeError(t("impl.tui_audit_failed", v0=e)) from e
+
+    @work(exclusive=True, group="battery")
+    async def refresh_battery(self):
+        from textual.worker import get_current_worker
+
+        from travel_mode.system import battery
+
+        reading = await asyncio.to_thread(battery.read)
+        if not get_current_worker().is_cancelled and self.is_running:
+            self.query_one("#dash-battery", Static).update(battery.describe(reading))
+
+    def on_unmount(self):
+        self._measurement_cancelled.set()
+        if self._battery_timer is not None:
+            self._battery_timer.stop()
 
     def on_mount(self):
         self._translate_bindings()
@@ -364,7 +393,9 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
         if system_apps.ensure_conf():
             self.logline("dim", t("impl.created_default_action_configuration", v0=common.CONF_PATH))
         self.refresh_dash()
-        self.refresh_audit_detail()
+        self.refresh_battery()
+        if self._battery_timer is None:
+            self._battery_timer = self.set_interval(30, self.refresh_battery)
 
     def action_refresh(self):
         if self.scenario == "ask" or not self.origin_ready:
@@ -373,7 +404,7 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
         self.refresh_complete = False
         self.logline("dim", t("impl.refresh"))
         self.refresh_dash()
-        self.refresh_audit_detail()
+        self.refresh_battery()
 
     def action_goto(self, pane: str):
         if self.scenario == "ask":
@@ -411,7 +442,7 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
         self.run_worker(fix, group="tabfix", exclusive=True)
 
 
-def tui(return_class=False, dry_run=False):
+def tui(return_class=False, dry_run=False, measure=None):
     if return_class:
         if not dry_run:
             return TravelApp
@@ -421,7 +452,7 @@ def tui(return_class=False, dry_run=False):
                 super().__init__(dry_run=True)
 
         return DryRunTravelApp
-    return TravelApp(dry_run=dry_run).run()
+    return TravelApp(dry_run=dry_run, measure=measure).run()
 
 
 def run_tui():

@@ -35,6 +35,9 @@ class Dispatch:
             self.notify(t("scenario.preparing"), severity="warning")
             return
         with self.scenario_scope():
+            if ev.button.id == "b-energy":
+                self.refresh_audit_detail()
+                return
             if ev.button.id in {"b-dash-apps", "b-dash-svc"}:
                 await self._dispatch_button(ev)
                 return
@@ -95,6 +98,11 @@ class Dispatch:
         self.query_one(TabbedContent).focus()
         if bid == "b-quick":
             await self.act_quick(ev.button)
+        elif bid == "b-reapply":
+            from travel_mode.resurrection import reapply
+
+            await self.busy(ev.button, reapply, self.st, self.execute, self.save)
+            self.action_refresh()
         elif bid == "b-fixsleep":
             _, rc = await asyncio.to_thread(self.execute, EnableSleep())
             self.logline("ok" if rc == 0 else "warn", "disablesleep → 0" if rc == 0 else t("impl.fix_failed"))

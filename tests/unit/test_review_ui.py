@@ -298,8 +298,9 @@ def test_cli_dry_run_tui_language_write_uses_configuration_copy(cli_platform, mo
     monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
 
-    def tui(*, dry_run):
+    def tui(*, dry_run, measure):
         assert dry_run
+        assert measure is None
         assert config_path() != source
         write_language("zh")
         return 0

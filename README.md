@@ -66,6 +66,8 @@ Sudo is requested only for operations that require it, such as power writes, glo
 | --- | --- |
 | `travel-mode` / `travel-mode on` | Select a scenario, then use the chosen interface |
 | `travel-mode off` / `travel-mode restore` | Restore outstanding recovery records |
+| `travel-mode power --seconds 20` / `--json` | Measure battery draw in a finite window |
+| `travel-mode check --reapply` | Pause recorded items detected running again |
 | `travel-mode check` / `travel-mode check --json` | Read-only audit, including the effective saved scenario in JSON |
 | `travel-mode report` / `travel-mode report --json` | Read-only sleep / DarkWake report |
 | `travel-mode config path` | Show configuration and state paths |
@@ -91,6 +93,11 @@ Paths default to `~/.config/travel-mode/config.toml` and `~/.local/state/travel-
 scenario = "ask" # ask | work | away
 interface = "tui" # tui | cli
 language = "auto" # auto | en | zh
+
+[measurement]
+seconds = 20
+interval = 2
+settle_seconds = 10
 
 [categories]
 pause = ["sync", "backup", "updater"]
@@ -119,6 +126,22 @@ Category actions supplement `services.unload` and explicit `apps.quit` / `apps.f
 Built-ins are `work`, `flight` and `overnight`. `cafe` was merged into `work` and removed, with no alias. A profile overrides ordinary settings for its supplied fields; custom `[profiles.NAME]` values override the matching built-in. A custom profile defaults to away unless it sets `scenario = "work"`. Conflicting explicit `--scenario` and profile scenarios are errors. Snapshots record the last applied scenario while keeping the first original values for recovery. `check --json` uses null when no saved scenario exists, including older snapshots.
 
 `TRAVEL_MODE_LANG` overrides configured language. `TRAVEL_MODE_APP_DIRS` adds colon-separated absolute app directories; empty/relative entries are errors. `suggest --write` requests confirmation, preserves comments and validates before replacing configuration. JSON schemas: [check](docs/json-schema/check.schema.json), [suggest](docs/json-schema/suggest.schema.json). Optional integrations: [Shortcuts](integrations/shortcuts.md), [menu plugin](integrations/swiftbar/travel-mode.10s.sh), [sudoers](docs/sudoers.md).
+
+## Power measurement
+
+`travel-mode power` samples `ioreg -rn AppleSmartBattery` every 2 seconds for a 20-second window and reads `pmset -g batt` once for macOS's estimate. Use `travel-mode power --seconds 30 --json` for structured output; the [power schema](docs/json-schema/power.schema.json) describes available and unavailable results. No sudo is needed. A connected charger, charging battery or absent battery produces an explicit unavailable result, without a synthetic power reading. Missing or malformed discharge fields produce an error.
+
+Power is voltage in mV × signed discharge current in mA / 1,000,000. Unsigned 64-bit negative current is decoded before calculation. Remaining energy uses `AppleRawCurrentCapacity` in mAh and current voltage; estimated hours are remaining Wh / mean W. `TimeRemaining=65535` and an absent macOS time estimate mean unknown. Raw mAh fields are required for discharge estimates; percentage-only capacities are not substituted. Instantaneous current fluctuates with screen brightness, networking, temperature and foreground work. These estimates are observations of the sampling window, not a battery-life guarantee or proof that an action caused a change.
+
+On battery, work apply measures before the actions, waits 10 seconds after them and measures again. This adds about 50 seconds at the defaults. `--no-measure` skips the comparison; `--measure` enables it in away too. The TUI has the same selection and shows progress while its interface remains responsive. Dry-run skips comparisons because the actions have not executed. A power-source change stops the affected window. A complete comparison is saved in the active snapshot and shown by `report`, including negative savings if power draw increased. Additional hours compare both mean powers at the same remaining charge after the actions.
+
+Configure `[measurement] seconds`, `interval` and `settle_seconds`. Values must be finite seconds, at most 3600; the window must be positive, the interval at least 0.5, and the settling period nonnegative. `power --seconds` overrides that command's window. The overview reads only ioreg every 30 seconds while the TUI is open. It stops its timer on exit. Energy ranking uses one `top -stats power` invocation only when its button is clicked. There is no installed monitor, daemon or background service.
+
+Opening the tool or running `check` also compares recorded pauses with current LaunchAgent labels, app executables and exact PID birth identities. It lists reloaded agents, restarted apps and resumed frozen PIDs. Use **Apply pauses again** or `travel-mode check --reapply` to invoke the existing Actions again. Detection does not monitor after the command or TUI exits; a reused PID is not treated as the original process.
+
+Measured on macOS on 2026-10-15 with external power connected: a 20.159-second probe window used 0.020392 s of process CPU and 0.155477 s of child CPU (0.175869 s total), with 10 ioreg calls and one pmset call. The TUI idle window lasted 300.001 seconds and used 0.931522 s of process CPU plus 0.189740 s of child CPU (1.121262 s total). Its only subprocesses during that window were 10 ioreg calls; no top ran. These are CPU seconds, not watt-hours. The TUI was idle; other validation processes were active on the host.
+
+Reproduce with `uv run python scripts/measure_overhead.py probes --output /tmp/travel-mode-probes.json` and `uv run python scripts/measure_overhead.py tui --output /tmp/travel-mode-tui.json`. The script isolates HOME/config/state, enforces a read-only Runner and takes deltas of `resource.getrusage(RUSAGE_SELF)` and `RUSAGE_CHILDREN` user + system CPU times. TUI accounting starts after initial rendering and covers five minutes with no input. The 20-second probe mode exercises the read/parse path even on AC and includes one macOS estimate query; normal `power` and apply skip the window on AC. No valid discharge measurement or battery-life improvement was hardware-verified in this run.
 
 ## Restore and recovery
 

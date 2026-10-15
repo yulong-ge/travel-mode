@@ -33,7 +33,7 @@ def _main(argv=None):
     parser.add_argument(
         "cmd",
         nargs="?",
-        choices=["on", "off", "restore", "check", "report", "config", "thaw", "profiles", "suggest"],
+        choices=["on", "off", "restore", "check", "report", "config", "thaw", "profiles", "suggest", "power"],
     )
     parser.add_argument(
         "config_cmd", nargs="?", choices=["path", "init", "validate", "edit", "set-language", "set-interface"]
@@ -53,11 +53,24 @@ def _main(argv=None):
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--samples", type=int, default=3)
+    parser.add_argument("--seconds", type=float, help=t("measurement.seconds_help"))
+    measure_flags = parser.add_mutually_exclusive_group()
+    measure_flags.add_argument(
+        "--measure", dest="measure", action="store_true", default=None, help=t("measurement.enable_help")
+    )
+    measure_flags.add_argument(
+        "--no-measure", dest="measure", action="store_false", help=t("measurement.disable_help")
+    )
+    parser.add_argument("--reapply", action="store_true", help=t("resurrection.reapply_help"))
     parser.add_argument("--lang", choices=["en", "zh"], help=t("cli.output_language"))
     parser.add_argument("--demo", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--all", action="store_true", help=t("cli.thaw_resume_all_stopped_app_processes"))
     parser.add_argument("--version", action="version", version="travel-mode 1.1.0")
     args = parser.parse_args(argv)
+    if args.seconds is not None and args.cmd != "power":
+        parser.error(t("measurement.seconds_only_power"))
+    if args.reapply and args.cmd != "check" and not args.check:
+        parser.error(t("resurrection.check_only"))
     if args.value is not None and args.config_cmd not in {"set-language", "set-interface"}:
         parser.error(t("cli.unexpected_config_value"))
     if args.config_cmd == "set-language" and args.value not in {"en", "zh"}:
@@ -102,6 +115,22 @@ def _main(argv=None):
         for name, profile in {**builtin_profiles(), **config.profiles}.items():
             print(f"{name}: {profile.values.get('description', '')}")
         return 0
+    if args.cmd == "power":
+        import json
+        from dataclasses import replace
+
+        from .measurement import describe, measure, validate_settings
+
+        settings = load_config().measurement
+        if args.seconds is not None:
+            settings = replace(settings, seconds=args.seconds)
+        try:
+            validate_settings(settings)
+        except ValueError as exc:
+            parser.error(str(exc))
+        result = measure(settings)
+        print(json.dumps(result, ensure_ascii=False) if args.json else describe(result))
+        return 0
     if args.cmd == "suggest":
         from .flows.suggest import confirm_write, print_suggestions, print_warnings, suggest_data
 
@@ -121,6 +150,10 @@ def _main(argv=None):
     if args.cmd == "thaw":
         return thaw_processes(all_processes=args.all)
     if args.cmd == "check" or args.check:
+        if args.reapply:
+            from .flows.check import reapply_paused
+
+            reapply_paused()
         if args.dry_run:
             from .actions.runtime import _prepare_dry_run
 
@@ -163,12 +196,16 @@ def _main(argv=None):
                 scenario = ask_scenario()
         with profile_scope(config, args.profile, aggressive=args.aggressive, scenario=scenario):
             if args.yes or args.interface == "cli":
-                return mode_apply(yes=args.yes, aggressive=args.aggressive, dry_run=args.dry_run)
+                return mode_apply(
+                    yes=args.yes, aggressive=args.aggressive, dry_run=args.dry_run, measure=args.measure
+                )
             if not sys.stdin.isatty() or not sys.stdout.isatty():
                 print(t("impl.non_interactive_terminal_running_check_use"), file=sys.stderr)
                 return mode_check()
             if interface == "cli":
-                return mode_apply(yes=False, aggressive=args.aggressive, dry_run=args.dry_run)
+                return mode_apply(
+                    yes=False, aggressive=args.aggressive, dry_run=args.dry_run, measure=args.measure
+                )
             if args.dry_run:
                 from .actions.runtime import _prepare_dry_run
 
@@ -176,7 +213,7 @@ def _main(argv=None):
             from .state import load_state
 
             load_state()  # Validate before Textual can wrap startup errors in a worker exception.
-            return tui(dry_run=args.dry_run)
+            return tui(dry_run=args.dry_run, measure=args.measure)
     raise RuntimeError("unhandled travel-mode command")
 
 

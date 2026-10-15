@@ -41,6 +41,9 @@ class FakeRunner:
 def _readonly_responses() -> dict[tuple[str, ...], CmdResult]:
     fixture = Path(__file__).parent / "fixtures"
     return {
+        ("ioreg", "-rn", "AppleSmartBattery"): CmdResult(
+            '"ExternalConnected" = Yes\n"IsCharging" = No\n', "", 0
+        ),
         ("pmset", "-g", "custom"): CmdResult((fixture / "pmset-g-custom.txt").read_text(), "", 0),
         ("pmset", "-g"): CmdResult((fixture / "pmset-g.txt").read_text(), "", 0),
         ("pmset", "-g", "batt"): CmdResult(
@@ -75,6 +78,7 @@ class ReadOnlyHostRunner:
         allowed = (
             key[:2] == ("pmset", "-g")
             or key == ("launchctl", "list")
+            or key == ("ioreg", "-rn", "AppleSmartBattery")
             or key[:2] == ("mdutil", "-s")
             or key[:2] == ("brightness", "-l")
             or (key and key[0] in {"ps", "pgrep", "top", "mdfind"})

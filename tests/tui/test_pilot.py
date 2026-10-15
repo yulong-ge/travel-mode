@@ -139,7 +139,11 @@ async def test_tui_pilot_read_only(demo_app, readonly_tui):
         await wait_for_dashboard(app, pilot)
         audit = app.query_one("#dash-audit")
         audit_txt = str(audit.content) if audit.content is not None else ""
-        assert "InternalBattery" in audit_txt or "CPU" in audit_txt or "电池供电" in audit_txt
+        from travel_mode.i18n import t
+
+        assert audit_txt == t("measurement.energy_hint")
+        assert app.query_one("#b-energy").is_attached
+        assert str(app.query_one("#dash-battery").content)
 
         tb = app.query_one(TabbedContent)
         for pane in ("p-apps", "p-svc", "p-net", "p-power"):

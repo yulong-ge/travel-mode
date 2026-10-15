@@ -10,7 +10,8 @@
     "services",
     "spotlight_indexing",
     "snapshot",
-    "scenario"
+    "scenario",
+    "resurrected"
   ],
   "properties": {
     "version": {
@@ -175,6 +176,36 @@
         "away",
         null
       ]
+    },
+    "resurrected": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "kind",
+          "name",
+          "path"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "agent",
+              "app",
+              "pid"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "pid": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
     }
   }
 }

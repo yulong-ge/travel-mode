@@ -30,6 +30,14 @@ def _configure_demo() -> None:
     class DemoRunner:
         def __call__(self, command, timeout=None, interactive=False):
             cmd = tuple(command)
+            if cmd == ("ioreg", "-rn", "AppleSmartBattery"):
+                return CmdResult(
+                    '"ExternalConnected" = No\n"IsCharging" = No\n"Voltage" = 12000\n'
+                    '"InstantAmperage" = 18446744073709550616\n"AppleRawCurrentCapacity" = 4000\n'
+                    '"AppleRawMaxCapacity" = 5000\n"TimeRemaining" = 240\n',
+                    "",
+                    0,
+                )
             if cmd == ("pmset", "-g", "custom"):
                 return CmdResult((fixture / "pmset-g-custom.txt").read_text(), "", 0)
             if cmd == ("pmset", "-g"):

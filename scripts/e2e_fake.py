@@ -49,6 +49,8 @@ class Machine:
         if interactive:
             raise RuntimeError("Fake machine never accepts interactive authentication")
         self.calls.append(tuple(cmd))
+        if cmd == ["ioreg", "-rn", "AppleSmartBattery"]:
+            return CmdResult('"ExternalConnected" = Yes\n"IsCharging" = No\n', "", 0)
         if cmd[:3] == ["sudo", "-n", "-l"]:
             return CmdResult("", "" if self.permission else "sudo denied", int(not self.permission))
         if cmd == PROCESS_QUERY:

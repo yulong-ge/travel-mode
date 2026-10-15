@@ -35,6 +35,13 @@ from travel_mode.tui.widgets import Button, _ellip, status_row
 
 class DashboardPage:
     def compose_dashboard(self):
+        yield Static(t("impl.scanning"), id="dash-battery")
+        revived = Static("", id="dash-revived")
+        revived.display = False
+        yield revived
+        reapply = Button(t("resurrection.reapply"), id="b-reapply", disabled=True)
+        reapply.display = False
+        yield reapply
         self._dash_status = Vertical(
             Label(t("impl.scanning"), classes="srow"), id="dash-status", classes="card"
         )
@@ -43,6 +50,13 @@ class DashboardPage:
         quick = Vertical(classes="card")
         quick.border_title = t("impl.save_power_before_departure")
         with quick:
+            yield Checkbox(
+                t("measurement.checkbox"),
+                self.measure_enabled if self.measure_enabled is not None else self.scenario == "work",
+                id="q-measure",
+                classes="scope",
+            )
+            yield Static("", id="measurement-progress")
             yield Checkbox(
                 t("impl.recommended_power_settings_battery_profile"),
                 True,
@@ -81,9 +95,16 @@ class DashboardPage:
                 classes="scope",
             )
             yield Button(t("impl.run_selected_actions"), id="b-quick", variant="success")
-        yield Static(t("impl.sampling"), id="dash-audit")
+        yield Button(t("measurement.energy_button"), id="b-energy")
+        yield Static(t("measurement.energy_hint"), id="dash-audit")
 
     async def build_dash(self, blocks, ac, batt, spot):
+        from travel_mode.resurrection import describe
+
+        self.query_one("#dash-revived", Static).update("\n".join(describe(row) for row in self.resurrected))
+        self.query_one("#dash-revived", Static).display = bool(self.resurrected)
+        self.query_one("#b-reapply", Button).disabled = not self.resurrected
+        self.query_one("#b-reapply", Button).display = bool(self.resurrected)
         box = self._dash_status
         await box.remove_children()
         source = t("impl.ac_power") if ac else t("impl.battery_power")
@@ -156,6 +177,7 @@ class DashboardPage:
         await box.mount(*w)
 
     async def act_quick(self, btn):
+        measure_requested = self.query_one("#q-measure", Checkbox).value
         scope = {
             k: self.query_one(f"#q-{k}", Checkbox).value
             for k in ("power", "apps", "svc", "spot", "net", "sync", "updater")
@@ -166,6 +188,21 @@ class DashboardPage:
 
         def flow():
             config = load_config()
+            from travel_mode import measurement
+
+            def progress(message):
+                self.tlog("dim", message)
+                self.call_from_thread(self.query_one("#measurement-progress", Static).update, message)
+
+            clock = measurement.CancellableClock(self._measurement_cancelled)
+            before = measurement.begin(
+                self.scenario,
+                measure_requested,
+                config.measurement,
+                progress,
+                clock=clock,
+                cancelled=self._measurement_cancelled,
+            )
             categories = set()
             if scope["sync"]:
                 categories.update({"sync", "backup"} & set(config.categories.pause))
@@ -330,6 +367,15 @@ class DashboardPage:
                 if t("impl.audio") in msg or "daemon app" in msg:
                     self.tlog(kind, t("impl.final_audit", v0=_ellip(msg, 70)))
             self.tlog("ok", t("impl.power_saving_actions_complete_snapshot_updated"))
+            measurement.finish(
+                before,
+                config.measurement,
+                self.st,
+                self.save,
+                progress,
+                clock=clock,
+                cancelled=self._measurement_cancelled,
+            )
 
         await self.busy(btn, flow)
         self.notify(t("impl.power_saving_actions_complete"), severity="information")

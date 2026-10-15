@@ -1,0 +1,5 @@
++-o AppleSmartBattery
+{
+  "ExternalConnected" = Yes
+  "IsCharging" = No
+}

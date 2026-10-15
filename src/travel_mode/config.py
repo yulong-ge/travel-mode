@@ -10,6 +10,7 @@ from typing import Any
 import tomlkit
 
 from .i18n import t
+from .measurement import Settings, validate_settings
 
 try:
     import tomllib
@@ -159,6 +160,7 @@ class Config:
     options: OptionsConfig = field(default_factory=OptionsConfig)
     profiles: dict[str, Profile] = field(default_factory=dict)
     categories: CategoriesConfig = field(default_factory=CategoriesConfig)
+    measurement: Settings = field(default_factory=Settings)
 
     @classmethod
     def defaults(cls) -> Config:
@@ -170,7 +172,7 @@ class Config:
         )
 
 
-_TOP_KEYS = {"apps", "network", "services", "power", "options", "profiles", "categories"}
+_TOP_KEYS = {"apps", "network", "services", "power", "options", "profiles", "categories", "measurement"}
 _APP_KEYS = {"default", "watch", "ignore", "quit", "freeze", "skip", "ask", "with_daemon"}
 _ACTIONS = ("quit", "freeze", "skip", "ask")
 
@@ -320,12 +322,20 @@ def load_config(path: str | Path | None = None) -> Config:
     if not isinstance(raw_profiles, dict):
         raise _error(target, "profiles", t("config.expected_a_table"))
     profiles = parse_profiles(raw_profiles, target)
+    measurement = _table(data, "measurement", target)
+    _check_keys(measurement, {"seconds", "interval", "settle_seconds"}, target, "measurement")
+    settings = Settings(**measurement)
+    try:
+        validate_settings(settings)
+    except ValueError as exc:
+        raise ConfigError(target, "measurement", str(exc), cause=exc) from exc
     return Config(
         apps=app_config,
         network=network_config,
         services=service_config,
         power_overrides=overrides,
         options=OptionsConfig(aggressive, language, interface, scenario),
+        measurement=settings,
         profiles=profiles,
         categories=CategoriesConfig(
             pause, _strings(categories.get("ignore", []), target, "categories.ignore")

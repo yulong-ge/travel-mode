@@ -66,6 +66,8 @@ away 动作可修改电池设置、AC 的 `powernap` / `womp`、全局 `disables
 | --- | --- |
 | `travel-mode` / `travel-mode on` | 选择场景后进入选定界面 |
 | `travel-mode off` / `travel-mode restore` | 恢复尚未完成的恢复记录 |
+| `travel-mode power --seconds 20` / `--json` | 在有限窗口内测量电池功耗 |
+| `travel-mode check --reapply` | 再次暂停检测到已复活的记录项 |
 | `travel-mode check` / `travel-mode check --json` | 只读检查；JSON 包含当前已保存的生效场景 |
 | `travel-mode report` / `travel-mode report --json` | 只读睡眠 / DarkWake 报告 |
 | `travel-mode config path` | 显示配置和状态路径 |
@@ -91,6 +93,11 @@ away 动作可修改电池设置、AC 的 `powernap` / `womp`、全局 `disables
 scenario = "ask" # ask | work | away
 interface = "tui" # tui | cli
 language = "auto" # auto | en | zh
+
+[measurement]
+seconds = 20
+interval = 2
+settle_seconds = 10
 
 [categories]
 pause = ["sync", "backup", "updater"]
@@ -119,6 +126,22 @@ skip = []
 内置 profile 为 `work`、`flight`、`overnight`。`cafe` 已合并到 `work` 并删除，不保留别名。profile 提供的字段覆盖普通配置；自定义 `[profiles.NAME]` 覆盖同名内置值。自定义 profile 默认属于 away，除非设置 `scenario = "work"`。显式 `--scenario` 与 profile 场景冲突会报错。快照记录最后应用的场景，同时保留首次原值用于恢复。没有已保存场景时，包括旧快照，`check --json` 输出 null。
 
 `TRAVEL_MODE_LANG` 覆盖配置语言。`TRAVEL_MODE_APP_DIRS` 添加以冒号分隔的绝对应用目录，空项或相对路径会报错。`suggest --write` 请求确认、保留注释，并在替换配置前校验。JSON schema：[check](docs/json-schema/check.schema.json)、[suggest](docs/json-schema/suggest.schema.json)。可选集成：[Shortcuts](integrations/shortcuts.md)、[菜单插件](integrations/swiftbar/travel-mode.10s.sh)、[sudoers](docs/sudoers.md)。
+
+## 功耗测量
+
+`travel-mode power` 在 20 秒窗口内每 2 秒采样一次 `ioreg -rn AppleSmartBattery`，并读取一次 `pmset -g batt` 显示 macOS 的估计。`travel-mode power --seconds 30 --json` 输出结构化结果；[power schema](docs/json-schema/power.schema.json) 定义可测量与不可测量结果。此命令无需 sudo。接电、充电或没有电池时，明确返回不可测量，不合成功率数值。放电字段缺失或格式异常时明确报错。
+
+功率为电压 mV × 有符号放电电流 mA / 1,000,000。无符号 64 位负电流会先转换为有符号值。剩余能量使用 `AppleRawCurrentCapacity` 的 mAh 值和当前电压；预计小时数为剩余 Wh / 平均 W。`TimeRemaining=65535` 或 macOS 未提供时长时显示未知。放电估算需要原始 mAh 字段，不以百分比容量替代。瞬时电流会随屏幕亮度、网络、温度和前台任务波动。结果描述采样窗口，不保证实际续航，也不能证明变化由某个动作导致。
+
+使用电池时，work 应用动作前先测量，动作后等待 10 秒，再次测量。默认增加约 50 秒。`--no-measure` 关闭对比；`--measure` 在 away 中也开启。TUI 提供相同选择，测量时显示进度，界面继续响应。dry-run 没有执行动作，因此跳过对比。电源来源变化会终止当前窗口。完整对比保存在活动快照中，由 `report` 展示；功耗增加时保留负节省值。额外时长按动作后同一份剩余电量比较两次平均功率。
+
+可配置 `[measurement] seconds`、`interval` 和 `settle_seconds`。数值必须有限且不超过 3600 秒；窗口大于 0，间隔至少 0.5 秒，稳定期不小于 0。`power --seconds` 仅覆盖本次命令的窗口。总览仅在 TUI 打开期间每 30 秒读取一次 ioreg，退出时停止定时器。耗电排行仅在点击按钮时运行一次 `top -stats power`。工具不安装监控进程、守护进程或后台服务。
+
+打开工具或运行 `check` 时，还会对照暂停记录检查 LaunchAgent label、应用可执行文件和 PID 出生身份，列出重新加载的 agent、重新运行的应用和恢复运行的冻结 PID。点击“再次处理”或运行 `travel-mode check --reapply` 可复用现有 Action 再次暂停。命令或 TUI 退出后不再检测；复用的 PID 不会被视为原进程。
+
+2026-10-15 在 macOS 接电状态下实测：20.159 秒采样窗口使用工具进程 CPU 0.020392 秒、子进程 CPU 0.155477 秒，合计 0.175869 秒；调用 ioreg 10 次、pmset 1 次。TUI 空闲窗口为 300.001 秒，使用工具进程 CPU 0.931522 秒、子进程 CPU 0.189740 秒，合计 1.121262 秒。该窗口内仅调用 ioreg 10 次，没有运行 top。这些是 CPU 时间，不是耗电量。TUI 没有交互；本机同时运行其他验证进程。
+
+复现方法：`uv run python scripts/measure_overhead.py probes --output /tmp/travel-mode-probes.json` 与 `uv run python scripts/measure_overhead.py tui --output /tmp/travel-mode-tui.json`。脚本隔离 HOME、配置和状态，强制使用只读 Runner，并计算 `resource.getrusage(RUSAGE_SELF)` 与 `RUSAGE_CHILDREN` 的用户态加内核态 CPU 时间差。TUI 在初始渲染完成后计时，保持五分钟无输入。20 秒探针模式在接电时也执行读数与解析路径，并查询一次 macOS 估计；正常 power 和 apply 在接电时跳过窗口。本轮没有真机验证有效放电测量或续航改善。
 
 ## 恢复机制
 

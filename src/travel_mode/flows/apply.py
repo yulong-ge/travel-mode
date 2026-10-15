@@ -76,7 +76,7 @@ def ask_qf(prompt, default_act, yes=False, *, aggressive=False):
 
 
 @runtime._sudo_lifecycle
-def mode_apply(yes=False, aggressive=False, dry_run=False):
+def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
     runtime._prepare_dry_run(dry_run)
     from ..profiles import active_values
 
@@ -100,6 +100,11 @@ def mode_apply(yes=False, aggressive=False, dry_run=False):
         c.print(f"{mark} {msg}")
 
     st, merged = snapshots.snapshot_origin()
+    from .. import measurement
+
+    before = measurement.begin(
+        config.options.scenario, measure, config.measurement, lambda msg: emit("dim", msg)
+    )
     if config.options.scenario != "ask":
         st["scenario"] = config.options.scenario
     from ..actions.journal import mutation_scope
@@ -412,8 +417,10 @@ def mode_apply(yes=False, aggressive=False, dry_run=False):
         bl = pmset.battery_line()
         if bl:
             c.print(f"  {bl}", highlight=False)
+        measurement.finish(before, config.measurement, st, state_api.save_state, lambda msg: emit("dim", msg))
         has_changes = (
-            power_applied
+            "measurement" in st
+            or power_applied
             or ac_applied
             or fixsleep_applied
             or any(st[k] for k in LIST_KEYS)

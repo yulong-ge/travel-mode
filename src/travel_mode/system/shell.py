@@ -81,6 +81,8 @@ def _dry_run_readonly(cmd: list[str]) -> bool:
         return len(args) >= 1 and args[0] == "-g"
     if base == "launchctl":
         return args == ["list"]
+    if base == "ioreg":
+        return args == ["-rn", "AppleSmartBattery"]
     if base == "mdutil":
         return args[:1] == ["-s"]
     if base in {"ps", "pgrep", "top", "mdfind"}:

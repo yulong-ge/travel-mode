@@ -66,6 +66,13 @@ def mode_check():
         c.print(f"{mark} {msg}")
 
     c.rule(t("impl.system_audit"))
+    from ..resurrection import describe, detect
+    from ..state import load_state
+
+    for row in detect(load_state()):
+        emit("warn", describe(row))
+    if load_state():
+        emit("dim", t("resurrection.hint"))
     for line in audit_lines():
         c.print(line, highlight=False)
     c.rule(t("impl.sleep_blockers"))
@@ -133,3 +140,19 @@ def mode_check():
     if bl:
         c.print(f"  {bl}", highlight=False)
     return 0
+
+
+def reapply_paused():
+    from ..actions.base import Context
+    from ..actions.executor import Executor, _sudo_lifecycle
+    from ..resurrection import reapply
+    from ..state import load_state, save_state
+
+    @_sudo_lifecycle
+    def apply():
+        state = load_state()
+        if state is not None:
+            executor = Executor(Context(state, save_state))
+            reapply(state, executor.execute, save_state)
+
+    apply()

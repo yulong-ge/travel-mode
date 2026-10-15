@@ -2,6 +2,16 @@
   "active": "p-dash",
   "commands": [
     [
+      "ioreg",
+      "-rn",
+      "AppleSmartBattery"
+    ],
+    [
+      "pmset",
+      "-g",
+      "batt"
+    ],
+    [
       "launchctl",
       "list"
     ],
@@ -424,6 +434,14 @@
     [
       "dim",
       "Executing: Run selected actions"
+    ],
+    [
+      "dim",
+      "Measuring battery draw before applying actions"
+    ],
+    [
+      "dim",
+      "Not measurable: external power is connected"
     ],
     [
       "dim",

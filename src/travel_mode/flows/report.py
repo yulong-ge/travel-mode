@@ -58,6 +58,12 @@ def mode_report():
     from rich.table import Table
 
     c = Console()
+    from ..measurement import comparison_description
+    from ..state import load_state
+
+    state = load_state()
+    if state and "measurement" in state:
+        c.print(comparison_description(state["measurement"]))
     c.rule(t("impl.overnight_last_lid_close_battery_report"))
     out, _ = run_out(["pmset", "-g", "log"], timeout=30)
     segs = []

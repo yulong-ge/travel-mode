@@ -43,6 +43,7 @@ system; only a maintainer who has reviewed them runs those.
 - Tests are hermetic. An autouse strict `FakeRunner` (`tests/conftest.py`) rejects unregistered
   commands and host subprocesses; register responses and assert the recorded calls. Do not depend
   on the host's sudoers, fonts, locale, terminal width, platform or installed apps.
+- Run new or modified TUI/asynchronous tests repeatedly to verify stability before committing.
 - Characterization goldens record ordered commands, final state, output and exit codes. A mismatch
   means behavior changed: investigate, don't regenerate to make it pass. Intentional changes go
   through `tests/characterization/update_golden.py ... --acknowledge-behavior-change`, listed and
@@ -86,6 +87,7 @@ cli.py → flows/ (apply, restore, check, report, suggest, configuration, thaw)
   daemon plists are validated before anything is unloaded (`system/daemon_apps.py`).
 - `config.py` loads strict TOML from XDG paths (`config_template.toml` is the shipped template);
   `profiles.py` holds built-in profiles; `constants.py` holds generic default app lists.
+- `system/battery.py` reads ioreg without sudo; `measurement.py` uses finite windows. Only the open TUI owns a 30-second ioreg timer, stopped on exit; energy ranking is button-only, with no resident monitor.
 - Two scenarios select the profile and defaults: `work` (unplugged work: screen and network stay
   on, sync/backup/updater programs are paused) and `away` (lid closed / overnight).
 - `categories.toml` + `categories.py` are the built-in rules that recognise sync, backup, updater

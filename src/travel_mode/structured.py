@@ -74,11 +74,14 @@ def check_data() -> dict:
     ]
     services = launchd.svc_scan()
     state = load_state()
+    from .resurrection import detect
+
     return {
         "version": __version__.split(".dev", 1)[0],
         "scenario": state.get("scenario") or None if state else None,
         "battery": {"percent": int(match[1]) if match else None, "source": source, "raw": raw},
         "blockers": blockers,
+        "resurrected": detect(state),
         "power": power,
         "apps": apps,
         "services": {key: services[key] for key in ("unloadable", "candidates", "kept")},
@@ -95,8 +98,12 @@ def report_data() -> dict:
     from .flows.report import parse_darkwake_reasons, parse_sleep_segments
 
     output = read_command(["pmset", "-g", "log"])
-    return {
+    result = {
         "version": __version__.split(".dev", 1)[0],
         "sleep_segments": parse_sleep_segments(output),
         "darkwake_reasons": parse_darkwake_reasons(output),
     }
+    state = load_state()
+    if state and "measurement" in state:
+        result["measurement"] = state["measurement"]
+    return result

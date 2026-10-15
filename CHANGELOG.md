@@ -12,6 +12,9 @@ All notable changes follow Keep a Changelog.
 
 ### Added
 
+- On-demand battery power measurement, configurable finite windows, work before/after comparisons and saved session results.
+- Open-TUI battery readings every 30 seconds, button-only energy ranking and one-shot resurrection detection with existing Action remediation.
+- A read-only resource.getrusage overhead measurement script and battery/check JSON schema coverage.
 - Work and away scenarios, a bilingual startup picker, CLI scenario selection, configuration and snapshot/JSON scenario fields.
 - Packaged public category rules for sync, backup, updater and VM products; grouped discovery, category pause controls and explicit keep/skip precedence.
 - Single-line configuration/state diagnostics with exit codes 2/3 and opt-in debug tracebacks.

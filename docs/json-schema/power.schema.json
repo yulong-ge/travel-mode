@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "available",
+    "reason",
+    "samples",
+    "macos"
+  ],
+  "properties": {
+    "available": {
+      "type": "boolean"
+    },
+    "reason": {
+      "enum": [
+        null,
+        "external_power",
+        "no_battery",
+        "charging",
+        "not_discharging"
+      ]
+    },
+    "samples": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "macos": {
+      "type": "object",
+      "required": [
+        "raw",
+        "minutes"
+      ],
+      "properties": {
+        "raw": {
+          "type": "string"
+        },
+        "minutes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "available": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "seconds",
+          "average_watts",
+          "remaining_wh",
+          "remaining_hours"
+        ],
+        "properties": {
+          "reason": {
+            "type": "null"
+          },
+          "seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "average_watts": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "remaining_wh": {
+            "type": "number",
+            "minimum": 0
+          },
+          "remaining_hours": {
+            "type": "number",
+            "minimum": 0
+          },
+          "samples": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "reason": {
+            "enum": [
+              "external_power",
+              "no_battery",
+              "charging",
+              "not_discharging"
+            ]
+          }
+        },
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "average_watts"
+              ]
+            },
+            {
+              "required": [
+                "remaining_wh"
+              ]
+            },
+            {
+              "required": [
+                "remaining_hours"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
