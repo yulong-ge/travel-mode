@@ -7,7 +7,7 @@ from pathlib import Path
 
 from ..actions.journal import active_state, mutation_scope, persist, record_change
 from ..config import DaemonApp
-from ..i18n import t
+from ..presentation import action_message as t
 from .apps import app_path, bundle_alive, force_kill, grace_quit
 from .launchd import _loaded
 from .process_control import force_kill as stop_bundle

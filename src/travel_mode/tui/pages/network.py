@@ -14,7 +14,7 @@ from travel_mode.actions.apps import (
     configured_daemon,
 )
 from travel_mode.flows import restore as flow_restore
-from travel_mode.i18n import t
+from travel_mode.presentation import action_message as t
 from travel_mode.tui.widgets import Button
 
 

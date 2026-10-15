@@ -5,6 +5,8 @@ from __future__ import annotations
 import plistlib
 import re
 import shutil
+from contextlib import contextmanager
+from contextvars import ContextVar
 from fnmatch import fnmatchcase
 from pathlib import Path
 from xml.parsers.expat import ExpatError
@@ -133,9 +135,27 @@ def agent_directories():
     return (Path.home() / "Library/LaunchAgents", Path("/Library/LaunchAgents"))
 
 
+_discovery_roots: ContextVar[tuple[Path, ...] | None] = ContextVar("agent_discovery_roots", default=None)
+
+
+def scan_directories():
+    roots = _discovery_roots.get()
+    return agent_directories() if roots is None else roots
+
+
+@contextmanager
+def discovery_scope(roots):
+    """Preserve read-only discovery when write isolation changes HOME."""
+    token = _discovery_roots.set(tuple(roots))
+    try:
+        yield
+    finally:
+        _discovery_roots.reset(token)
+
+
 def svc_scan(config: Config | None = None, *, directories: tuple[Path, ...] | None = None) -> dict:
     config = config or load_config()
-    directories = agent_directories() if directories is None else directories
+    directories = scan_directories() if directories is None else directories
     loaded = _loaded(launchctl_names())
     rows, invalid = [], []
     seen_labels = set()

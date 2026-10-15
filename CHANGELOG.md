@@ -4,6 +4,12 @@ All notable changes follow Keep a Changelog.
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve user LaunchAgent discovery roots while dry-run isolates HOME and write paths; deduplicate repeated unloads in one plan.
+- Label dry-run action results as plans, count intended freeze targets and show projected battery values.
+- Document language persistence and remove the maintainer command proxy from public test instructions.
+
 ### Added
 
 - Work and away scenarios, a bilingual startup picker, CLI scenario selection, configuration and snapshot/JSON scenario fields.

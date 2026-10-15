@@ -17,7 +17,7 @@ from travel_mode.actions.apps import (
     configured_daemon,
 )
 from travel_mode.categories import grouped
-from travel_mode.i18n import t
+from travel_mode.presentation import action_message as t
 from travel_mode.system import apps as system_apps
 from travel_mode.tui.widgets import Button, _ellip
 
@@ -226,7 +226,7 @@ class AppsPage:
                 )
             okf = await self.busy(btn, self.execute, FreezeApp(path))
             if okf:
-                n = await asyncio.to_thread(system_apps.frozen_count, path)
+                n = await asyncio.to_thread(system_apps.freeze_result_count, path)
                 self.save()
                 self.mark_row_done(
                     i, t("impl.frozen_processes_off_resumes_them", v0=name, v1=n), expected_path=path

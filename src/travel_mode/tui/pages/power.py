@@ -12,7 +12,7 @@ from travel_mode.actions.power import (
     SetBrightness,
     SetPowerProfile,
 )
-from travel_mode.i18n import t
+from travel_mode.presentation import action_message as t
 from travel_mode.system import brightness, pmset
 from travel_mode.tui.widgets import Button
 

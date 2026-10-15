@@ -21,7 +21,7 @@ from travel_mode.actions.executor import Executor
 from travel_mode.config import load_config
 from travel_mode.flows import check as flow_check
 from travel_mode.flows import common
-from travel_mode.i18n import t
+from travel_mode.presentation import action_message as t
 from travel_mode.profiles import active_name, active_scenario, active_values, profile_scope
 from travel_mode.system import apps as system_apps
 from travel_mode.system import launchd, pmset, spotlight

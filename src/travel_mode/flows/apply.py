@@ -31,7 +31,7 @@ from travel_mode.actions.power import (
 )
 from travel_mode.constants import LIST_KEYS
 from travel_mode.flows import common
-from travel_mode.i18n import t
+from travel_mode.presentation import action_message as t
 from travel_mode.system import apps as system_apps
 from travel_mode.system import brightness, launchd, pmset, processes, spotlight
 from travel_mode.system import network as system_network
@@ -187,7 +187,11 @@ def mode_apply(yes=False, aggressive=False, dry_run=False):
                 power_applied = True
                 for i in range(0, len(chg), 2):
                     emit("ok", f"{chg[i]} → {chg[i + 1]}")
-                newb = pmset.pmset_custom().get("b", {})
+                newb = (
+                    {**profs.get("b", {}), **dict(zip(chg[::2], chg[1::2], strict=True))}
+                    if is_dry_run()
+                    else pmset.pmset_custom().get("b", {})
+                )
                 emit(
                     "dim",
                     t(
@@ -281,7 +285,7 @@ def mode_apply(yes=False, aggressive=False, dry_run=False):
                         t(
                             "impl.frozen_processes_stopped_off_resumes_them",
                             v0=name,
-                            v1=system_apps.frozen_count(path),
+                            v1=system_apps.freeze_result_count(path),
                         ),
                     )
                     state_api.save_state(st)

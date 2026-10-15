@@ -48,6 +48,7 @@ def command_lifecycle(argv, dispatch):
 
     from .. import state
     from ..paths import legacy_conf_path, legacy_state_path
+    from ..system.launchd import discovery_scope, scan_directories
     from ..system.shell import disable_dry_run, enable_dry_run, get_runner, set_runner
 
     sources = {
@@ -60,6 +61,7 @@ def command_lifecycle(argv, dispatch):
     previous_env = {name: os.environ.get(name) for name in variables}
     previous_override = state._STATE_PATH_OVERRIDE
     previous_runner = get_runner()
+    discovery_roots = scan_directories() if dry_run else ()
     if dry_run:
         directory = enable_dry_run()
     else:
@@ -78,7 +80,8 @@ def command_lifecycle(argv, dispatch):
         os.environ["TRAVEL_MODE_CONFIG"] = str(directory / "config.toml")
         os.environ["TRAVEL_MODE_STATE"] = str(directory / "state.json")
         state.set_state_path_override(directory / "state.json")
-        result = dispatch(raw_argv)
+        with discovery_scope(discovery_roots):
+            result = dispatch(raw_argv)
         from ..system.shell import dry_run_unknowns
 
         return (result or 1) if dry_run and dry_run_unknowns() else result

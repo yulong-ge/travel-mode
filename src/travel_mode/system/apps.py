@@ -122,6 +122,21 @@ def frozen_count(path):
     return sum(row.stat.startswith("T") for row in app_processes(path))
 
 
+def freeze_result_count(path):
+    """Count planned exact PID receipts in dry-run, observed stopped processes otherwise."""
+    if not is_dry_run():
+        return frozen_count(path)
+    from ..actions.journal import active_state
+    from ..state import StateError
+    from .shell import dry_run_commands
+
+    state = active_state()
+    if state is None:
+        raise StateError(t("safety.journal_required", field="freeze result count"))
+    planned = {cmd[2] for cmd in dry_run_commands() if cmd[:2] == ["kill", "-STOP"]}
+    return sum(row["path"] == path and str(row["pid"]) in planned for row in state.get("frozen_pids", []))
+
+
 def app_sleep_assertions(name):
     """该 app 名字命中的防睡断言行. 冻结不释放断言 — 命中时建议改为退出."""
     atext, rc = run_rc(["pmset", "-g", "assertions"], timeout=20)

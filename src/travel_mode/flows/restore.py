@@ -11,8 +11,8 @@ from travel_mode import snapshots
 from travel_mode import state as state_api
 from travel_mode.actions import runtime
 from travel_mode.flows import common
-from travel_mode.i18n import t
 from travel_mode.paths import state_path
+from travel_mode.presentation import action_message as t
 from travel_mode.system import pmset, shell
 from travel_mode.system.shell import is_dry_run, run_rc
 

@@ -105,6 +105,10 @@ class DryRunRunner:
             return CmdResult("", t("sudo.no_tty"), 1)
         if _dry_run_readonly(cmd) or (cmd == ["sudo", "-v"] and interactive and sys.stdin.isatty()):
             return self.real(cmd, timeout, interactive)
+        bare = cmd[1:] if cmd[:1] == ["sudo"] else cmd
+        if bare[:2] == ["launchctl", "unload"] and cmd in _dry_run_commands:
+            print(t("dry_run.already_planned", command=shlex.join(cmd)))
+            return CmdResult("", "", 0)
         _dry_run_commands.append(list(cmd))
         print(f"[dry-run] {shlex.join(cmd)}")
         return CmdResult("", "", 0)

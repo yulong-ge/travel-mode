@@ -15,7 +15,7 @@ from travel_mode.actions.power import (
     KillCaffeinate,
     StopSpotlight,
 )
-from travel_mode.i18n import t
+from travel_mode.presentation import action_message as t
 from travel_mode.system import network as system_network
 from travel_mode.system import spotlight
 from travel_mode.system.shell import is_dry_run

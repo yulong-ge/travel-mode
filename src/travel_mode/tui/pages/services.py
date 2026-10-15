@@ -10,7 +10,7 @@ from travel_mode.actions.apps import (
     UnloadAgent,
 )
 from travel_mode.categories import grouped, pause_categories
-from travel_mode.i18n import t
+from travel_mode.presentation import action_message as t
 from travel_mode.tui.widgets import Button
 
 

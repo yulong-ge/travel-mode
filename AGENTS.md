@@ -19,7 +19,7 @@ uv run --python 3.10 pytest              # CI runs 3.10–3.13 on ubuntu and mac
 uv build && uv run python scripts/check_dist.py       # package + wheel/sdist content check
 
 uv run travel-mode check                 # read-only audit of this machine
-uv run travel-mode --dry-run --yes       # prints planned commands, changes nothing
+uv run travel-mode --dry-run --scenario away --yes       # prints planned commands, changes nothing
 uv run travel-mode --demo               # TUI on fixture data (hidden flag)
 
 uv run python scripts/tui_debug.py --all # tmux screenshots + lint of every tab, both languages, 3 sizes

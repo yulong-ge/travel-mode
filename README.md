@@ -80,7 +80,7 @@ Sudo is requested only for operations that require it, such as power writes, glo
 | `travel-mode suggest --json` | Structured suggestions |
 | `travel-mode suggest --write` | Confirm additions to app/service/daemon configuration |
 
-Other options: `--scenario work|away`, `--profile NAME`, `--dry-run`, `--yes` / `-y`, `--aggressive`, `--lang en|zh`, `--help`, `--version`. `--force` with `off` discards outstanding recovery records even after a restore failure. `thaw --all` can resume apps stopped outside this tool. The TUI switches language with `L` and preserves TOML comments. Hidden `--demo` uses fixtures for screenshots.
+Other options: `--scenario work|away`, `--profile NAME`, `--dry-run`, `--yes` / `-y`, `--aggressive`, `--lang en|zh`, `--help`, `--version`. `--force` with `off` discards outstanding recovery records even after a restore failure. `thaw --all` can resume apps stopped outside this tool. Pressing `L` in the TUI saves the selected language to `options.language` in the configuration file and preserves TOML comments. In dry-run, it writes only the isolated configuration copy. Hidden `--demo` uses fixtures for screenshots.
 
 ## Configuration and categories
 

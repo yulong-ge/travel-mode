@@ -6,7 +6,7 @@ import sys
 
 from travel_mode.actions.apps import ResumeProcess
 from travel_mode.actions.executor import execute
-from travel_mode.i18n import t
+from travel_mode.presentation import action_message as t
 from travel_mode.system.shell import run_out
 
 """Emergency thaw flow for stopped application processes."""

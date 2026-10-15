@@ -26,7 +26,7 @@ from travel_mode.actions.power import (
 from travel_mode.categories import pause_categories
 from travel_mode.config import load_config
 from travel_mode.flows import check as flow_check
-from travel_mode.i18n import t
+from travel_mode.presentation import action_message as t
 from travel_mode.system import apps as system_apps
 from travel_mode.system import launchd, pmset, spotlight
 from travel_mode.system import network as system_network

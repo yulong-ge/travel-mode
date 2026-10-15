@@ -80,7 +80,7 @@ away 动作可修改电池设置、AC 的 `powernap` / `womp`、全局 `disables
 | `travel-mode suggest --json` | 结构化建议 |
 | `travel-mode suggest --write` | 确认后添加应用、服务或守护程序配置 |
 
-其他参数：`--scenario work|away`、`--profile NAME`、`--dry-run`、`--yes` / `-y`、`--aggressive`、`--lang en|zh`、`--help`、`--version`。`off --force` 即使恢复失败也会丢弃剩余记录。`thaw --all` 可能恢复本工具之外停止的应用。TUI 按 `L` 切换语言并保留 TOML 注释。隐藏的 `--demo` 用测试数据生成截图。
+其他参数：`--scenario work|away`、`--profile NAME`、`--dry-run`、`--yes` / `-y`、`--aggressive`、`--lang en|zh`、`--help`、`--version`。`off --force` 即使恢复失败也会丢弃剩余记录。`thaw --all` 可能恢复本工具之外停止的应用。TUI 按 `L` 切换语言时，会把所选语言保存到配置文件的 `options.language`，并保留 TOML 注释。dry-run 仅写入隔离的配置副本。隐藏的 `--demo` 用测试数据生成截图。
 
 ## 配置与类别
 

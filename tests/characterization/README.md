@@ -35,8 +35,8 @@ CLI prompt guide. Non-interactive `--yes` contracts keep their original output.
 For a Linux platform/font boundary simulation on macOS, run from the repo root:
 
 ```bash
-rtk proxy mkdir -p /tmp/travel-mode-ci-home
-rtk proxy env -i PATH="$PATH" HOME=/tmp/travel-mode-ci-home CI=true \
+mkdir -p /tmp/travel-mode-ci-home
+env -i PATH="$PATH" HOME=/tmp/travel-mode-ci-home CI=true \
   COLUMNS=57 LANG=C.UTF-8 TZ=Pacific/Honolulu PYTHONPATH=tests \
   uv run --no-sync pytest -p ci_host </dev/null
 ```
@@ -50,7 +50,7 @@ missing, untracked contracts. It cannot overwrite existing files or recreate a
 tracked file. A mismatch needs investigation; do not regenerate expectations to
 hide a regression.
 
-Failed comparisons leave diagnostic JSON in `/tmp/travel-mode-golden-actual`.
+Failed comparisons leave diagnostic JSON in `/tmp/tm-verify/golden-actual`.
 After reviewing an intentional behavior change, use:
 
 ```bash
