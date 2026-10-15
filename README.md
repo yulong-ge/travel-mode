@@ -52,6 +52,8 @@ Interface priority is `--tui` / `--no-tui`, then `TRAVEL_MODE_INTERFACE=cli|tui`
 
 ## Changes, permissions and safety
 
+Apple command-line tools use fixed system paths at execution time, including `/usr/bin/sudo` and its system-tool targets. Missing system paths fail explicitly without PATH fallback. Optional `blueutil` and `brightness` executables use PATH; `check` shows their resolved paths and `check --json` includes `tool_paths`. Review these locations before using third-party controls. FakeRunner records and dry-run commands retain logical tool names.
+
 Work defaults enable battery Low Power Mode, select configured categories, unload explicitly configured user LaunchAgents, and apply explicit app quit/freeze choices. They preserve foreground app defaults and network availability. A profile can supply a brightness target between 0 and 1; ordinary work brightness is unchanged. Work power recommendations ignore sleep/display/hibernation overrides. The Power and Network pages still expose separately selected manual actions.
 
 Away actions can change battery settings, AC `powernap`/`womp`, global `disablesleep`, apps, launchd services, indexing, Wi-Fi/Bluetooth and brightness. They can also terminate selected `caffeinate` assertion holders or sleep the display. `--yes` accepts defaults, including AC changes and the existing force-quit fallback. `--aggressive` additionally permits the optional aggressive CLI actions. Profiles can request actions independently. Review a dry run after changing configuration. Save documents before quitting; force quit can lose work, freezing can retain sleep assertions, and network changes can disconnect remote sessions.

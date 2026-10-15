@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from travel_mode import i18n
-from travel_mode.system import apps, brightness, daemon_discovery, launchd, platform
+from travel_mode.system import apps, brightness, daemon_discovery, launchd, platform, shell
 from travel_mode.system.shell import CmdResult, set_runner, subprocess_runner
 from user_data_snapshot import assert_unchanged, snapshot_user_data
 
@@ -158,6 +158,7 @@ def hermetic_environment(request, monkeypatch):
     monkeypatch.setattr(i18n, "_language", "zh")
     monkeypatch.setattr(brightness, "available", lambda: False)
     commands = frozenset(platform.REQUIRED_COMMANDS)
+    monkeypatch.setattr(shell, "_is_executable", lambda path: path in shell.SYSTEM_TOOLS.values())
     monkeypatch.setattr(
         shutil,
         "which",

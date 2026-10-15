@@ -263,7 +263,7 @@ async def test_tui_queued_duplicate_button_messages_are_rejected(action_ui, fake
 
 
 def test_time_machine_unparseable_status_is_explicit_unknown(monkeypatch, fake_runner):
-    monkeypatch.setattr(launchd.shutil, "which", lambda name: "/usr/bin/tmutil")
+    monkeypatch.setattr(launchd, "command_path", lambda name: "/usr/bin/tmutil")
     fake_runner.responses[("tmutil", "status")] = CmdResult("Unexpected status output", "", 0)
     info = launchd.time_machine_info()
     lines = launchd.service_information({"time_machine": info})
@@ -380,7 +380,7 @@ def test_save_state_replace_failure_preserves_original_and_removes_temp(monkeypa
 
 
 def test_time_machine_missing_capability_displays_unavailable(monkeypatch):
-    monkeypatch.setattr(launchd.shutil, "which", lambda name: None)
+    monkeypatch.setattr(launchd, "command_path", lambda name: None)
     info = launchd.time_machine_info()
     rendered = "\n".join(launchd.service_information({"time_machine": info}))
     assert not info["available"]

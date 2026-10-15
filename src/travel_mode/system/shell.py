@@ -4,7 +4,9 @@
 subprocess 调用因此集中在一个位置。
 """
 
+import os
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -13,6 +15,86 @@ from pathlib import Path
 from typing import Protocol
 
 from ..i18n import t
+
+# Apple tools are selected independently of PATH, including sudo's target.
+# Keep logical argv upstream for Runner doubles, journaling and dry-run output.
+SYSTEM_TOOLS = {
+    "pmset": "/usr/bin/pmset",
+    "ioreg": "/usr/sbin/ioreg",
+    "launchctl": "/bin/launchctl",
+    "ps": "/bin/ps",
+    "pgrep": "/usr/bin/pgrep",
+    "pkill": "/usr/bin/pkill",
+    "kill": "/bin/kill",
+    "top": "/usr/bin/top",
+    "mdutil": "/usr/bin/mdutil",
+    "mdfind": "/usr/bin/mdfind",
+    "networksetup": "/usr/sbin/networksetup",
+    "tmutil": "/usr/bin/tmutil",
+    "osascript": "/usr/bin/osascript",
+    "open": "/usr/bin/open",
+    "sudo": "/usr/bin/sudo",
+    "system_profiler": "/usr/sbin/system_profiler",
+    "plutil": "/usr/bin/plutil",
+    "sw_vers": "/usr/bin/sw_vers",
+    "lsappinfo": "/usr/bin/lsappinfo",
+    "osacompile": "/usr/bin/osacompile",
+    "codesign": "/usr/bin/codesign",
+    "true": "/usr/bin/true",
+    "sh": "/bin/sh",
+    "sleep": "/bin/sleep",
+    "caffeinate": "/usr/bin/caffeinate",
+}
+THIRD_PARTY_TOOLS = ("blueutil", "brightness")
+
+
+class CommandResolutionError(FileNotFoundError):
+    """A required executable cannot be selected safely."""
+
+
+def _is_executable(path: str) -> bool:
+    return Path(path).is_file() and os.access(path, os.X_OK)
+
+
+def command_path(name: str) -> str | None:
+    """Report a trusted system path or a PATH-selected optional executable."""
+    fixed = SYSTEM_TOOLS.get(Path(name).name)
+    if fixed is not None:
+        return fixed if _is_executable(fixed) else None
+    return shutil.which(name)
+
+
+def optional_tool_paths() -> dict[str, str | None]:
+    return {name: command_path(name) for name in THIRD_PARTY_TOOLS}
+
+
+def _resolve_executable(name: str) -> str:
+    path = command_path(name)
+    if path is None:
+        fixed = SYSTEM_TOOLS.get(Path(name).name)
+        if fixed is not None:
+            raise CommandResolutionError(t("shell.system_tool_missing", tool=name, path=fixed))
+        raise CommandResolutionError(t("shell.executable_missing", tool=name))
+    return str(Path(path).absolute())
+
+
+def resolve_command(cmd: list[str]) -> list[str]:
+    """Resolve executable positions, never arguments, without mutating logical argv."""
+    if not cmd:
+        raise ValueError(t("shell.empty_command"))
+    resolved = [_resolve_executable(cmd[0]), *cmd[1:]]
+    if Path(cmd[0]).name == "sudo":
+        index = 1
+        while index < len(cmd) and cmd[index].startswith("-"):
+            option = cmd[index]
+            index += 1
+            if option == "--":
+                break
+            if option not in {"-n", "-l", "-v"}:
+                raise ValueError(t("shell.sudo_option", option=option))
+        if index < len(cmd):
+            resolved[index:] = resolve_command(cmd[index:])
+    return resolved
 
 
 @dataclass(frozen=True)
@@ -31,13 +113,16 @@ class Runner(Protocol):
 def subprocess_runner(cmd: list[str], timeout: float | None = None, interactive: bool = False) -> CmdResult:
     """执行命令并保留稳定的错误码语义。"""
     try:
+        executed = resolve_command(cmd)
         if interactive:
-            proc = subprocess.run(cmd, timeout=timeout, check=False)
+            proc = subprocess.run(executed, timeout=timeout, check=False)
             return CmdResult("", "", proc.returncode)
         proc = subprocess.run(
-            cmd, capture_output=True, text=True, errors="replace", timeout=timeout, check=False
+            executed, capture_output=True, text=True, errors="replace", timeout=timeout, check=False
         )
         return CmdResult(proc.stdout, proc.stderr, proc.returncode)
+    except CommandResolutionError as exc:
+        return CmdResult("", str(exc), 127)
     except FileNotFoundError:
         command = cmd[0] if cmd else "<empty command>"
         return CmdResult("", f"command not found: {command}", 127)

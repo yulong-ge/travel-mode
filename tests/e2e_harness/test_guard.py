@@ -171,3 +171,38 @@ def test_readonly_timeout_reaches_backend_and_keeps_diagnostic_trace(sandbox, mo
     assert trace["command"] == calls[0][0] and trace["timeout"] == 10
     assert trace["rc"] == 124 and trace["seconds"] >= 0
     assert trace["thread"] and trace["stdout_bytes"] == 0
+
+
+@pytest.mark.parametrize(
+    ("logical", "executed"),
+    [
+        (["ioreg", "-rn", "AppleSmartBattery"], ["/usr/sbin/ioreg", "-rn", "AppleSmartBattery"]),
+        (["pmset", "-g", "custom"], ["/usr/bin/pmset", "-g", "custom"]),
+        (
+            ["sudo", "-n", "-l", "pmset", "-g", "ps"],
+            ["/usr/bin/sudo", "-n", "-l", "/usr/bin/pmset", "-g", "ps"],
+        ),
+    ],
+)
+def test_local_backend_pins_paths_after_exact_guard_validation(sandbox, monkeypatch, logical, executed):
+    import subprocess
+
+    from e2e_guard import LocalBackend
+
+    from travel_mode.system import shell
+
+    _, guard, _ = sandbox
+    calls = []
+
+    def run(cmd, **kwargs):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, "fixture", "")
+
+    monkeypatch.setattr(shell, "_is_executable", lambda _: True)
+    monkeypatch.setattr(shell.subprocess, "run", run)
+    monkeypatch.setattr(shell.shutil, "which", lambda _: pytest.fail("guard/system tool used PATH"))
+    guard.backend = LocalBackend([])
+    assert guard(logical, timeout=10).rc == 0
+    assert calls == [executed]
+    assert guard.trace[-1]["executable"] == executed[0]
+    assert not guard.tripped

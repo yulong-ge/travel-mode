@@ -52,6 +52,8 @@ travel-mode --tui --scenario away
 
 ## 修改范围与安全
 
+Apple 命令行工具在执行时使用固定系统路径，包括 `/usr/bin/sudo` 及其系统工具目标。系统路径缺失时明确报错，不回退到 PATH。可选的 `blueutil` 与 `brightness` 按 PATH 解析；`check` 显示解析路径，`check --json` 包含 `tool_paths`。使用第三方控制功能前请检查这些路径。FakeRunner 记录与 dry-run 命令保留逻辑工具名。
+
 work 默认开启电池低电量模式、选择配置的类别、卸载明确配置的用户 LaunchAgent，并执行明确配置的应用退出或冻结动作。前台应用默认选择和网络保持可用。profile 可配置 0 到 1 的目标亮度；普通 work 默认不改亮度。work 的电源建议忽略睡眠、显示器睡眠和休眠模式覆写。电源页和网络页仍提供需要单独选择的手动动作。
 
 away 动作可修改电池设置、AC 的 `powernap` / `womp`、全局 `disablesleep`、应用、launchd 服务、索引、Wi-Fi / 蓝牙和亮度，也可终止选中的 `caffeinate` 断言持有进程或立即关闭屏幕。`--yes` 接受默认动作，包括 AC 修改和现有的强制退出回退；`--aggressive` 还允许 CLI 中可选的激进动作。profile 可以独立请求动作。修改配置后应检查 dry-run。退出前保存文档；强退可能丢失内容，冻结可能保留防睡断言，断网可能中断远程会话。

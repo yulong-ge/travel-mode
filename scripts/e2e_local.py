@@ -147,12 +147,12 @@ def create_fixtures(root):
                 }
             )
         )
-        (helper / "loop").write_text(f"#!{helper}/sh\nwhile :; do sleep 0.2; done\n")
+        (helper / "loop").write_text(f"#!{helper}/sh\nwhile :; do /bin/sleep 0.2; done\n")
         (helper / "loop").chmod(0o700)
-        (main / "loop").write_text(f'#!{main}/sh\n"{helper}/loop" &\nwhile :; do sleep 0.2; done\n')
+        (main / "loop").write_text(f'#!{main}/sh\n"{helper}/loop" &\nwhile :; do /bin/sleep 0.2; done\n')
         (main / "loop").chmod(0o700)
     agent = root / "agent.sh"
-    agent.write_text("#!/bin/sh\nwhile :; do sleep 0.2; done\n")
+    agent.write_text("#!/bin/sh\nwhile :; do /bin/sleep 0.2; done\n")
     agent.chmod(0o700)
     (root / "agent.plist").write_bytes(
         plistlib.dumps({"Label": LABEL, "ProgramArguments": [str(agent)], "RunAtLoad": True})

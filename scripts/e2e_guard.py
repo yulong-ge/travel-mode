@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import re
 import shlex
-import shutil
 import subprocess
 import threading
 import time
 from pathlib import Path
 
 from travel_mode.system.health import PROCESS_COMMAND, native_command
-from travel_mode.system.shell import CmdResult, subprocess_runner
+from travel_mode.system.shell import CmdResult, command_path, subprocess_runner
 
 PROCESS_QUERY = ["ps", "-axo", "pid=,ppid=,stat=,lstart=,comm="]
 STATUS_QUERY = ["ps", "-axo", "pid=,stat=,comm="]
@@ -268,7 +267,7 @@ class GuardRunner:
             command=list(cmd),
             timeout=timeout,
             thread=threading.current_thread().name,
-            executable=shutil.which(cmd[0]),
+            executable=command_path(cmd[0]),
         )
         self.trace.append(event)
         started = time.monotonic()

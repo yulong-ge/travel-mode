@@ -2,6 +2,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
+    "tool_paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blueutil", "brightness"],
+      "properties": {
+        "blueutil": {"type": ["string", "null"]},
+        "brightness": {"type": ["string", "null"]}
+      }
+    },
     "version": {
       "type": "string"
     },
@@ -353,7 +362,8 @@
   },
   "required": [
     "version",
-    "health"
+    "health",
+    "tool_paths"
   ],
   "oneOf": [
     {

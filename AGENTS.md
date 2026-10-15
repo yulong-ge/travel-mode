@@ -80,6 +80,7 @@ cli.py → flows/ (apply, restore, check, report, suggest, configuration, thaw)
 - `system/shell.py` is the only place that spawns processes. The Runner is swappable:
   `FakeRunner` in tests, a dry-run runner that executes only allowlisted read-only commands and
   records the rest, and the guarded runner used by the e2e scripts.
+  The real subprocess boundary pins Apple tools and sudo targets to system paths; optional third-party tools use PATH, while logical Runner/journal/dry-run argv stay unchanged.
 - `actions/`: each Action declares a risk (`safe` / `aggressive`) and implements `apply(ctx)`. The
   journal persists recovery intent to state *before* the mutation runs; the Executor owns sudo
   credentials (probed per command with `sudo -n -l`, requested only when needed), ordering, and the

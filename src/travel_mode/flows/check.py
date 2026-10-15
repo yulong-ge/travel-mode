@@ -61,11 +61,16 @@ def mode_check():
     from .doctor import collect, lines
 
     report = collect()
+    from ..system.shell import optional_tool_paths
+
+    console = Console()
+    console.rule(t("shell.optional_tools"))
+    for tool, path in optional_tool_paths().items():
+        console.print(t("shell.tool_path", tool=tool, path=path or t("shell.not_found")), markup=False)
     try:
         _mode_check()
     except ReadError as exc:
         Console().print(t("health.legacy_failed", reason=str(exc)), markup=False, highlight=False)
-    console = Console()
     console.rule(t("health.title"))
     for line in lines(report):
         console.print(line, markup=False, highlight=False)

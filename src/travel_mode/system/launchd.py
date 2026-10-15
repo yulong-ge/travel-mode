@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import plistlib
 import re
-import shutil
 from contextlib import contextmanager
 from contextvars import ContextVar
 from fnmatch import fnmatchcase
@@ -15,7 +14,7 @@ from ..categories import identify, ignored, metadata, protected
 from ..categories import selected as category_selected
 from ..config import Config, load_config
 from ..i18n import t
-from .shell import get_runner, run_out, run_rc, subprocess_runner
+from .shell import command_path, get_runner, run_out, run_rc, subprocess_runner
 
 
 def launchctl_names() -> list[str]:
@@ -66,7 +65,7 @@ def time_machine_info(loaded_labels: set[str] | None = None) -> dict:
             "running": False,
             "available": False,
         }
-    if shutil.which("tmutil") is None:
+    if command_path("tmutil") is None:
         return {
             "name": "Time Machine",
             "labels": ["com.apple.backupd", "com.apple.backupd-helper"],

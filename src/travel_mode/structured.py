@@ -13,7 +13,7 @@ from .i18n import t
 from .state import load_state
 from .system.health import collect
 from .system.platform import map_pmset_key, supported_pmset_keys
-from .system.shell import ReadError, run_rc
+from .system.shell import ReadError, optional_tool_paths, run_rc
 
 
 def read_command(command: list[str], timeout=30) -> str:
@@ -34,7 +34,7 @@ def check_data() -> dict:
         # No fabricated legacy values: the incomplete audit is explicit and the
         # nine independent health results are still returned in full.
         result = {"version": __version__.split(".dev", 1)[0], "audit_error": str(exc)}
-    return {**result, "health": report}
+    return {**result, "health": report, "tool_paths": optional_tool_paths()}
 
 
 def _audit_data() -> dict:

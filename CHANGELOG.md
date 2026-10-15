@@ -6,6 +6,7 @@ All notable changes follow Keep a Changelog.
 
 ### Fixed
 
+- Pin Apple system tools and sudo targets to fixed macOS paths at execution time; report optional PATH-selected tool locations in check. E2e traces use the same resolver without expanding the guard allowlist.
 - Restrict e2e app, agent, assertion and category discovery to fixtures; keep full process observations for safety checks and disable health remediation controls in the UI harness.
 - Skip measurement on external power before ioreg sampling; retain auxiliary measurement failures without aborting Actions or the TUI. Record e2e command timing and timeout diagnostics.
 - Exercise scenario selection in CLI/TUI demo drivers and verify work/away round trips separately.

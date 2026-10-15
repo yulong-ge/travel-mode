@@ -7,7 +7,7 @@ import sys
 from dataclasses import dataclass
 
 from ..i18n import t
-from .shell import run_out
+from .shell import command_path, run_out
 
 REQUIRED_COMMANDS = (
     "pmset",
@@ -50,7 +50,7 @@ def ensure_macos() -> None:
 
 
 def missing_required_commands() -> list[str]:
-    return [name for name in REQUIRED_COMMANDS if shutil.which(name) is None]
+    return [name for name in REQUIRED_COMMANDS if command_path(name) is None]
 
 
 def _parse_pmset_keys(text: str) -> set[str]:
