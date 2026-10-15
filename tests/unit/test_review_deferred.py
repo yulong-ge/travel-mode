@@ -86,8 +86,7 @@ class ButtonQueueProbe(Message):
 
 async def queued(button, probe_seen):
     button.post_message(ButtonQueueProbe())
-    async with asyncio.timeout(5):
-        await probe_seen.wait()
+    await asyncio.wait_for(probe_seen.wait(), timeout=5)
 
 
 async def test_tui_batch_then_off_button_events_are_serial(action_ui, fake_runner, monkeypatch):

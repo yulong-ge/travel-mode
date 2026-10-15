@@ -174,6 +174,10 @@ async def test_tui_batch_completion_does_not_mark_replacement_row(monkeypatch, t
             raise TimeoutError("test did not release frozen app operation")
         return True
 
+    async def wait_until_entered():
+        while not entered.is_set():
+            await asyncio.sleep(0.01)
+
     monkeypatch.setattr(system_apps, "freeze_app", freeze)
     app = TravelApp()
     async with app.run_test(size=(110, 30)) as pilot:
@@ -181,9 +185,7 @@ async def test_tui_batch_completion_does_not_mark_replacement_row(monkeypatch, t
         await app.workers.wait_for_complete()
         action = asyncio.create_task(app.act_apps_all(app.query_one("#b-apps-all")))
         try:
-            async with asyncio.timeout(5):
-                while not entered.is_set():
-                    await asyncio.sleep(0.01)
+            await asyncio.wait_for(wait_until_entered(), timeout=5)
             rows[:] = [
                 {"name": "DemoB", "path": str(tmp_paths / "DemoB.app"), "cpu": "0", "defact": "freeze"}
             ]
