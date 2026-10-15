@@ -18,7 +18,7 @@ from travel_mode.system.shell import CmdResult, dry_run_commands, dry_run_state_
 @pytest.mark.parametrize("scenario", ["work", "away"])
 @pytest.mark.parametrize("unreadable_daemon", [False, True])
 def test_dry_run_plans_all_configured_user_agents_and_off_reloads(
-    scenario, unreadable_daemon, tmp_paths, monkeypatch, fake_runner, capsys
+    scenario, unreadable_daemon, tmp_paths, darwin_platform, monkeypatch, fake_runner, capsys
 ):
     set_language("en")
     directory = tmp_paths / "Library/LaunchAgents"
