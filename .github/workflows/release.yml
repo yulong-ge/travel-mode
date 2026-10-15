@@ -24,7 +24,7 @@ jobs:
       - name: Extract release notes
         run: uv run python scripts/changelog_section.py "${GITHUB_REF_NAME#v}" > release-notes.md
       - name: GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           body_path: release-notes.md
           files: dist/*
