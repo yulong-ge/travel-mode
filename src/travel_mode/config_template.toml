@@ -27,6 +27,8 @@ keep = []
 [options]
 aggressive = false
 language = "auto"
+# Default interface: "tui" or "cli"; overridden by TRAVEL_MODE_INTERFACE, then --tui / --no-tui.
+interface = "tui"
 
 [profiles.flight]
 # Add profile-specific values in a future release.

@@ -46,6 +46,15 @@ def _configure_demo() -> None:
                 return CmdResult("PID\tStatus\tLabel\n", "", 0)
             if cmd == ("mdutil", "-s", "/"):
                 return CmdResult("/:\tIndexing enabled.\n", "", 0)
+            if cmd == ("ps", "-axo", "pid=,%cpu=,command="):
+                return CmdResult(
+                    "\n".join(
+                        f"{pid} 0.5 /Demo/{name}.app/Contents/MacOS/{name}"
+                        for pid, name in enumerate(("aTrust", "Clash Party", "UURemote"), 1001)
+                    ),
+                    "",
+                    0,
+                )
             if cmd and cmd[0] in {"ps", "pgrep", "top", "mdfind"}:
                 return CmdResult("", "", 0)
             if cmd[:2] == ("networksetup", "-listallhardwareports"):

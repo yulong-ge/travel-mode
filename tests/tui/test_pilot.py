@@ -4,6 +4,7 @@ import json
 import shutil
 import sys
 import threading
+from itertools import pairwise
 from pathlib import Path
 
 import pytest
@@ -72,6 +73,63 @@ async def wait_for_dashboard(app, pilot):
     assert app.query_one(TabbedContent).active == "p-dash"
     for selector in ("#power-list", "#apps-box", "#dash-status", "#svc-box", "#net-box"):
         assert app.query_one(selector).children
+
+
+@pytest.mark.parametrize("language", ["en", "zh"])
+@pytest.mark.parametrize("size", [(80, 24), (120, 36), (160, 45)])
+async def test_list_row_buttons_are_compact_and_centered(
+    language, size, demo_app, readonly_tui, monkeypatch, restore_language, tmp_paths
+):
+    from textual.widgets import Button, Label
+
+    set_language(language)
+    service = {"label": "org.demo.worker", "pid": "123", "cpu": "1", "plist_path": str(tmp_paths / "a")}
+    monkeypatch.setattr(
+        launchd, "svc_scan", lambda config=None: {"unloadable": [service], "kept": [], "invalid": []}
+    )
+    app = TravelApp()
+    async with app.run_test(size=size) as pilot:
+        await wait_for_dashboard(app, pilot)
+        # Mount deterministic running network rows without probing the host.
+        await app.build_net(
+            [
+                dict(
+                    name=f"Network Demo {i}",
+                    path=f"/fixture/{i}.app",
+                    running=True,
+                    status="running",
+                    cpu=1.0,
+                    resident=False,
+                )
+                for i in range(2)
+            ],
+            "en0",
+            True,
+            True,
+        )
+        for page, box in (("p-apps", "apps-box"), ("p-svc", "svc-box"), ("p-net", "net-box")):
+            app.action_goto(page)
+            await pilot.pause()
+            rows = list(app.query(f"#{box} .row"))
+            assert rows
+            for row in rows:
+                label = row.query_one(Label)
+                buttons = list(row.query(Button))
+                assert buttons
+                assert row.region.height == 1
+                assert label.region.height == 1
+                for button in buttons:
+                    assert button.region.y == label.region.y
+                    assert button.region.height == 1
+                    assert button.content_region == button.region
+            for previous, current in pairwise(rows):
+                assert current.region.y == previous.region.bottom
+            for row in app.query(f"#{page} .cardrow"):
+                label = row.query_one(Label)
+                button = row.query_one(Button)
+                assert label.region.y == button.region.y
+                assert label.region.height == button.region.height == row.region.height
+                assert button.styles.content_align_vertical == "middle"
 
 
 @pytest.mark.asyncio

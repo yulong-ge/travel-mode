@@ -60,6 +60,7 @@ travel-mode off
 | `travel-mode config validate` | 校验配置 |
 | `travel-mode config edit` | 用配置的编辑器打开配置 |
 | `travel-mode config set-language en` / `zh` | 保存界面语言 |
+| `travel-mode config set-interface cli` / `tui` | 保存默认界面 |
 | `travel-mode thaw` / `travel-mode thaw --all` | 恢复已记录的冻结应用 / 所有停止的应用进程 |
 | `travel-mode profiles` | 列出内置和自定义 profile |
 | `travel-mode suggest` | 只读生成能耗与应用守护建议 |
@@ -85,6 +86,16 @@ travel-mode suggest --json
 ```
 
 `--write` 在交互确认后才添加推荐的 `[[apps.with_daemon]]` 条目。它保留注释和格式，跳过同名条目。JSON 模式保持 stdout 可供程序读取。Schema：[check](docs/json-schema/check.schema.json)、[suggest](docs/json-schema/suggest.schema.json)。
+
+### 不喜欢 TUI？
+
+```bash
+travel-mode --no-tui                  # 本次使用 CLI 问答
+travel-mode --yes                     # 跳过所有提问，只执行安全默认
+travel-mode config set-interface cli  # 默认使用 CLI 问答（tui 恢复默认）
+```
+
+`options.interface` 默认为 `"tui"`。优先级：`--tui` / `--no-tui` > `TRAVEL_MODE_INTERFACE=cli|tui` > 配置 > 默认。`travel-mode` 和 `travel-mode on` 使用所选界面；非交互终端降级为 `check`。显式 `--no-tui` 和 `--yes` 保留原有执行行为。`--tui` 可在本次强制打开 TUI。
 
 ## 配置和集成
 

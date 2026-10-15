@@ -23,6 +23,15 @@ suffix, preserving the existing goldens' wrapping without depending on TMPDIR,
 the pytest session counter or the user's name. All golden fields and comparisons
 remain unchanged.
 
+The interface option extends the config-init template. Those two cases assert
+the exact new comment and `interface = "tui"` entry, then compare the original
+template projection against the unchanged goldens. `test_interface.py` also
+validates both complete templates and the saved interface. No command, state,
+exit-code or output fields are projected out.
+
+The `apply-all`, `apply-none` and `apply-mixed` goldens add only the first-line
+CLI prompt guide. Non-interactive `--yes` contracts keep their original output.
+
 For a Linux platform/font boundary simulation on macOS, run from the repo root:
 
 ```bash

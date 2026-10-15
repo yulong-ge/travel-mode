@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import builtins
-import importlib
+import importlib.util
 import sys
 import types
 from pathlib import Path
@@ -116,12 +116,15 @@ def test_tomli_compatibility_branch_is_imported_when_tomllib_is_unavailable(monk
     monkeypatch.setattr(builtins, "__import__", import_without_tomllib)
     monkeypatch.delitem(sys.modules, "tomllib", raising=False)
     monkeypatch.setitem(sys.modules, "tomli", fake_tomli)
-    reloaded = importlib.reload(config_module)
-    try:
-        assert reloaded.tomllib is fake_tomli
-        path = tmp_path / "config.toml"
-        path.write_text("default = ignored by mocked parser\n", encoding="utf-8")
-        assert reloaded.load_config(path).apps.default == "ask"
-    finally:
-        monkeypatch.undo()
-        importlib.reload(config_module)
+    # Load the compatibility branch under a separate package-local name. Reloading
+    # the live module replaces ConfigError while existing importers retain the old
+    # class, breaking exception handling in later tests and hiding order dependence.
+    name = "travel_mode._config_tomli_probe"
+    spec = importlib.util.spec_from_file_location(name, config_module.__file__)
+    probe = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, name, probe)
+    spec.loader.exec_module(probe)
+    assert probe.tomllib is fake_tomli
+    path = tmp_path / "config.toml"
+    path.write_text("default = ignored by mocked parser\n", encoding="utf-8")
+    assert probe.load_config(path).apps.default == "ask"

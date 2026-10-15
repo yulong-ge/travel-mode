@@ -129,6 +129,17 @@ def test_config_is_copied_without_modifying_source(debug_modules, tmp_path, expl
     assert (source.read_bytes(), source.stat().st_mtime_ns) == before
 
 
+def test_compact_page_body_text_is_not_mistaken_for_blank_tab(debug_modules):
+    _, debug = debug_modules
+    text = "Header\nApps\n────\nDefault actions   Apply all\nDemo   Quit Freeze Skip\n\n Log \nmessage\n"
+    layout = {"active": "p-apps", "body_visible": True, "content_visible": True}
+    assert debug.body_has_text(text)
+    assert not debug.lint_active_tab(text, layout, observed=True)
+    blank = "Header\nApps\n────\n\n\n\n Log \nmessage\n"
+    assert not debug.body_has_text(blank)
+    assert debug.lint_active_tab(blank, layout, observed=True)[0]["kind"] == "blank-active-tab"
+
+
 def test_missing_default_config_is_reported_but_explicit_missing_fails(debug_modules, tmp_path):
     _, debug = debug_modules
     info = debug.copy_config(tmp_path, live=True, config=None, host_home=tmp_path / "missing")

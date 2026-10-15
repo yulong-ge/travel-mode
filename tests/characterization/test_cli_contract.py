@@ -14,6 +14,17 @@ from travel_mode.system.shell import CmdResult
 from .conftest import artifact, assert_golden
 
 
+def legacy_template_contract(result):
+    """Keep the original template contract; test the additive option explicitly."""
+    addition = (
+        '# Default interface: "tui" or "cli"; overridden by TRAVEL_MODE_INTERFACE, then --tui / --no-tui.\n'
+        'interface = "tui"\n'
+    )
+    assert result["config"].count(addition) == 1
+    result["config"] = result["config"].replace(addition, "", 1)
+    return result
+
+
 @pytest.mark.parametrize("case", ["yes", "aggressive", "flight", "overnight", "cafe", "all", "none", "mixed"])
 def test_apply_contract(case, machine, monkeypatch, capsys):
     def answer(prompt):
@@ -88,9 +99,10 @@ def test_cli_contract(argv, machine, monkeypatch, capsys):
     monkeypatch.setattr("sys.stdin.isatty", lambda: False)
     rc = cli.main(argv)
     captured = capsys.readouterr()
-    assert_golden(
-        "cli-" + "-".join(argv), artifact(machine, rc, captured.out + captured.err), machine["root"]
-    )
+    result = artifact(machine, rc, captured.out + captured.err)
+    if argv == ["config", "init", "--force"]:
+        result = legacy_template_contract(result)
+    assert_golden("cli-" + "-".join(argv), result, machine["root"])
 
 
 @pytest.mark.parametrize("case", ["thaw-accept", "thaw-reject", "config-init-new", "off-frozen"])
@@ -118,4 +130,7 @@ def test_additional_contract(case, machine, monkeypatch, capsys):
         state.save_state(snapshot)
         rc = flow_restore.mode_off()
     captured = capsys.readouterr()
-    assert_golden(case, artifact(machine, rc, captured.out + captured.err), machine["root"])
+    result = artifact(machine, rc, captured.out + captured.err)
+    if case == "config-init-new":
+        result = legacy_template_contract(result)
+    assert_golden(case, result, machine["root"])

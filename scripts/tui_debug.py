@@ -129,7 +129,9 @@ def body_has_text(text: str) -> bool:
     log_start = next(
         (i for i, line in enumerate(lines) if " Log " in line or " 日志 " in line), len(lines) - 7
     )
-    return any(line.strip(" ─━│┃╭╮╰╯▁▔") for line in lines[5:log_start])
+    # Header, tab labels and tab underline occupy rows 0..2. Compact pages can
+    # put all their content in rows 3..4; do not skip those first body rows.
+    return any(line.strip(" ─━│┃╭╮╰╯▁▔") for line in lines[3:log_start])
 
 
 def log_has_text(text: str) -> bool:

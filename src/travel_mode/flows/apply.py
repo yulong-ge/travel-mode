@@ -91,6 +91,8 @@ def mode_apply(yes=False, aggressive=False, dry_run=False):
     from rich.console import Console
 
     c = Console()
+    if not yes:
+        print(t("cli.prompt_help"))
 
     def emit(kind, msg):
         mark = {"ok": "[green]✓[/]", "warn": "[yellow]![/]", "bad": "[red]✗[/]", "dim": "[dim]·[/]"}[kind]

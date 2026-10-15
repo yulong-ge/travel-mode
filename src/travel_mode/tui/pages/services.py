@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from rich.markup import escape
-from textual.containers import Horizontal, Vertical
+from textual.containers import ItemGrid, Vertical
 from textual.widgets import Label
 
 from travel_mode.actions.apps import (
@@ -15,7 +15,7 @@ from travel_mode.tui.widgets import Button
 
 class ServicesPage:
     def compose_services(self):
-        with Horizontal(classes="cardrow"):
+        with ItemGrid(classes="cardrow"):
             yield Label(
                 t("services.launchd_intro") + " " + t("impl.unloaded_launchagents_are_restored_by_off"),
                 classes="grow",
@@ -34,7 +34,7 @@ class ServicesPage:
             cpu = f", CPU {s['cpu']}%" if s["cpu"] else ""
             lab = Label(f"{escape(s['label'])} [dim]pid {s['pid']}{cpu}[/]", classes="grow")
             b = Button(t("impl.unload"), id=f"svc-{i}", classes="btn")
-            w.append(Horizontal(lab, b, classes="row"))
+            w.append(ItemGrid(lab, b, classes="row"))
             self.svc_btns[i] = b
         if not self.svc["unloadable"]:
             w.append(Label(t("impl.no_unloadable_agents_are_loaded"), classes="srow"))

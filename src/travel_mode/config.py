@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -39,22 +40,47 @@ def write_language(language: str, path: Path | None = None) -> None:
     target = path or config_path()
     if language not in {"en", "zh"}:
         raise ConfigError(target, "options.language", t("config.must_be_auto_zh_or_en"))
+    _write_option("language", language, target)
+
+
+def validate_interface(value: Any, path: str | Path) -> str:
+    if value not in ("tui", "cli"):
+        raise ConfigError(path, "options.interface", t("config.must_be_tui_or_cli", value=value))
+    return value
+
+
+def select_interface(cli: str | None, configured: str) -> str:
+    """Resolve command line > environment > validated configuration."""
+    if cli is not None:
+        return validate_interface(cli, "<command line>")
+    if "TRAVEL_MODE_INTERFACE" in os.environ:
+        return validate_interface(os.environ["TRAVEL_MODE_INTERFACE"], "TRAVEL_MODE_INTERFACE")
+    return validate_interface(configured, config_path())
+
+
+def write_interface(interface: str, path: Path | None = None) -> None:
+    """Save the default interface using the same atomic TOML writer as language."""
+    target = path or config_path()
+    _write_option("interface", validate_interface(interface, target), target)
+
+
+def _write_option(key: str, value: str, target: Path) -> None:
     load_config(target)
     doc = tomlkit.parse(target.read_text("utf-8")) if target.exists() else tomlkit.document()
     if "options" not in doc:
         doc["options"] = tomlkit.table()
-    doc["options"]["language"] = language
+    doc["options"][key] = value
     target.parent.mkdir(parents=True, exist_ok=True)
     import tempfile
 
-    with tempfile.NamedTemporaryFile(dir=target.parent, prefix=".language-", delete=False) as handle:
+    with tempfile.NamedTemporaryFile(dir=target.parent, prefix=f".{key}-", delete=False) as handle:
         temporary = Path(handle.name)
     try:
         temporary.write_text(tomlkit.dumps(doc), "utf-8")
         load_config(temporary)
         temporary.replace(target)
     except OSError as exc:
-        raise ConfigError(target, "options.language", str(exc), cause=exc) from exc
+        raise ConfigError(target, f"options.{key}", str(exc), cause=exc) from exc
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -108,6 +134,7 @@ class ServicesConfig:
 class OptionsConfig:
     aggressive: bool = False
     language: str = "auto"
+    interface: str = "tui"
 
 
 @dataclass(frozen=True)
@@ -261,12 +288,13 @@ def load_config(path: str | Path | None = None) -> Config:
         overrides[key] = str(value)
 
     options = _table(data, "options", target)
-    _check_keys(options, {"aggressive", "language"}, target, "options")
+    _check_keys(options, {"aggressive", "language", "interface"}, target, "options")
     aggressive, language = options.get("aggressive", False), options.get("language", "auto")
     if not isinstance(aggressive, bool):
         raise _error(target, "options.aggressive", t("config.expected_a_boolean"))
     if language not in {"auto", "zh", "en"}:
         raise _error(target, "options.language", t("config.must_be_auto_zh_or_en"))
+    interface = validate_interface(options.get("interface", "tui"), target)
 
     raw_profiles = data.get("profiles", {})
     if not isinstance(raw_profiles, dict):
@@ -277,7 +305,7 @@ def load_config(path: str | Path | None = None) -> Config:
         network=network_config,
         services=service_config,
         power_overrides=overrides,
-        options=OptionsConfig(aggressive, language),
+        options=OptionsConfig(aggressive, language, interface),
         profiles=profiles,
     )
 

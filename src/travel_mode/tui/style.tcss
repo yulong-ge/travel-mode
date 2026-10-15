@@ -3,7 +3,28 @@
 TabPane { height: 1fr; padding: 0 1; }
 TabPane VerticalScroll { height: 1fr; }
 .row { height: auto; min-height: 3; align-vertical: middle; }
-.cardrow { height: auto; min-height: 3; align-vertical: middle; }
+.cardrow { height: auto; }
+# Auto grid rows measure wrapped labels before stretching the row's controls.
+# Borderless controls keep single-line rows at one cell high.
+#apps-box .row, #svc-box .row, #net-box .row, .cardrow {
+    layout: grid;
+    grid-size: 2;
+    grid-columns: 1fr auto;
+    grid-rows: auto;
+    min-height: 1;
+    grid-gutter: 0 1;
+}
+#apps-box .row { grid-size: 4; grid-columns: 1fr auto auto auto; }
+#apps-box .row > .grow, #svc-box .row > .grow, #net-box .row > .grow, .cardrow > .grow {
+    height: auto;
+    content-align: left middle;
+}
+#apps-box .row > Button, #svc-box .row > Button, #net-box .row > Button, .cardrow > Button {
+    height: 1;
+    min-height: 1;
+    border: none;
+    margin-left: 0;
+}
 .srow { width: 1fr; height: auto; padding: 0 1; }
 .grow { width: 1fr; height: auto; padding: 0 1 0 0; }
 .btn { min-width: 7; margin-left: 1; }

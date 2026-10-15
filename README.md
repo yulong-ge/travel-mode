@@ -60,6 +60,7 @@ Sudo is needed for power-setting writes, global sleep repair, system launchd ope
 | `travel-mode config validate` | Validate configuration |
 | `travel-mode config edit` | Open configuration in the configured editor |
 | `travel-mode config set-language en` / `zh` | Save interface language |
+| `travel-mode config set-interface cli` / `tui` | Save the default interface |
 | `travel-mode thaw` / `travel-mode thaw --all` | Resume recorded frozen apps / all stopped app processes |
 | `travel-mode profiles` | List built-in and custom profiles |
 | `travel-mode suggest` | Read-only energy and app-daemon suggestions |
@@ -85,6 +86,16 @@ travel-mode suggest --json
 ```
 
 `--write` asks for interactive confirmation before adding recommended `[[apps.with_daemon]]` entries. It preserves comments/layout and skips duplicate names. JSON mode keeps stdout machine-readable. Schemas: [check](docs/json-schema/check.schema.json) and [suggest](docs/json-schema/suggest.schema.json).
+
+### Prefer CLI prompts?
+
+```bash
+travel-mode --no-tui                  # Use CLI prompts for this run
+travel-mode --yes                     # Skip all questions; apply safe defaults
+travel-mode config set-interface cli  # Use CLI prompts by default (tui to reset)
+```
+
+`options.interface` defaults to `"tui"`. Priority: `--tui` / `--no-tui` > `TRAVEL_MODE_INTERFACE=cli|tui` > configuration > default. `travel-mode` and `travel-mode on` use the selected interface; a non-interactive terminal falls back to `check`. Explicit `--no-tui` and `--yes` retain their existing apply behavior. Use `--tui` to open the TUI for one run.
 
 ## Configuration and integrations
 

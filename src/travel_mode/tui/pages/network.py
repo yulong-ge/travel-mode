@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from rich.markup import escape
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.containers import ItemGrid, Vertical, VerticalScroll
 from textual.widgets import Label, Static
 
 from travel_mode import snapshots
@@ -52,7 +52,7 @@ class NetworkPage:
                 label += " · " + t("network.resident")
             if row["running"] and row["path"]:
                 w.append(
-                    Horizontal(
+                    ItemGrid(
                         Label(f"{escape(row['name'])}: {label}", classes="grow"),
                         Button(t("impl.quit_2"), id=f"net-{idx}", classes="btn"),
                         classes="row",

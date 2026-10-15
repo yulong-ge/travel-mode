@@ -14,7 +14,7 @@ import travel_mode.flows.thaw as flow_thaw
 
 from . import demo
 from .actions.runtime import command_lifecycle
-from .config import load_config, migrate_legacy
+from .config import load_config, migrate_legacy, select_interface
 from .flows import configuration
 from .i18n import select_language, set_language, t
 
@@ -35,12 +35,16 @@ def _main(argv=None):
         nargs="?",
         choices=["on", "off", "restore", "check", "report", "config", "thaw", "profiles", "suggest"],
     )
-    parser.add_argument("config_cmd", nargs="?", choices=["path", "init", "validate", "edit", "set-language"])
-    parser.add_argument("language", nargs="?", choices=["en", "zh"])
+    parser.add_argument(
+        "config_cmd", nargs="?", choices=["path", "init", "validate", "edit", "set-language", "set-interface"]
+    )
+    parser.add_argument("value", nargs="?")
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--report", action="store_true")
     parser.add_argument("--yes", "-y", action="store_true")
-    parser.add_argument("--no-tui", action="store_true")
+    interface_flags = parser.add_mutually_exclusive_group()
+    interface_flags.add_argument("--no-tui", dest="interface", action="store_const", const="cli")
+    interface_flags.add_argument("--tui", dest="interface", action="store_const", const="tui")
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--aggressive", action="store_true")
@@ -53,8 +57,13 @@ def _main(argv=None):
     parser.add_argument("--all", action="store_true", help=t("cli.thaw_resume_all_stopped_app_processes"))
     parser.add_argument("--version", action="version", version="travel-mode 1.1.0")
     args = parser.parse_args(argv)
-    configured = load_config().options.language
-    set_language(select_language(args.lang, configured))
+    if args.value is not None and args.config_cmd not in {"set-language", "set-interface"}:
+        parser.error(t("cli.unexpected_config_value"))
+    if args.config_cmd == "set-language" and args.value not in {"en", "zh"}:
+        parser.error(t("config.must_be_auto_zh_or_en"))
+    configured = load_config().options
+    set_language(select_language(args.lang, configured.language))
+    interface = select_interface(args.interface, configured.interface)
     if args.demo:
         os.environ["TRAVEL_MODE_DEMO"] = "1"
         demo._configure_demo()
@@ -138,13 +147,15 @@ def _main(argv=None):
         return mode_report()
     from .profiles import profile_scope
 
-    if args.yes or args.no_tui or args.cmd in (None, "on"):
+    if args.yes or args.interface is not None or args.cmd in (None, "on"):
         with profile_scope(load_config(), args.profile, aggressive=args.aggressive):
-            if args.yes or args.no_tui:
+            if args.yes or args.interface == "cli":
                 return mode_apply(yes=args.yes, aggressive=args.aggressive, dry_run=args.dry_run)
             if not sys.stdin.isatty() or not sys.stdout.isatty():
                 print(t("impl.non_interactive_terminal_running_check_use"), file=sys.stderr)
                 return mode_check()
+            if interface == "cli":
+                return mode_apply(yes=False, aggressive=args.aggressive, dry_run=args.dry_run)
             if args.dry_run:
                 from .actions.runtime import _prepare_dry_run
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 
 from rich.markup import escape
-from textual.containers import Horizontal, Vertical
+from textual.containers import ItemGrid, Vertical
 from textual.widgets import Label
 
 from travel_mode.actions.apps import (
@@ -23,7 +23,7 @@ from travel_mode.tui.widgets import Button, _ellip
 
 class AppsPage:
     def compose_apps(self):
-        with Horizontal(classes="cardrow"):
+        with ItemGrid(classes="cardrow"):
             yield Label(t("impl.default_actions_come_from_config_toml"), classes="grow")
             yield Button(t("impl.apply_all_defaults"), id="b-apps-all", variant="primary", classes="btn")
         yield Vertical(Label(t("impl.scanning"), classes="srow"), id="apps-box")
@@ -70,7 +70,7 @@ class AppsPage:
                 classes="btn",
             )
             bs = Button(t("impl.skip"), id=f"btn-{i}-s", classes="btn")
-            w.append(Horizontal(lab, bq, bf, bs, classes="row"))
+            w.append(ItemGrid(lab, bq, bf, bs, classes="row"))
             self.app_rows[i] = {
                 "name": name,
                 "path": app["path"],
