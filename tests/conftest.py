@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import os
+import shutil
+import subprocess
+import sys
+import time
 from pathlib import Path
 
 import pytest
 
+from travel_mode import i18n
+from travel_mode.system import apps, brightness, daemon_discovery, platform
 from travel_mode.system.shell import CmdResult, set_runner, subprocess_runner
 from user_data_snapshot import assert_unchanged, snapshot_user_data
 
@@ -102,7 +109,92 @@ def real_user_data_guard(real_user_data_session_guard):
 
 
 @pytest.fixture(autouse=True)
-def isolated_user_paths(real_user_data_guard, tmp_path, monkeypatch):
+def hermetic_environment(request, monkeypatch):
+    """Pin ambient inputs; tests of a probe must explicitly override its double."""
+    if request.node.get_closest_marker("macos") is not None:
+        yield
+        return
+    previous_tz = os.environ.get("TZ")
+    for name in tuple(os.environ):
+        if (
+            name.startswith(("LC_", "TRAVEL_MODE_", "SUDO_")) and name != "TRAVEL_MODE_RECORD_INITIAL"
+        ) or name in {
+            "FORCE_COLOR",
+            "CLICOLOR",
+            "CLICOLOR_FORCE",
+            "COLORTERM",
+            "EDITOR",
+            "VISUAL",
+        }:
+            monkeypatch.delenv(name)
+    for name, value in {
+        "LANG": "en_US.UTF-8",
+        "TZ": "UTC",
+        "USER": "fixture",
+        "LOGNAME": "fixture",
+        "COLUMNS": "120",
+        "LINES": "40",
+        "TERM": "dumb",
+        "NO_COLOR": "1",
+        "CI": "true",
+    }.items():
+        monkeypatch.setenv(name, value)
+    time.tzset()
+    monkeypatch.setattr(i18n, "_language", "zh")
+    monkeypatch.setattr(brightness, "available", lambda: False)
+    commands = frozenset(platform.REQUIRED_COMMANDS)
+    monkeypatch.setattr(
+        shutil,
+        "which",
+        lambda name, mode=os.F_OK | os.X_OK, path=None: f"/fixture/bin/{name}" if name in commands else None,
+    )
+    monkeypatch.setattr(os, "isatty", lambda fd: False)
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        monkeypatch.setattr(stream, "isatty", lambda: False)
+    monkeypatch.setattr(os, "get_terminal_size", lambda fd=1: os.terminal_size((120, 40)))
+
+    popen = subprocess.Popen
+
+    def forbidden_process(command, *args, **kwargs):
+        # Preserve the explicit initial-recorder's read-only tracking check.
+        # This is repository metadata, never a product/system observation.
+        if (
+            os.environ.get("TRAVEL_MODE_RECORD_INITIAL") == "1"
+            and isinstance(command, list)
+            and len(command) == 4
+            and command[:3] == ["git", "ls-files", "--error-unmatch"]
+            and Path(command[3]).parent == Path(__file__).parent / "characterization/golden"
+        ):
+            return popen(command, *args, **kwargs)
+        pytest.fail(f"Host subprocess forbidden in hermetic test: {command!r}")
+
+    monkeypatch.setattr(subprocess, "Popen", forbidden_process)
+    try:
+        yield
+    finally:
+        # Restore libc's process-local timezone as well as the environment.
+        if previous_tz is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = previous_tz
+        time.tzset()
+
+
+@pytest.fixture
+def darwin_platform(monkeypatch):
+    """Model the product's platform check without changing third-party sys.platform."""
+
+    class DarwinSystem:
+        platform = "darwin"
+
+        def __getattr__(self, name):
+            return getattr(sys, name)
+
+    monkeypatch.setattr(platform, "sys", DarwinSystem())
+
+
+@pytest.fixture(autouse=True)
+def isolated_user_paths(real_user_data_guard, hermetic_environment, tmp_path, monkeypatch):
     # macos only selects the command runner; it must never bypass path isolation.
     monkeypatch.setenv("TRAVEL_MODE_CONFIG", str(tmp_path / "config.toml"))
     monkeypatch.setenv("TRAVEL_MODE_STATE", str(tmp_path / "state.json"))
@@ -117,6 +209,11 @@ def isolated_user_paths(real_user_data_guard, tmp_path, monkeypatch):
         "XDG_DATA_DIRS": "xdg-data-dirs",
     }.items():
         monkeypatch.setenv(variable, str(tmp_path / directory))
+    monkeypatch.setattr(apps, "APP_DIRS", [str(tmp_path / "Applications")])
+    monkeypatch.setattr(daemon_discovery, "app_directories", lambda: (Path.home() / "Applications",))
+    monkeypatch.setattr(
+        daemon_discovery, "plist_directories", lambda: (Path.home() / "Library/LaunchAgents",)
+    )
     return tmp_path
 
 

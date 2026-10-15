@@ -2,6 +2,7 @@
 
 import json
 import re
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -24,14 +25,28 @@ class FixedTime(datetime):
 
 
 @pytest.fixture
-def machine(tmp_paths, monkeypatch):
+def contract_root(request):
+    """Keep the original contracts' path wrapping independent of pytest/host paths.
+
+    Rich wraps before artifact normalization. The recorded contracts use an
+    87-column parent plus pytest's (at most 30-character) test name and counter.
+    Use that explicit display geometry without the author's TMPDIR or username.
+    Each invocation owns a unique temporary directory and removes it afterwards.
+    """
+    with tempfile.TemporaryDirectory(prefix="tm-contract-", dir="/tmp") as temporary:
+        parent = Path(temporary) / ("x" * (87 - len(temporary) - 1))
+        assert len(str(parent)) == 87
+        name = re.sub(r"[\W]", "_", request.node.name)[:30] + "0"
+        root = parent / name
+        root.mkdir(parents=True)
+        yield root
+
+
+@pytest.fixture
+def machine(contract_root, tmp_paths, darwin_platform, monkeypatch):
     import plistlib
 
-    # Rich wraps paths before normalization. Keep their display width constant
-    # when pytest's session counter grows from one digit to two or more.
-    extra = len(tmp_paths.parent.name) - len("pytest-1")
-    root = tmp_paths.with_name(tmp_paths.name[extra:]) if extra > 0 else tmp_paths
-    root.mkdir(exist_ok=True)
+    root = contract_root
     monkeypatch.setenv("HOME", str(root))
     monkeypatch.setenv("TRAVEL_MODE_CONFIG", str(root / "config.toml"))
     monkeypatch.setenv("TRAVEL_MODE_STATE", str(root / "state.json"))

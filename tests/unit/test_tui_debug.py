@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from PIL import Image
+from PIL import Image, ImageFont
 
 import travel_mode.flows.check as flow_check
 from travel_mode.system import apps as system_apps
@@ -46,8 +46,12 @@ def test_readonly_runner_rejects_before_execution(command, monkeypatch):
         ReadOnlyRunner()(command)
 
 
-def test_renderer_positions_punctuation_symbols_and_sgr(debug_modules, tmp_path):
+def test_renderer_positions_punctuation_symbols_and_sgr(debug_modules, tmp_path, monkeypatch):
     renderer, _ = debug_modules
+    # This checks terminal cells and backgrounds, not macOS glyph coverage.
+    # Pillow embeds this font; no installed font or fallback is involved.
+    fonts = {size: ImageFont.load_default(size=size) for size in (18, 19)}
+    monkeypatch.setattr(renderer.ImageFont, "truetype", lambda font, size, **kwargs: fonts[size])
     text = "\x1b[31;44;1m中，→✓A\x1b[7mB\x1b[0m"
     cells = list(renderer.styled_cells(text))
     assert [cell[1] for cell in cells] == [0, 2, 4, 5, 6, 7]
@@ -59,6 +63,19 @@ def test_renderer_positions_punctuation_symbols_and_sgr(debug_modules, tmp_path)
     im = Image.open(path)
     assert im.getpixel((0, 23)) == renderer.PALETTE[4]
     assert im.getpixel((7 * renderer.CELL_W, 23)) == renderer.PALETTE[1]
+
+
+def test_renderer_missing_system_font_is_an_error(debug_modules, tmp_path, monkeypatch):
+    renderer, _ = debug_modules
+
+    def missing_font(font, *args, **kwargs):
+        raise OSError(f"cannot open resource: {font}")
+
+    monkeypatch.setattr(renderer.ImageFont, "truetype", missing_font)
+    path = tmp_path / "render.png"
+    with pytest.raises(OSError, match=r"cannot open resource: /System/Library/Fonts/Menlo\.ttc"):
+        renderer.render("text", path)
+    assert not path.exists()
 
 
 def test_lint_detects_real_defects_and_allows_command_names(debug_modules):

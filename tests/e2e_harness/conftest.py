@@ -16,7 +16,7 @@ from e2e_guard import GuardRunner  # noqa: E402
 
 
 @pytest.fixture
-def sandbox(tmp_path, monkeypatch):
+def sandbox(tmp_path, darwin_platform, monkeypatch):
     monkeypatch.setattr("travel_mode.system.brightness.select_backend", lambda: None)
     root = tmp_path / "travel-mode-e2e-test"
     root.mkdir()
