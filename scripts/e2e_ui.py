@@ -19,7 +19,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from e2e_fake import Machine, SimulatedBrightness
-from e2e_guard import LABEL, GuardRunner, LocalBackend
+from e2e_guard import GuardRunner, LocalBackend
+from e2e_isolation import write_fixture_config
 from e2e_local import Harness, create_fixtures, fixture_paths, preflight, print_plan, product_environment
 from terminal_render import render
 from tui_debug import ROOT, DebugApp, Session, isolated_env
@@ -46,7 +47,20 @@ def wait_for(predicate, message, timeout=30):
     raise TimeoutError(message)
 
 
+class FixtureDebugApp(DebugApp):
+    """Health remains read-only; only the dedicated fixture/power controls run Actions."""
+
+    async def build_health(self, report):
+        report = {**report, "checks": [{**row, "actions": []} for row in report["checks"]]}
+        await super().build_health(report)
+        # This includes the legacy manual Spotlight button, outside health.actions.
+        for button in self.query("#dash-health Button"):
+            await button.remove()
+
+
 class InteractiveHarness(Harness):
+    scenario = "away"
+
     def setup(self):
         if self.agent_loaded():
             raise RuntimeError("Fixture agent already loaded")
@@ -63,14 +77,7 @@ class InteractiveHarness(Harness):
         graceful_ready = self.graceful()
         if self.state_file.exists():
             raise AssertionError("Preflight graceful stage left a state file")
-        config = self.root / "config.toml"
-        config.write_text(
-            '[apps]\ndefault="skip"\nquit='
-            + ('["TravelModeE2E-Graceful"]' if graceful_ready else "[]")
-            + '\nfreeze=["TravelModeE2E-Freeze"]\nskip=["TravelModeE2E-Quit"]\n'
-            '[services]\nunload=["' + LABEL + '"]\n[network]\napps=[]\n'
-            '[options]\nlanguage="en"\n'
-        )
+        write_fixture_config(self.root, graceful=graceful_ready)
         print(
             "SKIP shell Quit fixture in UI; covered by local ForceQuitApp: "
             "its AppleEvent is outside the exact guard allowlist.",
@@ -119,12 +126,21 @@ class InteractiveHarness(Harness):
         self.check(apps.frozen_count(str(self.apps[1])) == 2, "UI froze fixture main/helper")
         self.check(not self.agent_loaded(), "UI unloaded fixture agent")
         profiles = pmset.pmset_custom()
-        self.check_power(pmset.sleep_disabled() == "0", "UI repaired SleepDisabled")
+        work = self.scenario == "work"
+        self.check_power(
+            pmset.sleep_disabled() == (self.original_sleep if work else "0"), "Scenario sleep policy"
+        )
         self.check_profile(
-            self.original_profiles["a"], profiles["a"], {"powernap": "0", "womp": "0"}, "UI AC"
+            self.original_profiles["a"],
+            profiles["a"],
+            {} if work else {"powernap": "0", "womp": "0"},
+            "UI AC",
         )
         targets = {key: target for key, _, target in pmset.power_recommendations()}
-        targets["hibernatemode"] = "25"
+        if work:
+            targets = {key: value for key, value in targets.items() if key in {"lowpowermode", "powermode"}}
+        else:
+            targets["hibernatemode"] = "25"
         self.check_profile(self.original_profiles["b"], profiles["b"], targets, "UI battery")
         applet_pids = {
             pid
@@ -142,6 +158,7 @@ class InteractiveHarness(Harness):
             self.check(not apps.app_running(str(self.runner.graceful)), "UI gracefully quit fixture")
         self.check(self.state_file.exists(), "UI persisted isolated state")
         saved = state.load_state()
+        self.check(saved["scenario"] == self.scenario, "Snapshot scenario matches selected scenario")
         self.check(
             len(saved["frozen_pids"]) == 2 and len(saved["unloaded_svcs"]) == 1, "UI exact fixture receipts"
         )
@@ -168,7 +185,7 @@ class InteractiveHarness(Harness):
         self.check(not self.runner.tripped, "UI round trip no guard violation")
 
 
-def answers():
+def answers(scenario="away"):
     """Exact i18n-rendered prompt allowlist, derived from the observed snapshot."""
     yes = [
         "impl.fix_pmset_disablesleep",
@@ -182,7 +199,7 @@ def answers():
         "impl.turn_off_the_display_now_pmset",
         "impl.quit_the_configured_daemon_app",
     ]
-    result = {}
+    result = {t("scenario.input"): ("scenario", scenario)}
     for key, answer in [(k, "y") for k in yes] + [(k, "n") for k in no]:
         result[t(key)] = (key, answer)
     for target in processes.caffeinate_procs():
@@ -197,7 +214,10 @@ def answers():
         "n",
     )
     profiles = pmset.pmset_custom()
-    for k, desc, rec in pmset.power_recommendations():
+    recommendations = pmset.power_recommendations()
+    if scenario == "work":
+        recommendations = [r for r in recommendations if r[0] in {"lowpowermode", "powermode"}]
+    for k, desc, rec in recommendations:
         prompt = t(
             "impl.set_current_recommended", v0=k, v1=rec, v2=profiles["b"].get(k, "(unset)"), v3=rec, v4=desc
         )
@@ -265,7 +285,13 @@ def child(args):
         Path(args.real_state),
         brightness_loader=SimulatedBrightness if args.demo else brightness.NativeBrightness.load,
     )
-    report = {"mode": "demo" if args.demo else "real", "interface": args.child, "status": "FAIL"}
+    harness.scenario = args.scenario
+    report = {
+        "mode": "demo" if args.demo else "real",
+        "interface": args.child,
+        "scenario": args.scenario,
+        "status": "FAIL",
+    }
     # Evidence survives temporary fixture cleanup.
     evidence = args.evidence
     try:
@@ -275,7 +301,7 @@ def child(args):
                 set_language("en")
                 harness.setup()
                 if args.child == "cli":
-                    policy = answers()
+                    policy = answers(args.scenario)
                     original_input = builtins.input
                     count = 0
 
@@ -303,7 +329,7 @@ def child(args):
                     harness.check_power(product_main(["off", "--lang", "en"]) == 0, "CLI off succeeded")
                 else:
 
-                    class ObservedApp(DebugApp):
+                    class ObservedApp(FixtureDebugApp):
                         def on_descendant_focus(self, event):
                             self.call_after_refresh(self.write_layout)
 
@@ -342,6 +368,7 @@ def child(args):
         report["guard_tripped"] = runner.tripped
         report["violations"] = runner.violations
         report["commands"] = [list(c) for c in runner.commands]
+        report["command_trace"] = runner.trace
         report["original_power"] = harness.original_power
         report["original_sleepdisabled"] = harness.original_sleep
         report["emergency_rollback"] = harness.rollback_commands
@@ -351,7 +378,8 @@ def child(args):
 
 
 class UISession(Session):
-    def __init__(self, evidence, fixture, interface, demo):
+    def __init__(self, evidence, fixture, interface, demo, scenario):
+        self.scenario = scenario
         self.root = evidence
         self.cols = 160
         self.rows = 55
@@ -377,7 +405,11 @@ class UISession(Session):
             "--evidence",
             str(evidence),
             "--real-state",
-            str(Path(pwd.getpwuid(os.getuid()).pw_dir) / ".local/state/travel-mode/state.json"),
+            str(evidence / "unused-user-state.json")
+            if demo
+            else str(Path(pwd.getpwuid(os.getuid()).pw_dir) / ".local/state/travel-mode/state.json"),
+            "--scenario",
+            scenario,
         ]
         if demo:
             command.append("--demo")
@@ -473,14 +505,19 @@ def mutate(session, widget, step):
 
 def drive_tui(session):
     session.wait_started()
+    session.wait_text(t("scenario.prompt"))
+    session.shot("00-scenario")
+    session.widget_click("scenario-" + session.scenario)
     session.wait_complete()
     session.shot("01-dashboard")
     # Fix SleepDisabled through its real button. No unsafe diagnostic buttons.
-    mutate(session, "b-fixsleep", "02-fixsleep")
+    if session.scenario == "away":
+        mutate(session, "b-fixsleep", "02-fixsleep")
     session.keys("2")
     session.wait_complete()
-    session.widget_click("cb-hib25")
-    session.widget_click("cb-ac")
+    if session.scenario == "away":
+        session.widget_click("cb-hib25")
+        session.widget_click("cb-ac")
     session.shot("03-power-selection")
     mutate(session, "b-power", "04-power-applied")
     session.keys("3")
@@ -500,16 +537,25 @@ def drive_tui(session):
     session.wait_complete()
     session.shot("10-network-restore")
     mutate(session, "b-off", "11-off-restored")
+    session.shot("12-session-report")
+    session.keys("Escape")
+    wait_for(
+        lambda: "Session report:" not in session.tmux("capture-pane", "-p"),
+        "Report did not close",
+        session.timeout,
+    )
     session.keys("q")
     session.finish()
 
 
 def main(argv=None):
+    set_language("en")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plan", action="store_true")
     parser.add_argument("--demo", action="store_true")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--interface", choices=("both", "cli", "tui"), default="both")
+    parser.add_argument("--scenario", choices=("work", "away"), default="away", help=argparse.SUPPRESS)
     parser.add_argument("--child", choices=["cli", "tui"], help=argparse.SUPPRESS)
     parser.add_argument("--root", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--evidence", type=Path, help=argparse.SUPPRESS)
@@ -517,7 +563,10 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.plan:
         print_plan()
-        print("UI: two isolated tmux children install GuardRunner BEFORE entering real CLI/TravelApp.")
+        print(
+            "UI: four isolated tmux children (work/away x CLI/TUI) install GuardRunner "
+            "BEFORE entering real CLI/TravelApp."
+        )
         print(
             "CLI: match exact i18n-rendered prompt before each send-keys; yes only safe "
             "power/fixture actions; no all other prompts."
@@ -549,18 +598,24 @@ def main(argv=None):
     output = args.output or Path("/tmp/tui-e2e") / datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     output.mkdir(parents=True, exist_ok=False)
     rows = []
-    for interface, driver in [("cli", drive_cli), ("tui", drive_tui)]:
+    for scenario, interface, driver in [
+        (scenario, interface, driver)
+        for scenario in ("work", "away")
+        for interface, driver in [("cli", drive_cli), ("tui", drive_tui)]
+    ]:
         if args.interface not in ("both", interface):
             continue
-        evidence = output / interface
+        evidence = output / f"{scenario}-{interface}"
         evidence.mkdir()
         fixture = Path(tempfile.mkdtemp(prefix="travel-mode-e2e-ui-"))
-        session = UISession(evidence, fixture, interface, args.demo)
+        session = UISession(evidence, fixture, interface, args.demo, scenario)
         try:
             driver(session)
         except (RuntimeError, TimeoutError, AssertionError, OSError):
             session.shot("failure")
             if not (evidence / "result.json").exists():
+                if interface == "tui":
+                    session.keys("Escape")
                 session.tmux("send-keys", "q" if interface == "tui" else "C-c")
                 wait_for(
                     lambda evidence=evidence: (evidence / "result.json").exists(),

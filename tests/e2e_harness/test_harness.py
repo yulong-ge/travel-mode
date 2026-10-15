@@ -289,7 +289,7 @@ def test_ui_plan_creates_no_backend_or_tmux(monkeypatch, capsys):
     monkeypatch.setattr(e2e_ui, "UISession", lambda *_: pytest.fail("plan starts tmux"))
     monkeypatch.setattr(e2e_ui, "LocalBackend", lambda *_: pytest.fail("plan creates backend"))
     assert e2e_ui.main(["--plan"]) == 0
-    assert "UI: two isolated tmux children" in capsys.readouterr().out
+    assert "UI: four isolated tmux children (work/away x CLI/TUI)" in capsys.readouterr().out
 
 
 def test_ui_prompt_policy_allows_only_numeric_cpu_variation():

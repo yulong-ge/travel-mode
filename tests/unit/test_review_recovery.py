@@ -264,6 +264,13 @@ def test_fake_on_off_roundtrip_preserves_every_original_and_unmodified_key(monke
             output = "Assertion status system-wide:\n"
         elif cmd == ["pmset", "-g", "batt"]:
             output = "InternalBattery 80%;\n"
+        elif cmd == ["ioreg", "-rn", "AppleSmartBattery"]:
+            output = (
+                '"ExternalConnected" = No\n"IsCharging" = No\n"Voltage" = 12000\n'
+                '"AppleRawCurrentCapacity" = 4000\n'
+            )
+        elif cmd == ["pmset", "-g", "log"]:
+            output = ""
         elif cmd[:2] == ["pmset", "-a"]:
             assert cmd[2] == "disablesleep"
             hardware["sleepdisabled"] = cmd[3]

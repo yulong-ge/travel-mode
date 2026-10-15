@@ -30,6 +30,9 @@ class Dispatch:
         if ev.button.id in {"scenario-work", "scenario-away"}:
             await self.choose_scenario(ev.button.id.removeprefix("scenario-"))
             return
+        if ev.button.id == "b-history":
+            await self.show_history()
+            return
 
         if not self.origin_ready:
             if ev.button.id == "b-doctor" and self._origin_error is not None:
@@ -89,6 +92,7 @@ class Dispatch:
                         with mutation_scope(self.st, self.save):
                             await self._dispatch_button(ev)
                 finally:
+                    self.flush_session_observations()
                     self._mutation_action = None
                     self._transaction_view = None
                     self._mutation_generation += 1

@@ -21,6 +21,8 @@ def test_action_sequence_persists_intent_before_each_command(fake_runner):
     observed = []
 
     def runner(command, timeout=None, interactive=False):
+        if command == ["ioreg", "-rn", "AppleSmartBattery"] or command == ["pmset", "-g", "batt"]:
+            return fake_runner(command, timeout, interactive)
         persisted = state.load_state()
         assert persisted is not None
         assert list(command) in persisted["pending_commands"]

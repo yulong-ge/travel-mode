@@ -48,6 +48,8 @@ def machine(contract_root, tmp_paths, darwin_platform, monkeypatch):
     import plistlib
 
     monkeypatch.setattr("travel_mode.system.health.monotonic", lambda: 0.0)
+    monkeypatch.setattr("travel_mode.sessions.utc_now", lambda: "2026-10-15T12:00:00+00:00")
+    monkeypatch.setattr("travel_mode.sessions.uuid4", lambda: "fixture-session")
 
     root = contract_root
     monkeypatch.setenv("HOME", str(root))

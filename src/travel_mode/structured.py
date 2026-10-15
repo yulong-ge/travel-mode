@@ -25,6 +25,9 @@ def read_command(command: list[str], timeout=30) -> str:
 
 def check_data() -> dict:
     report = collect()
+    from .health_view import display_checks
+
+    report["display_checks"] = display_checks(report)
     try:
         result = _audit_data()
     except ReadError as exc:
@@ -88,12 +91,18 @@ def _audit_data() -> dict:
     state = load_state()
     from .resurrection import detect
 
+    revived = detect(state)
+    if state and "session" in state:
+        from .sessions import note
+
+        note(state, revived, external=pmset.on_ac_power())
+
     return {
         "version": __version__.split(".dev", 1)[0],
         "scenario": state.get("scenario") or None if state else None,
         "battery": {"percent": int(match[1]) if match else None, "source": source, "raw": raw},
         "blockers": blockers,
-        "resurrected": detect(state),
+        "resurrected": revived,
         "power": power,
         "apps": apps,
         "services": {key: services[key] for key in ("unloadable", "candidates", "kept")},

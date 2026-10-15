@@ -50,7 +50,10 @@ def _readonly_responses() -> dict[tuple[str, ...], CmdResult]:
         ("lsappinfo", "front"): CmdResult("ASN:0x0-0x1:", "", 0),
         ("lsappinfo", "info"): CmdResult('bundleID="org.demo.front"\npid = 900000', "", 0),
         ("ioreg", "-rn", "AppleSmartBattery"): CmdResult(
-            '"ExternalConnected" = Yes\n"IsCharging" = No\n', "", 0
+            '"ExternalConnected" = Yes\n"IsCharging" = No\n"Voltage" = 12000\n'
+            '"AppleRawCurrentCapacity" = 4000\n',
+            "",
+            0,
         ),
         ("pmset", "-g", "custom"): CmdResult((fixture / "pmset-g-custom.txt").read_text(), "", 0),
         ("pmset", "-g"): CmdResult((fixture / "pmset-g.txt").read_text(), "", 0),

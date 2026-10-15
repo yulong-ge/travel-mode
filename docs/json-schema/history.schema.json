@@ -1,0 +1,281 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "version",
+    "limit",
+    "sessions"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "sessions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "duration_seconds",
+          "percent_drop",
+          "mah_drop",
+          "average_watts",
+          "version",
+          "id",
+          "scenario",
+          "started_at",
+          "ended_at",
+          "start",
+          "end",
+          "average_scope",
+          "power_status",
+          "measurement",
+          "actions",
+          "restore",
+          "resurrected",
+          "away",
+          "errors"
+        ],
+        "properties": {
+          "duration_seconds": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "percent_drop": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "mah_drop": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "average_watts": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "version": {
+            "const": 1
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scenario": {
+            "enum": [
+              "work",
+              "away",
+              null
+            ]
+          },
+          "started_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ended_at": {
+            "type": "string"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "at",
+                  "external",
+                  "charging",
+                  "percent",
+                  "remaining_mah",
+                  "voltage_mv",
+                  "errors"
+                ],
+                "properties": {
+                  "at": {
+                    "type": "string"
+                  },
+                  "external": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "charging": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "percent": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "remaining_mah": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "voltage_mv": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "errors": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "end": {
+            "type": "object",
+            "required": [
+              "at",
+              "external",
+              "charging",
+              "percent",
+              "remaining_mah",
+              "voltage_mv",
+              "errors"
+            ],
+            "properties": {
+              "at": {
+                "type": "string"
+              },
+              "external": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "charging": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "percent": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 100
+              },
+              "remaining_mah": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "voltage_mv": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "errors": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "average_scope": {
+            "enum": [
+              "session",
+              "after_window",
+              null
+            ]
+          },
+          "power_status": {
+            "enum": [
+              "battery_only",
+              "external_seen",
+              "unknown"
+            ]
+          },
+          "measurement": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "actions": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "restore": {
+            "type": "object",
+            "required": [
+              "restored",
+              "failed",
+              "failed_attempts"
+            ]
+          },
+          "resurrected": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "away": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "comparison": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

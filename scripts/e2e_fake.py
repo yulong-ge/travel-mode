@@ -66,7 +66,12 @@ class Machine:
                 "\n".join(f"{p} 1 {os.getuid()} {s} 0.0 {b} {c}" for p, (s, b, c) in self.rows.items()), "", 0
             )
         if cmd == ["ioreg", "-rn", "AppleSmartBattery"]:
-            return CmdResult('"ExternalConnected" = Yes\n"IsCharging" = No\n', "", 0)
+            return CmdResult(
+                '"ExternalConnected" = Yes\n"IsCharging" = No\n"Voltage" = 12000\n'
+                '"AppleRawCurrentCapacity" = 4000\n',
+                "",
+                0,
+            )
         if cmd[:3] == ["sudo", "-n", "-l"]:
             return CmdResult("", "" if self.permission else "sudo denied", int(not self.permission))
         if cmd == PROCESS_QUERY:
@@ -111,6 +116,8 @@ class Machine:
             else:
                 self.loaded = cmd[1] == "load"
                 out = ""
+        elif cmd == ["/usr/bin/pmset", "-g", "log"]:
+            out = ""
         elif cmd == ["/usr/bin/pmset", "-g", "custom"]:
             out = self.power_text()
         elif cmd == ["/usr/bin/pmset", "-g", "cap"]:

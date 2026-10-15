@@ -81,6 +81,7 @@ Sudo is requested only for operations that require it, such as power writes, glo
 | `travel-mode suggest --samples 3` | Read-only energy and category suggestions |
 | `travel-mode suggest --json` | Structured suggestions |
 | `travel-mode suggest --write` | Confirm additions to app/service/daemon configuration |
+| `travel-mode history [--json] [--limit N]` | Read local session history |
 
 Other options: `--scenario work|away`, `--profile NAME`, `--dry-run`, `--yes` / `-y`, `--aggressive`, `--lang en|zh`, `--help`, `--version`. `--force` with `off` discards outstanding recovery records even after a restore failure. `thaw --all` can resume apps stopped outside this tool. Pressing `L` in the TUI saves the selected language to `options.language` in the configuration file and preserves TOML comments. In dry-run, it writes only the isolated configuration copy. Hidden `--demo` uses fixtures for screenshots.
 
@@ -164,6 +165,30 @@ Opening the tool or running `check` also compares recorded pauses with current L
 Measured on macOS on 2026-10-15 with external power connected: a 20.159-second probe window used 0.020392 s of process CPU and 0.155477 s of child CPU (0.175869 s total), with 10 ioreg calls and one pmset call. The TUI idle window lasted 300.001 seconds and used 0.931522 s of process CPU plus 0.189740 s of child CPU (1.121262 s total). Its only subprocesses during that window were 10 ioreg calls; no top ran. These are CPU seconds, not watt-hours. The TUI was idle; other validation processes were active on the host.
 
 Reproduce with `uv run python scripts/measure_overhead.py probes --output /tmp/travel-mode-probes.json` and `uv run python scripts/measure_overhead.py tui --output /tmp/travel-mode-tui.json`. The script isolates HOME/config/state, enforces a read-only Runner and takes deltas of `resource.getrusage(RUSAGE_SELF)` and `RUSAGE_CHILDREN` user + system CPU times. TUI accounting starts after initial rendering and covers five minutes with no input. The 20-second probe mode exercises the read/parse path even on AC and includes one macOS estimate query; normal `power` and apply skip the window on AC. No valid discharge measurement or battery-life improvement was hardware-verified in this run.
+
+## Session reports and history
+
+Apply checks `pmset -g ps` before sampling. External power skips the measurement window. A failed power-source query, battery read or parse reports the reason and continues the power-saving actions. The session report retains the failed measurement without estimated savings. If the first window fails, the second window is not attempted. Cancelling a measurement and unexpected programming errors still interrupt the operation. The standalone `power` command reports read failures as errors. The overview displays failed battery reads without closing the TUI.
+
+`travel-mode off` shows the session scenario, UTC start/end times, duration, battery endpoints in percent and raw mAh, available power estimates, attempted/successful/failed Action counts, restore results and previously observed resurrections. The TUI shows the same report in a scrollable view after restore. The Network/restore page has a read-only **Session history** button.
+
+A session begins at its first Action, not when the TUI is opened. Start/end readings use one ioreg and one pmset battery query each. The tool does not sample while closed. `check` and the open TUI retain resurrections they actually observed; this is not continuous monitoring. The existing TUI battery timer also records external-power observations without another probe. Counts refer to top-level Actions, not subprocess or PID counts. Failed attempts are retained. Restore counts are separate and accumulate across retries.
+
+Whole-session power is an estimate: mean endpoint voltage × raw capacity loss / elapsed hours. It is available only with valid endpoint fields, no increasing charge/capacity, and a battery-source anchor in the retained pmset log at or before the start with no recorded AC interval. Source classification depends on the retained log and cannot prove that events were never omitted. If AC was observed, the report says discharge statistics are incomplete and omits whole-session discharge and watts. Missing source coverage or readings also produce explicit unavailable values. Endpoint readings remain visible and are not described as discharge on AC. Valid before/after measurement windows are shown separately; an after-window average can be compared only with other after-window averages, never with whole-session estimates. JSON `difference_watts` is positive for lower power and negative for higher power; text displays the direction and absolute difference.
+
+Away reports reuse the sleep-segment and DarkWake parsers, restricted to the session interval. Only complete recorded sleep segments are summed. Segments crossing a boundary are not extrapolated; no matching complete segment means unknown discharge, not zero. Recorded AC or unknown source coverage suppresses aggregate sleep-discharge statistics. DarkWake counts/reasons refer only to recorded battery events in the interval.
+
+```bash
+travel-mode history
+travel-mode history --limit 10
+travel-mode history --json --limit 10
+```
+
+Reports are stored locally in `history.jsonl` beside the active state path (`TRAVEL_MODE_STATE` also isolates history). `[history] retain = 50` keeps the newest 50 reports by default; valid values are 1–10000. `history` shows the newest 50 by default; `--limit N` changes the display limit. JSON follows the [history schema](docs/json-schema/history.schema.json). Comparisons exclude the current report and use retained reports with the same scenario and statistical scope. Missing averages are excluded. History reads do not probe macOS or migrate configuration.
+
+The report is checkpointed before an atomic history write and state deletion. If archival fails, the state remains, further Actions are blocked, and another `off` retries the same report without changing its end readings or duplicating history. Partial restores retain their session and receipts. Dry-run does not sample or archive sessions. Older snapshots have unknown start readings/action counts; their reports state this explicitly. Reports contain local app/service names and should be reviewed before sharing. There is no cross-process writer lock; use one modifying instance at a time.
+
+Health JSON retains the complete `health.checks` observations and adds `health.display_checks` with deduplicated evidence and `references`. CLI and TUI use this display view; a process appears first in keep-awake tools, then assertions, then background CPU in priority order. The overview combines status and health in one card.
 
 ## Restore and recovery
 

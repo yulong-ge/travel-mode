@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import re
 import shlex
+import shutil
 import subprocess
+import threading
+import time
 from pathlib import Path
 
 from travel_mode.system.health import PROCESS_COMMAND, native_command
@@ -106,6 +109,7 @@ class GuardRunner:
         self.commands = []
         self.tripped = False
         self.results = []
+        self.trace = []
         self.violations = []
 
     def refuse(self, cmd):
@@ -157,7 +161,7 @@ class GuardRunner:
             ["mdfind", 'kMDItemContentType == "com.apple.application-bundle"'],
         ]
         allowed |= cmd in [
-            ["/usr/bin/pmset", "-g", kind] for kind in ("custom", "cap", "ps", "assertions", "batt")
+            ["/usr/bin/pmset", "-g", kind] for kind in ("custom", "cap", "ps", "assertions", "batt", "log")
         ]
         allowed |= (
             len(cmd) == 5
@@ -260,6 +264,18 @@ class GuardRunner:
             expected = self.owned[int(cmd[2])]
             if row is None or (row[1], row[2]) != expected:
                 self.refuse(cmd)
-        result = self.backend(cmd, timeout, interactive)
+        event = dict(
+            command=list(cmd),
+            timeout=timeout,
+            thread=threading.current_thread().name,
+            executable=shutil.which(cmd[0]),
+        )
+        self.trace.append(event)
+        started = time.monotonic()
+        try:
+            result = self.backend(cmd, timeout, interactive)
+        finally:
+            event["seconds"] = time.monotonic() - started
+        event.update(rc=result.rc, stdout_bytes=len(result.stdout.encode()), stderr=result.stderr)
         self.results.append((tuple(cmd), result))
         return result

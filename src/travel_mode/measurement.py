@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 from .i18n import t
 from .system import battery
-from .system.shell import _read, is_dry_run
+from .system.shell import ReadError, _read, is_dry_run
 
 
 @dataclass(frozen=True)
@@ -54,9 +54,26 @@ def macos_estimate():
     return {"minutes": int(match[1]) * 60 + int(match[2]) if match else None, "raw": raw}
 
 
-def measure(settings=None, *, clock=None, progress=None, cancelled=None, first=None):
+def on_external_power():
+    raw = _read(["pmset", "-g", "ps"], timeout=5)
+    if "AC Power" in raw:
+        return True
+    if "Battery Power" in raw:
+        return False
+    raise battery.BatteryError(t("battery.invalid", field="pmset -g ps", value=repr(raw)))
+
+
+def failed(error):
+    return dict(available=False, reason="failed", error=str(error), samples=0)
+
+
+def measure(settings=None, *, clock=None, progress=None, cancelled=None, first=None, source_checked=False):
     settings, clock = settings or Settings(), clock or Clock()
     validate_settings(settings)
+    if cancelled is not None and cancelled.is_set():
+        raise InterruptedError(t("measurement.cancelled"))
+    if not source_checked and on_external_power():
+        return dict(available=False, reason="external_power", samples=0, macos=macos_estimate())
     started = clock.monotonic()
     readings = []
     count = math.ceil(settings.seconds / settings.interval)
@@ -90,6 +107,8 @@ def measure(settings=None, *, clock=None, progress=None, cancelled=None, first=N
 
 
 def describe(result):
+    if result.get("reason") == "failed":
+        return t("measurement.failed", reason=result["error"])
     if not result["available"]:
         return battery.describe(result)
     minutes = result["macos"]["minutes"]
@@ -107,43 +126,65 @@ def begin(scenario, enabled, settings, emit, *, clock=None, cancelled=None):
     if is_dry_run():
         emit(t("measurement.dry_run"))
         return None
-    emit(t("measurement.before"))
-    result = measure(
-        settings,
-        clock=clock,
-        progress=lambda n, total: emit(t("measurement.progress", n=n, total=total)),
-        cancelled=cancelled,
-    )
+    validate_settings(settings)
+    if cancelled is not None and cancelled.is_set():
+        raise InterruptedError(t("measurement.cancelled"))
+    try:
+        if on_external_power():
+            emit(t("measurement.ac_skip"))
+            return None
+        emit(t("measurement.before"))
+        result = measure(
+            settings,
+            clock=clock,
+            progress=lambda n, total: emit(t("measurement.progress", n=n, total=total)),
+            cancelled=cancelled,
+            source_checked=True,
+        )
+    except (ReadError, battery.BatteryError) as exc:
+        result = failed(exc)
     emit(describe(result))
-    return result if result["available"] else None
+    return result if result["available"] or result.get("reason") == "failed" else None
 
 
 def finish(before, settings, state, save, emit, *, clock=None, cancelled=None):
     if before is None:
         return None
-    clock = clock or Clock()
-    emit(t("measurement.settling", seconds=settings.settle_seconds))
-    clock.sleep(settings.settle_seconds)
-    emit(t("measurement.after"))
-    after = measure(
-        settings,
-        clock=clock,
-        progress=lambda n, total: emit(t("measurement.progress", n=n, total=total)),
-        cancelled=cancelled,
-    )
+    validate_settings(settings)
+    after = None
+    if before["available"]:
+        clock = clock or Clock()
+        try:
+            if on_external_power():
+                after = dict(available=False, reason="external_power", samples=0, macos=macos_estimate())
+            else:
+                emit(t("measurement.settling", seconds=settings.settle_seconds))
+                clock.sleep(settings.settle_seconds)
+                emit(t("measurement.after"))
+                after = measure(
+                    settings,
+                    clock=clock,
+                    progress=lambda n, total: emit(t("measurement.progress", n=n, total=total)),
+                    cancelled=cancelled,
+                )
+        except (ReadError, battery.BatteryError) as exc:
+            after = failed(exc)
     result = {"before": before, "after": after, "saved_watts": None, "extra_hours": None}
-    if after["available"]:
+    if after is not None and after["available"]:
         result["saved_watts"] = before["average_watts"] - after["average_watts"]
         result["extra_hours"] = after["remaining_wh"] * (
             1 / after["average_watts"] - 1 / before["average_watts"]
         )
     state["measurement"] = result
     save(state)
-    emit(comparison_description(result))
+    if before["available"]:
+        emit(comparison_description(result))
     return result
 
 
 def comparison_description(result):
+    if not result["before"]["available"]:
+        return describe(result["before"])
     if not result["after"]["available"]:
         return describe(result["after"])
     return t(
@@ -169,10 +210,29 @@ def validate_comparison(value):
 
     if not isinstance(value, dict) or set(value) != {"before", "after", "saved_watts", "extra_hours"}:
         invalid("comparison")
+    if (
+        isinstance(value["before"], dict)
+        and value["before"].get("reason") == "failed"
+        and value["after"] is not None
+    ):
+        invalid("after")
     for key in ("before", "after"):
         row = value[key]
+        if key == "after" and row is None and value["before"].get("reason") == "failed":
+            continue
         if not isinstance(row, dict) or type(row.get("available")) is not bool:
             invalid(key)
+        if row.get("reason") == "failed":
+            if (
+                set(row) != {"available", "reason", "error", "samples"}
+                or row["available"]
+                or type(row["samples"]) is not int
+                or row["samples"] != 0
+                or not isinstance(row["error"], str)
+                or not row["error"]
+            ):
+                invalid(key)
+            continue
         if key == "before" and not row["available"]:
             invalid("before.available")
         if type(row.get("samples")) is not int or row["samples"] < int(row["available"]):
@@ -194,7 +254,7 @@ def validate_comparison(value):
         elif row.get("reason") not in {"no_battery", "external_power", "charging", "not_discharging"}:
             invalid(f"{key}.reason")
     for field in ("saved_watts", "extra_hours"):
-        if value["after"]["available"]:
+        if value["after"] is not None and value["after"]["available"]:
             number(value[field], field)
         elif value[field] is not None:
             invalid(field)

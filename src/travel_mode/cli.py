@@ -33,7 +33,19 @@ def _main(argv=None):
     parser.add_argument(
         "cmd",
         nargs="?",
-        choices=["on", "off", "restore", "check", "report", "config", "thaw", "profiles", "suggest", "power"],
+        choices=[
+            "on",
+            "off",
+            "restore",
+            "check",
+            "report",
+            "config",
+            "thaw",
+            "profiles",
+            "suggest",
+            "power",
+            "history",
+        ],
     )
     parser.add_argument(
         "config_cmd", nargs="?", choices=["path", "init", "validate", "edit", "set-language", "set-interface"]
@@ -53,6 +65,7 @@ def _main(argv=None):
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--samples", type=int, default=3)
+    parser.add_argument("--limit", type=int, help=t("session.limit_help"))
     parser.add_argument("--seconds", type=float, help=t("measurement.seconds_help"))
     measure_flags = parser.add_mutually_exclusive_group()
     measure_flags.add_argument(
@@ -67,6 +80,8 @@ def _main(argv=None):
     parser.add_argument("--all", action="store_true", help=t("cli.thaw_resume_all_stopped_app_processes"))
     parser.add_argument("--version", action="version", version="travel-mode 1.1.0")
     args = parser.parse_args(argv)
+    if args.limit is not None and (args.cmd != "history" or args.limit < 1):
+        parser.error(t("session.limit_error"))
     if args.seconds is not None and args.cmd != "power":
         parser.error(t("measurement.seconds_only_power"))
     if args.reapply and args.cmd != "check" and not args.check:
@@ -81,7 +96,7 @@ def _main(argv=None):
     if args.demo:
         os.environ["TRAVEL_MODE_DEMO"] = "1"
         demo._configure_demo()
-    exempt = args.cmd == "config" and args.config_cmd in {"path", "validate"}
+    exempt = args.cmd == "history" or (args.cmd == "config" and args.config_cmd in {"path", "validate"})
     if not exempt:
         from .system.platform import detect_capabilities, ensure_macos
 
@@ -94,7 +109,7 @@ def _main(argv=None):
         except RuntimeError as exc:
             print(str(exc), file=sys.stderr)
             return 2
-    migration_messages = [] if args.cmd == "suggest" else migrate_legacy()
+    migration_messages = [] if args.cmd in {"suggest", "history"} else migrate_legacy()
     for message in migration_messages:
         print(message, file=sys.stderr)
     from .tui import app as tui_app
@@ -114,6 +129,33 @@ def _main(argv=None):
         config = load_config()
         for name, profile in {**builtin_profiles(), **config.profiles}.items():
             print(f"{name}: {profile.values.get('description', '')}")
+        return 0
+    if args.cmd == "history":
+        import json
+
+        from . import sessions
+
+        rows = sessions.read_history()
+        limit = args.limit or 50
+        selected = list(reversed(rows))[:limit]
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "sessions": [
+                            {**row, "comparison": sessions.comparison(row, rows)} for row in selected
+                        ],
+                        "limit": limit,
+                    },
+                    ensure_ascii=False,
+                )
+            )
+        elif not selected:
+            print(t("session.history_empty"))
+        else:
+            for row in selected:
+                print("\n".join(sessions.describe(row, rows)))
         return 0
     if args.cmd == "power":
         import json
@@ -243,7 +285,7 @@ def ask_scenario():
     print(f"  work: {t('scenario.work_desc')}")
     print(f"  away: {t('scenario.away_desc')}")
     try:
-        answer = input("  [work/away] ").strip().lower()
+        answer = input(t("scenario.input")).strip().lower()
     except EOFError as exc:
         raise ConfigError("<cli>", "--scenario", t("scenario.required")) from exc
     if answer not in ("work", "away"):

@@ -34,6 +34,7 @@ class NetworkPage:
         with off:
             yield Static("", id="off-info")
             yield Button(t("impl.restore_travel_mode_off"), id="b-off", variant="error")
+            yield Button(t("session.history"), id="b-history")
 
     async def build_net(self, network, dev, wifi, bluetooth):
         box = self.query_one("#net-box", Vertical)
@@ -123,19 +124,31 @@ class NetworkPage:
             self.logline("warn", t("impl.snapshot_is_hours_old_restoring_the", v0=age))
 
         def flow():
+            from travel_mode import sessions
+
             n, fails = flow_restore.run_restore(self.st, lambda k, m: self.tlog(k, m))
             if fails:
-                return n, fails
+                if "session" in self.st:
+                    self.st["session"]["restored"] += n
+                    self.st["session"]["restore_failures"] += fails
+                    self.save()
+                return n, fails, None
+            report = sessions.finish(self.st, n, 0)
             from travel_mode.state import _path
 
             _path().unlink(missing_ok=True)
-            return n, 0
+            return n, 0, report
 
         res = await self.busy(btn, flow)
         if not res:
             self.action_refresh()
             return
-        n, fails = res
+        n, fails, report = res
+        if report is not None:
+            from travel_mode import sessions
+            from travel_mode.tui.session_screen import SessionScreen
+
+            self.push_screen(SessionScreen("\n".join(sessions.describe(report, sessions.read_history()))))
         if fails:
             self.logline("bad", t("impl.restores_failed_snapshot_retained_resolve_failures", v0=fails))
             self.notify(t("impl.restores_failed_snapshot_retained", v0=fails), severity="error")
@@ -144,3 +157,14 @@ class NetworkPage:
             self.notify(t("impl.original_state_restored_items", v0=n), severity="information")
         self.st, self.merged = snapshots.snapshot_origin()
         self.action_refresh()
+
+    async def show_history(self):
+        import asyncio
+
+        from travel_mode import sessions
+
+        rows = await asyncio.to_thread(sessions.read_history)
+        text = "\n\n".join("\n".join(sessions.describe(row, rows)) for row in reversed(rows))
+        from travel_mode.tui.session_screen import SessionScreen
+
+        self.push_screen(SessionScreen(text or t("session.history_empty")))

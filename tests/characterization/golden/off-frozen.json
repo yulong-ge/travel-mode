@@ -38,10 +38,20 @@
       "kill",
       "-CONT",
       "910002"
+    ],
+    [
+      "ioreg",
+      "-rn",
+      "AppleSmartBattery"
+    ],
+    [
+      "pmset",
+      "-g",
+      "batt"
     ]
   ],
   "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
   "exit_code": 0,
-  "output": "✓ Restoring snapshot saved at: <TIME>\n✓ Thawed: Freeze Demo\n✓ State file cleared (1 items restored)\n",
+  "output": "✓ Restoring snapshot saved at: <TIME>\n✓ Thawed: Freeze Demo\nSession report: unknown\nStart unknown; end 2026-10-15T12:00:00+00:00; duration unknown s.\nBattery endpoints: unknown% / unknown mAh → 87% / 4000 mAh.\nThe power-source log does not cover the interval; discharge statistics are incomplete.\nAverage power is unavailable.\nActions: unknown attempted, unknown succeeded, unknown failed.\nRestore: 1 items restored, 0 outstanding failures; 0 failed attempts across retries.\nSession reading unavailable: This snapshot predates session sampling; start readings and action counts are unknown.\n✓ State file cleared (1 items restored)\n",
   "state": null
 }

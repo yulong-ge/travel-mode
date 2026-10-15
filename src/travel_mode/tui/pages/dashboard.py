@@ -42,14 +42,11 @@ class DashboardPage:
         reapply = Button(t("resurrection.reapply"), id="b-reapply", disabled=True)
         reapply.display = False
         yield reapply
-        self._dash_status = Vertical(
-            Label(t("impl.scanning"), classes="srow"), id="dash-status", classes="card"
-        )
-        self._dash_status.border_title = t("impl.status")
-        yield self._dash_status
-        health = Vertical(Static(t("health.scanning")), id="dash-health", classes="card")
-        health.border_title = t("health.title")
-        yield health
+        with Vertical(id="overview-health", classes="card") as overview:
+            overview.border_title = t("health.title")
+            self._dash_status = Vertical(Label(t("impl.scanning"), classes="srow"), id="dash-status")
+            yield self._dash_status
+            yield Vertical(Static(t("health.scanning")), id="dash-health")
         yield Button(t("health.refresh"), id="b-doctor")
         quick = Vertical(classes="card")
         quick.border_title = t("impl.save_power_before_departure")
@@ -111,10 +108,31 @@ class DashboardPage:
         widgets = [
             Static(t("health.timing", seconds=report["elapsed_seconds"], budget=report["budget_seconds"]))
         ]
-        for row in report["checks"]:
+        from travel_mode.health_view import display_checks
+
+        self.health_report = report
+        for row in display_checks(report):
+            if row["id"] == "sleep_disabled" and row["status"] != "unknown":
+                continue
+            if row["id"] == "keep_awake":
+                import re
+
+                shown = getattr(self, "caffeinate_targets", {})
+                row["evidence"] = [
+                    line
+                    for line in row["evidence"]
+                    if not any(re.search(rf"\bPID {pid}\b", line) for pid in shown)
+                ]
+                row["actions"] = [
+                    d for d in row["actions"] if d["kind"] != "caffeinate" or d["process"]["pid"] not in shown
+                ]
+                if row["status"] == "hit" and not row["evidence"] and not row["actions"]:
+                    continue
             widgets.append(Static(escape(f"{row['title']}: {t('health.' + row['status'])}")))
             if row["error"]:
                 widgets.append(Static(escape(row["error"]), classes="health-detail"))
+            for reference in row["references"]:
+                widgets.append(Static(t("health.see", title=reference), classes="health-detail"))
             for evidence in row["evidence"]:
                 widgets.append(Static(escape(evidence), classes="health-detail"))
             if row["status"] == "hit":
@@ -125,6 +143,18 @@ class DashboardPage:
                 # Store the observation on the widget. A recomposed page cannot retarget a queued click.
                 button.health_descriptor = descriptor
                 widgets.append(Horizontal(Static("", classes="grow"), button, classes="health-action"))
+            if (
+                row["id"] == "spotlight"
+                and row["status"] == "clear"
+                and getattr(self, "spotlight_enabled", False)
+            ):
+                widgets.append(
+                    Horizontal(
+                        Static("", classes="grow"),
+                        Button(t("impl.stop_spotlight_indexing"), id="b-spot"),
+                        classes="health-action",
+                    )
+                )
         widgets.extend(Static(escape(line), classes="health-detail") for line in report["limitations"])
         await box.remove_children()
         await box.mount(*widgets)
@@ -138,6 +168,8 @@ class DashboardPage:
 
     async def build_dash(self, blocks, ac, batt, spot):
         from travel_mode.resurrection import describe
+
+        self.spotlight_enabled = spot
 
         self.query_one("#dash-revived", Static).update("\n".join(describe(row) for row in self.resurrected))
         self.query_one("#dash-revived", Static).display = bool(self.resurrected)
@@ -159,7 +191,7 @@ class DashboardPage:
             if "SleepDisabled=1" in msg:
                 w.append(
                     status_row(
-                        escape(msg),
+                        "SleepDisabled=1 · " + t("health.sleep_disabled.impact"),
                         icon="[red]✘[/]",
                         button=Button(t("impl.fix"), id="b-fixsleep", classes="btn"),
                     )
@@ -167,7 +199,7 @@ class DashboardPage:
             elif msg in caff_messages:
                 w.append(
                     status_row(
-                        escape(msg),
+                        t("health.keep_awake.title") + ": " + escape(msg),
                         icon="[yellow]▲[/]",
                         button=Button(
                             t("impl.terminate"),
@@ -200,19 +232,9 @@ class DashboardPage:
             else t("impl.scanning")
         )
         w.append(status_row(services, button=Button(t("impl.review"), id="b-dash-svc", classes="btn")))
-        if spot:
-            icon, text = t("impl.spotlight_indexing_enabled").split(" ", 1)
-            w.append(
-                status_row(
-                    text,
-                    icon=icon,
-                    button=Button(t("impl.disable"), id="b-spot", classes="btn"),
-                )
-            )
-        else:
-            icon, text = t("impl.spotlight_indexing_disabled_2").split(" ", 1)
-            w.append(status_row(text, icon=icon, compact=True))
         await box.mount(*w)
+        if hasattr(self, "health_report"):
+            await self.build_health(self.health_report)
 
     async def act_quick(self, btn):
         measure_requested = self.query_one("#q-measure", Checkbox).value
@@ -230,7 +252,7 @@ class DashboardPage:
 
             def progress(message):
                 self.tlog("dim", message)
-                self.call_from_thread(self.query_one("#measurement-progress", Static).update, message)
+                self.call_from_thread(self.query_one("#measurement-progress", Static).update, escape(message))
 
             clock = measurement.CancellableClock(self._measurement_cancelled)
             before = measurement.begin(

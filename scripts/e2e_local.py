@@ -33,6 +33,7 @@ from e2e_guard import (
     GuardRunner,
     LocalBackend,
 )
+from e2e_isolation import discovery_scope, write_fixture_config
 
 from travel_mode import state
 from travel_mode.actions.apps import ForceQuitApp, FreezeApp, QuitApp, UnloadAgent
@@ -108,8 +109,9 @@ def product_environment(root, runner):
     try:
         os.environ.update(values)
         state.set_state_path_override(root / "state.json")
-        shell.set_runner(runner)
-        yield
+        with discovery_scope(root, runner) as discovery:
+            shell.set_runner(discovery)
+            yield
     finally:
         shell.set_runner(previous_runner)
         state.set_state_path_override(previous_override)
@@ -158,11 +160,7 @@ def create_fixtures(root):
     agents = root / "home/Library/LaunchAgents"
     agents.mkdir(parents=True, exist_ok=True)
     (agents / f"{LABEL}.plist").symlink_to(root / "agent.plist")
-    (root / "config.toml").write_text(
-        '[apps]\nquit=["TravelModeE2E-Quit"]\nfreeze=["TravelModeE2E-Freeze"]\n'
-        'skip=[]\nask=[]\ndefault="skip"\nwith_daemon=[]\n'
-        f'[services]\nunload=["{LABEL}"]\nkeep=[]\n[network]\napps=[]\n'
-    )
+    write_fixture_config(root)
 
 
 class Harness:
@@ -748,6 +746,8 @@ def print_plan():
     print("PLAN ONLY: no system commands, fixture processes or filesystem writes.")
     print("Preflight: no real state; dedicated temporary root; agent label absent; AC connected.")
     print("Isolate HOME/XDG/config/state and app/agent discovery; snapshot foreign process states.")
+    print("Disable built-in defaults/categories; restrict discovery to fixture bundles and agent.")
+    print("Keep unfiltered GuardRunner process observations for identity checks and foreign-process safety.")
     root = Path("/tmp/travel-mode-e2e-PLAN")
     guard = GuardRunner(None, root, fixture_paths(root), root / "agent.plist", plan=True)
     for cmd in [

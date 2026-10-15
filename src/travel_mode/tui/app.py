@@ -68,6 +68,8 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
         self._measurement_cancelled = threading.Event()
         self._battery_timer = None
         self.resurrected = []
+        self._observed_resurrections = []
+        self._observed_external = False
         self.profile_values = active_values()
         self.scenario = scenario or active_scenario()
         self.config = load_config()
@@ -242,6 +244,9 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
                 from travel_mode.resurrection import detect
 
                 self.resurrected = await asyncio.to_thread(detect, self.display_state())
+                self._observed_resurrections.extend(self.resurrected)
+                if not self._mutation_lock.locked():
+                    self.flush_session_observations()
                 await apply("p-dash", self.build_dash, *dash_values)
 
             async def power():
@@ -375,10 +380,28 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
         from textual.worker import get_current_worker
 
         from travel_mode.system import battery
+        from travel_mode.system.shell import ReadError
 
-        reading = await asyncio.to_thread(battery.read)
+        try:
+            reading = await asyncio.to_thread(battery.read)
+        except (ReadError, battery.BatteryError) as exc:
+            if not get_current_worker().is_cancelled and self.is_running:
+                message = t("measurement.failed", reason=str(exc))
+                self.query_one("#dash-battery", Static).update(escape(message))
+                self.logline("warn", message)
+            return
         if not get_current_worker().is_cancelled and self.is_running:
+            self._observed_external |= reading.get("reason") in {"external_power", "charging"}
+            if not self._mutation_lock.locked():
+                self.flush_session_observations()
             self.query_one("#dash-battery", Static).update(battery.describe(reading))
+
+    def flush_session_observations(self):
+        from travel_mode.sessions import note
+
+        note(self.st, self._observed_resurrections, external=self._observed_external, save=self.save)
+        self._observed_resurrections.clear()
+        self._observed_external = False
 
     def on_unmount(self):
         self._measurement_cancelled.set()

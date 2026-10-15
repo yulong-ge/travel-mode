@@ -6,12 +6,18 @@ All notable changes follow Keep a Changelog.
 
 ### Fixed
 
+- Restrict e2e app, agent, assertion and category discovery to fixtures; keep full process observations for safety checks and disable health remediation controls in the UI harness.
+- Skip measurement on external power before ioreg sampling; retain auxiliary measurement failures without aborting Actions or the TUI. Record e2e command timing and timeout diagnostics.
+- Exercise scenario selection in CLI/TUI demo drivers and verify work/away round trips separately.
+- Merge overview status and health presentation; reference repeated process evidence and clarify caffeinate instructions.
 - Preserve user LaunchAgent discovery roots while dry-run isolates HOME and write paths; deduplicate repeated unloads in one plan.
 - Label dry-run action results as plans, count intended freeze targets and show projected battery values.
 - Document language persistence and remove the maintainer command proxy from public test instructions.
 
 ### Added
 
+- Session reports after restore, local retained JSONL history and same-scenario power comparisons, with explicit incomplete charging/log intervals.
+- Scrollable bilingual session/history views and a history JSON schema.
 - Bounded on-demand health checks shared by check/JSON and the bilingual overview, with evidence, manual steps and existing Action remediation buttons.
 - Public keep-awake app recognition and configurable brightness/CPU health thresholds; individual read failures remain visible without stopping other checks.
 - On-demand battery power measurement, configurable finite windows, work before/after comparisons and saved session results.

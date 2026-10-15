@@ -81,6 +81,7 @@ away 动作可修改电池设置、AC 的 `powernap` / `womp`、全局 `disables
 | `travel-mode suggest --samples 3` | 只读能耗与类别建议 |
 | `travel-mode suggest --json` | 结构化建议 |
 | `travel-mode suggest --write` | 确认后添加应用、服务或守护程序配置 |
+| `travel-mode history [--json] [--limit N]` | 读取本机会话历史 |
 
 其他参数：`--scenario work|away`、`--profile NAME`、`--dry-run`、`--yes` / `-y`、`--aggressive`、`--lang en|zh`、`--help`、`--version`。`off --force` 即使恢复失败也会丢弃剩余记录。`thaw --all` 可能恢复本工具之外停止的应用。TUI 按 `L` 切换语言时，会把所选语言保存到配置文件的 `options.language`，并保留 TOML 注释。dry-run 仅写入隔离的配置副本。隐藏的 `--demo` 用测试数据生成截图。
 
@@ -164,6 +165,30 @@ spotlight_cpu_threshold = 20
 2026-10-15 在 macOS 接电状态下实测：20.159 秒采样窗口使用工具进程 CPU 0.020392 秒、子进程 CPU 0.155477 秒，合计 0.175869 秒；调用 ioreg 10 次、pmset 1 次。TUI 空闲窗口为 300.001 秒，使用工具进程 CPU 0.931522 秒、子进程 CPU 0.189740 秒，合计 1.121262 秒。该窗口内仅调用 ioreg 10 次，没有运行 top。这些是 CPU 时间，不是耗电量。TUI 没有交互；本机同时运行其他验证进程。
 
 复现方法：`uv run python scripts/measure_overhead.py probes --output /tmp/travel-mode-probes.json` 与 `uv run python scripts/measure_overhead.py tui --output /tmp/travel-mode-tui.json`。脚本隔离 HOME、配置和状态，强制使用只读 Runner，并计算 `resource.getrusage(RUSAGE_SELF)` 与 `RUSAGE_CHILDREN` 的用户态加内核态 CPU 时间差。TUI 在初始渲染完成后计时，保持五分钟无输入。20 秒探针模式在接电时也执行读数与解析路径，并查询一次 macOS 估计；正常 power 和 apply 在接电时跳过窗口。本轮没有真机验证有效放电测量或续航改善。
+
+## 会话报告与历史
+
+应用动作前先用 `pmset -g ps` 判断电源来源。接电时跳过测量窗口。电源查询、电池读取或解析失败时显示原因，并继续省电动作。会话报告保留测量失败记录，不计算节省值。第一个窗口失败时不再尝试第二个窗口。取消测量和未预期的程序错误仍会中断操作。单独运行 `power` 时，读取失败仍作为错误报告。总览的电池读取失败会显示原因，不关闭 TUI。
+
+`travel-mode off` 显示本次场景、UTC 开始与结束时间、时长、电量端点（百分比与原始 mAh）、可用的功耗估计、Action 尝试/成功/失败次数、恢复结果，以及先前实际检测到的复活项目。TUI 恢复后显示相同的可滚动报告。「网络/恢复」页提供只读的「会话历史」入口。
+
+会话从第一个 Action 开始，不从打开 TUI 开始。开始和结束各调用一次 ioreg 与 pmset 电池查询。工具关闭后不采样。`check` 与打开的 TUI 记录实际发现的复活项目，不持续监控。现有 TUI 电池定时器会同时记录接电读数，不增加探测。动作数统计顶层 Action，不统计子进程或 PID 数；失败尝试也保留。恢复项单独计数，并跨重试累计。
+
+整段平均功耗按端点平均电压 × 原始容量减少量 ÷ 时长估算。仅在端点字段有效、电量与容量没有增加、保留的 pmset 日志在开始时刻或之前有电池供电记录且没有记录接电区间时提供。电源分类依赖保留的日志，不能证明事件从未遗漏。观察到接电时显示「期间曾接电，掉电统计不完整」，不提供整段掉电或功耗。日志覆盖不足或读数缺失时同样明确标为不可用。接电时仍显示端点读数，但不把差值称为掉电。已有的 before/after 测量窗口单独列出；应用后窗口均值只与其他应用后窗口比较，不与整段估计混算。JSON 的 `difference_watts` 为正表示功耗更低，为负表示更高；文本显示方向与差值的绝对值。
+
+away 报告复用睡眠段与 DarkWake 解析器，并限定在会话时间区间内。只累计日志中完整的睡眠段，不外推跨越边界的片段；没有完整匹配段时掉电为未知，不填零。记录到接电或电源覆盖未知时，不提供睡眠掉电总数。DarkWake 次数与原因仅来自区间内记录的电池事件。
+
+```bash
+travel-mode history
+travel-mode history --limit 10
+travel-mode history --json --limit 10
+```
+
+报告只保存在本机状态文件旁的 `history.jsonl`；设置 `TRAVEL_MODE_STATE` 会同时隔离历史路径。`[history] retain = 50` 默认保留最新 50 条，有效范围 1–10000。`history` 默认显示最新 50 条，`--limit N` 修改显示条数。JSON 遵循[历史 schema](docs/json-schema/history.schema.json)。比较只使用保留历史中同场景、同统计口径的其他会话，排除当前报告与缺少均值的记录。读取历史不探测 macOS，也不迁移配置。
+
+工具先保存报告检查点，再原子写入历史，最后删除状态。归档失败时保留状态并阻止新 Action；再次运行 `off` 会重试同一报告，不重新采集结束读数，也不重复写历史。部分恢复保留会话与恢复记录。dry-run 不采样、不归档会话。旧快照的开始读数和动作数为未知，报告会明确说明。报告包含本机应用/服务名称，分享前请检查。没有跨进程写锁，请一次只运行一个修改实例。
+
+体检 JSON 保留完整的 `health.checks` 原始观察，新增去重后的 `health.display_checks` 证据与 `references` 引用。CLI 与 TUI 使用展示视图；同一进程依次优先归入防睡工具、防睡断言、后台 CPU。总览把状态与体检合并为一个卡片。
 
 ## 恢复机制
 

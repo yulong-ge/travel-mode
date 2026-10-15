@@ -28,7 +28,36 @@ class Executor:
             else nullcontext()
         )
         with self._lock, scope:
-            return action.apply(ctx)
+            from .. import sessions
+            from ..system.shell import is_dry_run
+
+            counted = ctx.state is not None and not is_dry_run()
+            if counted:
+                if "session_report_pending" in ctx.state:
+                    raise StateError(f"{_path()}: session_report_pending: {t('session.pending_report')}")
+                journal.persist()  # Fail before sampling or mutating if recovery storage is unavailable.
+                sessions.begin(ctx.state)
+                counts = ctx.state["session"]["actions"]
+                counts["attempted"] += 1
+                journal.persist()
+            try:
+                result = action.apply(ctx)
+            except Exception:
+                if counted:
+                    counts["failed"] += 1
+                    journal.persist()
+                raise
+            if counted:
+                ok = (
+                    result[1]
+                    if isinstance(result, tuple) and len(result) == 3
+                    else result[1] == 0
+                    if isinstance(result, tuple)
+                    else bool(result)
+                )
+                counts["succeeded" if ok else "failed"] += 1
+                journal.persist()
+            return result
 
     def execute_all(self, actions):
         return [self.execute(action) for action in actions]

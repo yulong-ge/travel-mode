@@ -96,7 +96,8 @@ async def test_tui_failed_thaw_retains_receipt(fake_runner):
     with pytest.raises(RuntimeError):
         await TravelApp.act_app(app, 0, "f", SimpleNamespace())
     assert app.st["frozen_apps"] == [path]
-    assert not saved and not done
+    assert not done
+    assert app.st["session"]["actions"]["failed"] == 1
     assert not any(kind == "ok" for kind, _ in messages)
 
 

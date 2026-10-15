@@ -142,6 +142,15 @@ def load_state(path=None):
             raise StateError(f"{target}: measurement: {exc}") from exc
         result["measurement"] = raw["measurement"]
     result["version"] = version
+    from .sessions import validate_active, validate_report
+
+    for key, validate in [("session", validate_active), ("session_report_pending", validate_report)]:
+        if key in raw:
+            try:
+                validate(raw[key])
+            except (ValueError, TypeError, KeyError) as exc:
+                raise StateError(f"{target}: {key}: {exc}") from exc
+            result[key] = raw[key]
     return result
 
 

@@ -32,7 +32,10 @@ async def test_health_overview_refresh_and_executor_button(language, fake_runner
         await app.workers.wait_for_complete()
         assert app.refresh_complete and "health" in app.pages_ready
         text = "\n".join(str(widget.content) for widget in app.query("#dash-health Static"))
-        assert t("health.sleep_disabled.title") in text
+        summary = "\n".join(str(w.content) for w in app.query("#dash-status Label"))
+        assert summary.count("SleepDisabled=1") == 1
+        assert "SleepDisabled=1" not in text
+        assert len(app.query("#overview-health.card")) == 1
         assert t("health.unknown") in text and "probe denied" in text
         assert len(app.query("#dash-health Button")) == 2
         native_reads = fake_runner.calls.count(tuple(health.native_command("displays")))
@@ -40,7 +43,7 @@ async def test_health_overview_refresh_and_executor_button(language, fake_runner
         await app.workers.wait_for_complete()
         assert app.refresh_complete
         assert fake_runner.calls.count(tuple(health.native_command("displays"))) == native_reads + 1
-        await click_after_layout(pilot, "#b-health-sleep_disabled-0")
+        await click_after_layout(pilot, "#b-fixsleep")
         await app.workers.wait_for_complete()
         assert len(admitted) == 1 and isinstance(admitted[0], EnableSleep)
         assert app.merged and not app._mutation_lock.locked()

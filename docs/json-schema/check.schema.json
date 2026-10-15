@@ -332,6 +332,17 @@
               }
             }
           }
+        },
+        "display_checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "evidence",
+              "references"
+            ]
+          }
         }
       }
     },

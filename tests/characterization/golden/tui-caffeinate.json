@@ -2,6 +2,16 @@
   "active": "p-dash",
   "commands": [
     [
+      "ioreg",
+      "-rn",
+      "AppleSmartBattery"
+    ],
+    [
+      "pmset",
+      "-g",
+      "batt"
+    ],
+    [
       "pmset",
       "-g",
       "assertions"
@@ -23,17 +33,15 @@
     "",
     "[dim]-InternalBattery-0 (id=1) 87%; · Battery power[/]",
     "[red]✘[/]",
-    "SleepDisabled=1 (sleep disabled globally; closing the lid will not sleep)",
+    "SleepDisabled=1 · Normal system sleep is disabled.",
     "[yellow]▲[/]",
-    "caffeinate prevents sleep: PID 919999: /usr/bin/caffeinate -d; parent PID 919997: /Applications/Terminal.app/Contents/MacOS/Terminal",
+    "Keep-awake tools: caffeinate prevents sleep: PID 919999: /usr/bin/caffeinate -d; parent PID 919997: /Applications/Terminal.app/Contents/MacOS/Terminal",
     "[yellow]▲[/]",
     "Audio assertion: \"audio\" (quit the app playing audio to release it)",
     "",
     "High-energy apps: [b]5[/] running",
     "",
-    "Background agents: [b]1[/] unloadable",
-    "[yellow]▲[/]",
-    "Spotlight indexing enabled"
+    "Background agents: [b]1[/] unloadable"
   ],
   "log": [
     [
@@ -49,5 +57,50 @@
   "refresh_requests": [
     "refresh"
   ],
-  "state": null
+  "state": {
+    "ac_prof": "",
+    "anchored_at": "<TIME>",
+    "batt_prof": "",
+    "brightness": "",
+    "bt_off": "",
+    "frozen_apps": [],
+    "frozen_pids": [],
+    "power_origin": {
+      "ac_prof": "lowpowermode 0 sleep 0 displaysleep 0 powernap 1 tcpkeepalive 1 womp 1 standby 1 hibernatemode 3 ttyskeepawake 1 disksleep 10 networkoversleep 0",
+      "batt_prof": "lowpowermode 0 sleep 1 displaysleep 10 powernap 0 tcpkeepalive 1 womp 0 standby 1 hibernatemode 3 ttyskeepawake 1 disksleep 10 lessbright 1 networkoversleep 0",
+      "sleepdisabled": "1"
+    },
+    "profile": "",
+    "quit_apps": [],
+    "saved_at": "<TIME>",
+    "scenario": "away",
+    "session": {
+      "actions": {
+        "attempted": 1,
+        "failed": 0,
+        "succeeded": 1
+      },
+      "external_seen": true,
+      "id": "fixture-session",
+      "restore_failures": 0,
+      "restored": 0,
+      "resurrected": [],
+      "start": {
+        "at": "2026-10-15T12:00:00+00:00",
+        "charging": false,
+        "errors": [],
+        "external": true,
+        "percent": 87,
+        "remaining_mah": 4000,
+        "voltage_mv": 12000
+      },
+      "started_at": "2026-10-15T12:00:00+00:00"
+    },
+    "sleepdisabled": "",
+    "spotlight_off": "",
+    "unloaded_svcs": [],
+    "unloaded_sys_svcs": [],
+    "version": 3,
+    "wifi_off": ""
+  }
 }

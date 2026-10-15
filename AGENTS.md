@@ -32,6 +32,11 @@ Screenshots land in `/tmp/tui-debug/<run-id>/`; inspect the PNGs instead of aski
 at the TUI. `scripts/e2e_local.py` / `scripts/e2e_ui.py` without `--plan`/`--demo` change the real
 system; only a maintainer who has reviewed them runs those.
 
+`scripts/e2e_isolation.py` generates fixture-only configuration and projects product discovery
+reads onto fixture bundles/PIDs/agents. GuardRunner keeps complete process observations for safety;
+the UI harness disables health remediation controls. Do not replace full safety observations with
+the filtered product view.
+
 ## Hard rules
 
 - Never run state-changing system commands while developing or testing: `sudo` writes, `pmset`
@@ -89,6 +94,7 @@ cli.py → flows/ (apply, restore, check, report, suggest, configuration, thaw)
   `profiles.py` holds built-in profiles; `constants.py` holds generic default app lists.
 - `system/battery.py` reads ioreg without sudo; `measurement.py` uses finite windows. Only the open TUI owns a 30-second ioreg timer, stopped on exit; energy ranking is button-only, with no resident monitor.
 - `system/health.py` collects nine structured read-only checks once per command/open/explicit refresh (2 s per check, 15 s command budget); `health_native.py` isolates native reads under subprocess timeouts. `flows/doctor.py` maps findings to existing Actions; health has no timer or resident monitor.
+- `sessions.py` records action counts and one-shot battery observations, seals restore reports before deleting state, and atomically retains local JSONL history. `health_view.py` deduplicates presentation while preserving raw observations. No session sampler runs in the background.
 - Two scenarios select the profile and defaults: `work` (unplugged work: screen and network stay
   on, sync/backup/updater programs are paused) and `away` (lid closed / overnight).
 - `categories.toml` + `categories.py` are the built-in rules that recognise sync, backup, updater

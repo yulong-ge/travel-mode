@@ -228,9 +228,19 @@ def mode_off(force_off=False, dry_run=False):
     emit("ok", t("impl.restoring_snapshot_saved_at", v0=st.get("saved_at", "unknown")))
     n, fails = run_restore(st, emit)
     if fails and not force_off:
+        if "session" in st and not is_dry_run():
+            st["session"]["restored"] += n
+            st["session"]["restore_failures"] += fails
+            state_api.save_state(st)
         emit("bad", t("impl.restores_failed_snapshot_retained_resolve_the", v0=fails))
         runtime._finish_dry_run()
         return 1
+    from .. import sessions
+
+    report = sessions.finish(st, n, fails)
+    if report is not None:
+        for line in sessions.describe(report, sessions.read_history()):
+            c.print(line, markup=False, highlight=False)
     state_target = state_path()
     if is_dry_run():
         from ..system.shell import dry_run_state_dir

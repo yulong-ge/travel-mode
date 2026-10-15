@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import re
-
 from travel_mode.i18n import t
 from travel_mode.system import apps as system_apps
 from travel_mode.system import launchd, pmset, processes, spotlight
@@ -87,15 +85,18 @@ def _mode_check():
     from ..resurrection import describe, detect
     from ..state import load_state
 
-    for row in detect(load_state()):
+    state = load_state()
+    rows = detect(state)
+    if state and "session" in state:
+        from ..sessions import note
+
+        note(state, rows, external=pmset.on_ac_power())
+    for row in rows:
         emit("warn", describe(row))
     if load_state():
         emit("dim", t("resurrection.hint"))
     for line in audit_lines():
         c.print(line, highlight=False)
-    c.rule(t("impl.sleep_blockers"))
-    for kind, msg in blockers_lines():
-        emit(kind, msg)
     c.rule(t("impl.power_settings_battery_profile"))
     profs = pmset.pmset_custom()
     from ..system.platform import map_pmset_key, supported_pmset_keys
@@ -143,20 +144,6 @@ def _mode_check():
         emit("dim", info)
     for candidate in svc.get("candidates", []):
         emit("dim", f"{candidate['label']} (candidate, pid {candidate['pid']})")
-    c.rule(t("impl.current_assertions"))
-    for line in pmset.pmset_assertions():
-        if re.search(r"PreventUserIdle(System|Display)Sleep.*named", line):
-            c.print(f"  {line.strip()}", highlight=False)
-    sd = pmset.sleep_disabled()
-    emit(
-        "ok" if sd != "1" else "bad",
-        t("impl.sleepdisabled_lid_close_sleep_available")
-        if sd != "1"
-        else t("impl.sleepdisabled_is_still_closing_the_lid"),
-    )
-    bl = pmset.battery_line()
-    if bl:
-        c.print(f"  {bl}", highlight=False)
     return 0
 
 

@@ -170,6 +170,7 @@ class Config:
     categories: CategoriesConfig = field(default_factory=CategoriesConfig)
     measurement: Settings = field(default_factory=Settings)
     health: HealthConfig = field(default_factory=HealthConfig)
+    history_retain: int = 50
 
     @classmethod
     def defaults(cls) -> Config:
@@ -182,6 +183,7 @@ class Config:
 
 
 _TOP_KEYS = {
+    "history",
     "apps",
     "network",
     "services",
@@ -356,7 +358,13 @@ def load_config(path: str | Path | None = None) -> Config:
         upper = 1 if key.startswith("brightness_") else 10000
         if type(value) not in (int, float) or not math.isfinite(value) or not 0 < value <= upper:
             raise _error(target, f"health.{key}", t("health.invalid_setting", upper=upper))
+    history = _table(data, "history", target)
+    _check_keys(history, {"retain"}, target, "history")
+    retain = history.get("retain", 50)
+    if type(retain) is not int or not 1 <= retain <= 10000:
+        raise _error(target, "history.retain", t("session.invalid_retain"))
     return Config(
+        history_retain=retain,
         apps=app_config,
         network=network_config,
         services=service_config,

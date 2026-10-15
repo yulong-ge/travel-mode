@@ -9,16 +9,22 @@ from ..system.processes import CaffeinateTarget
 
 
 def lines(report):
+    from ..health_view import display_checks
+
     yield t("health.timing", seconds=report["elapsed_seconds"], budget=report["budget_seconds"])
-    for row in report["checks"]:
+    for row in display_checks(report):
         yield f"{row['title']}: {t('health.' + row['status'])}"
         if row["error"]:
             yield f"  {row['error']}"
+        for reference in row["references"]:
+            yield "  " + t("health.see", title=reference)
         for evidence in row["evidence"]:
             yield f"  {evidence}"
         if row["status"] == "hit":
-            yield f"  {row['impact']}"
-            yield f"  {row['manual']}"
+            if row["impact"]:
+                yield f"  {row['impact']}"
+            if row["manual"]:
+                yield f"  {row['manual']}"
             for action in row["actions"]:
                 yield f"  {action_label(action)}"
     yield from report["limitations"]

@@ -149,3 +149,25 @@ def test_extended_guard_accepts_only_exact_safe_commands(sandbox):
     for cmd in commands:
         guard(cmd)
     assert not machine.calls
+
+
+def test_readonly_timeout_reaches_backend_and_keeps_diagnostic_trace(sandbox, monkeypatch):
+    import e2e_guard
+    from e2e_guard import LocalBackend
+
+    _, guard, _ = sandbox
+    calls = []
+
+    def backend(cmd, timeout=None, interactive=False):
+        calls.append((cmd, timeout, interactive))
+        return CmdResult("", "timeout", 124)
+
+    monkeypatch.setattr(e2e_guard, "subprocess_runner", backend)
+    guard.backend = LocalBackend([])
+    result = guard(["ioreg", "-rn", "AppleSmartBattery"], timeout=10)
+    assert result.rc == 124 and calls == [(["ioreg", "-rn", "AppleSmartBattery"], 10, False)]
+    assert not guard.tripped and not guard.violations
+    trace = guard.trace[-1]
+    assert trace["command"] == calls[0][0] and trace["timeout"] == 10
+    assert trace["rc"] == 124 and trace["seconds"] >= 0
+    assert trace["thread"] and trace["stdout_bytes"] == 0

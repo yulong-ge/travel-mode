@@ -10,6 +10,11 @@
       "-g"
     ],
     [
+      "pmset",
+      "-g",
+      "ps"
+    ],
+    [
       "ioreg",
       "-rn",
       "AppleSmartBattery"
@@ -33,6 +38,16 @@
       "pmset",
       "-g",
       "cap"
+    ],
+    [
+      "ioreg",
+      "-rn",
+      "AppleSmartBattery"
+    ],
+    [
+      "pmset",
+      "-g",
+      "batt"
     ],
     [
       "sudo",
@@ -160,6 +175,28 @@
     ],
     "saved_at": "<TIME>",
     "scenario": "work",
+    "session": {
+      "actions": {
+        "attempted": 4,
+        "failed": 0,
+        "succeeded": 4
+      },
+      "external_seen": true,
+      "id": "fixture-session",
+      "restore_failures": 0,
+      "restored": 0,
+      "resurrected": [],
+      "start": {
+        "at": "2026-10-15T12:00:00+00:00",
+        "charging": false,
+        "errors": [],
+        "external": true,
+        "percent": 87,
+        "remaining_mah": 4000,
+        "voltage_mv": 12000
+      },
+      "started_at": "2026-10-15T12:00:00+00:00"
+    },
     "sleepdisabled": "",
     "spotlight_off": "",
     "unloaded_svcs": [

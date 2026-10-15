@@ -90,6 +90,7 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
     profile_spotlight_off = profile.get("spotlight") == "off"
     profile_brightness = profile.get("brightness")
     from rich.console import Console
+    from rich.markup import escape
 
     c = Console()
     if not yes:
@@ -103,7 +104,7 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
     from .. import measurement
 
     before = measurement.begin(
-        config.options.scenario, measure, config.measurement, lambda msg: emit("dim", msg)
+        config.options.scenario, measure, config.measurement, lambda msg: emit("dim", escape(msg))
     )
     if config.options.scenario != "ask":
         st["scenario"] = config.options.scenario
@@ -417,7 +418,9 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
         bl = pmset.battery_line()
         if bl:
             c.print(f"  {bl}", highlight=False)
-        measurement.finish(before, config.measurement, st, state_api.save_state, lambda msg: emit("dim", msg))
+        measurement.finish(
+            before, config.measurement, st, state_api.save_state, lambda msg: emit("dim", escape(msg))
+        )
         has_changes = (
             "measurement" in st
             or power_applied
