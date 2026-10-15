@@ -1,0 +1,32 @@
+# travel-mode 配置模板
+[apps]
+default = "ask"
+watch = ["Google Chrome", "Slack"]
+ignore = []
+quit = ["Spotify"]
+freeze = ["WeChat"]
+skip = ["Raycast"]
+ask = ["Visual Studio Code"]
+
+[[apps.with_daemon]]
+name = "Remote Support"
+system_daemons = ["/Library/LaunchDaemons/example.daemon.plist"]
+user_agents = ["/Library/LaunchAgents/example.agent.plist"]
+group = "network"
+
+[network]
+apps = ["Tailscale"]
+
+[services]
+unload = []
+keep = []
+
+[power.battery]
+# displaysleep = 3
+
+[options]
+aggressive = false
+language = "auto"
+
+[profiles.flight]
+# Add profile-specific values in a future release.

@@ -1,0 +1,521 @@
+{
+  "commands": [
+    [
+      "pmset",
+      "-g",
+      "custom"
+    ],
+    [
+      "pmset",
+      "-g"
+    ],
+    [
+      "pmset",
+      "-g"
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "pmset",
+      "-a",
+      "disablesleep",
+      "0"
+    ],
+    [
+      "sudo",
+      "pmset",
+      "-a",
+      "disablesleep",
+      "0"
+    ],
+    [
+      "pmset",
+      "-g",
+      "assertions"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-ww",
+      "-axo",
+      "pid=,command="
+    ],
+    [
+      "pmset",
+      "-g",
+      "assertions"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "kill",
+      "-TERM",
+      "919999"
+    ],
+    [
+      "pmset",
+      "-g",
+      "assertions"
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "launchctl",
+      "list"
+    ],
+    [
+      "sudo",
+      "-n",
+      "launchctl",
+      "list"
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "launchctl",
+      "unload",
+      "<ROOT>/org.demo.daemon.plist"
+    ],
+    [
+      "sudo",
+      "launchctl",
+      "unload",
+      "<ROOT>/org.demo.daemon.plist"
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "osascript",
+      "-e",
+      "with timeout of 8 seconds",
+      "-e",
+      "tell application id \"org.demo.app910005\" to quit",
+      "-e",
+      "end timeout"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "pmset",
+      "-g",
+      "assertions"
+    ],
+    [
+      "pmset",
+      "-g",
+      "custom"
+    ],
+    [
+      "pmset",
+      "-g",
+      "custom"
+    ],
+    [
+      "pmset",
+      "-g",
+      "cap"
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "pmset",
+      "-b",
+      "lowpowermode",
+      "1",
+      "sleep",
+      "5",
+      "displaysleep",
+      "3",
+      "hibernatemode",
+      "25"
+    ],
+    [
+      "sudo",
+      "pmset",
+      "-b",
+      "lowpowermode",
+      "1",
+      "sleep",
+      "5",
+      "displaysleep",
+      "3",
+      "hibernatemode",
+      "25"
+    ],
+    [
+      "pmset",
+      "-g",
+      "custom"
+    ],
+    [
+      "brightness",
+      "-l"
+    ],
+    [
+      "brightness",
+      "-l"
+    ],
+    [
+      "brightness",
+      "0.15"
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "pmset",
+      "-c",
+      "powernap",
+      "0",
+      "womp",
+      "0"
+    ],
+    [
+      "sudo",
+      "pmset",
+      "-c",
+      "powernap",
+      "0",
+      "womp",
+      "0"
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,%cpu=,command="
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "osascript",
+      "-e",
+      "with timeout of 8 seconds",
+      "-e",
+      "tell application id \"org.demo.app910001\" to quit",
+      "-e",
+      "end timeout"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "pmset",
+      "-g",
+      "assertions"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "kill",
+      "-STOP",
+      "910002"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "launchctl",
+      "list"
+    ],
+    [
+      "launchctl",
+      "unload",
+      "<ROOT>/Library/LaunchAgents/org.demo.worker.plist"
+    ],
+    [
+      "mdutil",
+      "-s",
+      "/"
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "mdutil",
+      "-i",
+      "off",
+      "/"
+    ],
+    [
+      "sudo",
+      "mdutil",
+      "-i",
+      "off",
+      "/"
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "osascript",
+      "-e",
+      "with timeout of 8 seconds",
+      "-e",
+      "tell application id \"org.demo.app910006\" to quit",
+      "-e",
+      "end timeout"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "launchctl",
+      "list"
+    ],
+    [
+      "sudo",
+      "-n",
+      "launchctl",
+      "list"
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "networksetup",
+      "-listallhardwareports"
+    ],
+    [
+      "networksetup",
+      "-getairportpower",
+      "en0"
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "networksetup",
+      "-setairportpower",
+      "en0",
+      "off"
+    ],
+    [
+      "sudo",
+      "networksetup",
+      "-setairportpower",
+      "en0",
+      "off"
+    ],
+    [
+      "blueutil",
+      "-p"
+    ],
+    [
+      "blueutil",
+      "-p",
+      "0"
+    ],
+    [
+      "pmset",
+      "-g",
+      "assertions"
+    ],
+    [
+      "pmset",
+      "-g"
+    ],
+    [
+      "pmset",
+      "-g",
+      "batt"
+    ],
+    [
+      "pmset",
+      "displaysleepnow"
+    ]
+  ],
+  "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
+  "exit_code": 0,
+  "output": "───────────────────────────────────────── 1. Sleep blockers (highest priority) ─────────────────────────────────────────\n✗ SleepDisabled=1 (sleep disabled globally; closing the lid will not sleep)\n  ? Fix: pmset disablesleep 0 [Y/n] ✓ Sleep enabled\n! caffeinate prevents sleep: PID 919999: /usr/bin/caffeinate -d; parent PID 919997: \n/Applications/Terminal.app/Contents/MacOS/Terminal\n  ? ⚠ Terminate caffeinate PID 919999? (irreversible; a process with -t also expires on its own) [y/N] ✓ Terminated\n! System sleep-blocking assertions found\n  ? Quit the configured daemon app? [Y/n] ✓ Daemon app: System daemon unloaded: \n<ROOT>/org.\ndemo.daemon.plist; Remote Demo quit (off restores it)\n! Audio assertion: \"audio\" (quit the app playing audio to release it)\n───────────────────────────────────────── 2. Power settings (battery profile) ──────────────────────────────────────────\n  ? Set lowpowermode=1? (current 0 → recommended 1) Low Power Mode [Y/n]   ? Set sleep=5? (current 1 → recommended 5) Idle minutes before system sleep [Y/n]   ? Set displaysleep=3? (current 10 → recommended 3) Minutes before display sleep [Y/n] ✓ powernap is already 0 (Power Nap)\n✓ tcpkeepalive is already 1 (Keep TCP connections during sleep)\n✓ womp is already 0 (Wake on network access)\n✓ standby is already 1 (Deep standby)\n✓ hibernatemode is already 3 (Hibernation mode)\n✓ ttyskeepawake is already 1 (Prevent sleep while a terminal is active)\n✓ disksleep is already 10 (Minutes before disk sleep)\n✓ lessbright is already 1 (Dim display on battery)\n✓ networkoversleep is already 0 (Network during sleep)\n  ? ⚠ Use hibernatemode=25? (write RAM to disk on lid close; slow wake; intended for extended sleep) [y/N] ✓ lowpowermode → 1\n✓ sleep → 5\n✓ displaysleep → 3\n✓ hibernatemode → 25\n· Battery profile after update: lowpowermode 0 sleep 1 displaysleep 10 powernap 0 tcpkeepalive 1 womp 0 standby 1 \nhibernatemode 3 ttyskeepawake 1 disksleep 10 lessbright 1 networkoversleep 0\n  ? ⚠ Reduce brightness to 15%? (off restores the original value) [y/N] ✓ Brightness → 15% (was 0.8)\n──────────────────────────────────── 2b. AC profile (also applies while plugged in) ────────────────────────────────────\n  ? Reduce AC activity too? (disable powernap+womp only) [y/N] ✓ Disabled powernap+womp on AC\n─────────────────────────────────────────────── 3. High-energy GUI apps ────────────────────────────────────────────────\n  ? Quit Demo (CPU 1.0%) [Y]quit [f]freeze [n]skip ✓ Quit Demo quit\n  ? Freeze Demo (CPU 1.0%) [y]quit [F]freeze [n]skip ✓ Freeze Demo frozen (1 processes stopped; off resumes them with CONT)\n· Keeping Skip Demo (skip)\n  ? Ask Demo (CPU 1.0%) [Y]quit [f]freeze [n]skip ───────────────────────────────────────────────── 4. Background agents ─────────────────────────────────────────────────\n  ? unload org.demo.worker? (pid -, CPU ?%) [Y/n] ✓ org.demo.worker unloaded\n  ? ⚠ Stop Spotlight indexing? (mdutil -i off; off restores it) [y/N] ✓ Spotlight indexing disabled\n────────────────────────────────────── 5. Remote / network apps (kept by default) ──────────────────────────────────────\n  ? ⚠ Disconnect completely? Quit configured network apps (aTrust, Sangfor, EasyConnect, Clash Party, ClashX Meta, Mihomo Party, V2rayU, Cloudflare WARP, UURemote, Tailscale, ClashX, ClashX Pro, Clash Verge, Surge, Shadowrocket, WireGuard, Network Demo, Remote Demo) [y/N] ✓ Network Demo quit\n✓ \n  ? ⚠ Disable Wi-Fi (en0)? (disconnects the network; off restores it) [y/N] ✓ Wi-Fi disabled\n  ? ⚠ Disable Bluetooth? (disconnects Bluetooth audio and input devices) [y/N] ✓ Bluetooth disabled\n! Configured LaunchAgents must be unloaded to stop their background activity\n─────────────────────────────────────────────── 6. Final assertion audit ───────────────────────────────────────────────\n  pid 919999(caffeinate): PreventUserIdleDisplaySleep named: \"caffeinate -d\"\n  pid 910001(Quit Demo): PreventUserIdleDisplaySleep named: \"audio\"\n✗ SleepDisabled is still 1 — closing the lid will not sleep!\n  -InternalBattery-0 (id=1) 87%;\n✓ Snapshot saved at \n<ROOT>/stat\ne.json (travel-mode off restores the original state)\n  ? ⚠ Turn off the display now? (pmset displaysleepnow; move the mouse or press a key to wake) [y/N] ",
+  "state": {
+    "ac_prof": "powernap 1 womp 1",
+    "anchored_at": "<TIME>",
+    "batt_prof": "lowpowermode 0 sleep 1 displaysleep 10 hibernatemode 3",
+    "brightness": "0.8",
+    "bt_off": "1",
+    "frozen_apps": [
+      "<ROOT>/Applications/Freeze Demo.app"
+    ],
+    "frozen_pids": [
+      {
+        "command": "<ROOT>/Applications/Freeze Demo.app/Contents/MacOS/Freeze Demo",
+        "path": "<ROOT>/Applications/Freeze Demo.app",
+        "pid": 910002,
+        "started": "Thu Oct 15 12:00:00 2026"
+      }
+    ],
+    "pending_commands": [],
+    "power_origin": {
+      "ac_prof": "lowpowermode 0 sleep 0 displaysleep 0 powernap 1 tcpkeepalive 1 womp 1 standby 1 hibernatemode 3 ttyskeepawake 1 disksleep 10 networkoversleep 0",
+      "batt_prof": "lowpowermode 0 sleep 1 displaysleep 10 powernap 0 tcpkeepalive 1 womp 0 standby 1 hibernatemode 3 ttyskeepawake 1 disksleep 10 lessbright 1 networkoversleep 0",
+      "sleepdisabled": "1"
+    },
+    "profile": "",
+    "quit_apps": [
+      "<ROOT>/Applications/Remote Demo.app",
+      "<ROOT>/Applications/Quit Demo.app",
+      "<ROOT>/Applications/Network Demo.app"
+    ],
+    "saved_at": "<TIME>",
+    "sleepdisabled": "1",
+    "spotlight_off": "1",
+    "unloaded_svcs": [
+      "<ROOT>/Library/LaunchAgents/org.demo.worker.plist"
+    ],
+    "unloaded_sys_svcs": [
+      "<ROOT>/org.demo.daemon.plist"
+    ],
+    "version": 3,
+    "wifi_off": "en0"
+  }
+}

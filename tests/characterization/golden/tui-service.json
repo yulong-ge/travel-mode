@@ -1,0 +1,56 @@
+{
+  "active": "p-svc",
+  "commands": [
+    [
+      "launchctl",
+      "unload",
+      "<ROOT>/Library/LaunchAgents/org.demo.worker.plist"
+    ]
+  ],
+  "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
+  "exit_code": null,
+  "labels": [
+    "launchd is macOS's service manager for background agents. Unloaded LaunchAgents are restored by off",
+    "org.demo.worker [dim]pid -[/]",
+    "Time Machine: unavailable",
+    "Managed by macOS; never unload it. Adjust it with tmutil or System Settings."
+  ],
+  "log": [
+    [
+      "dim",
+      "Executing: Unload"
+    ],
+    [
+      "ok",
+      "org.demo.worker unloaded (off restores it)"
+    ]
+  ],
+  "output": "",
+  "refresh_requests": [],
+  "state": {
+    "ac_prof": "",
+    "anchored_at": "<TIME>",
+    "batt_prof": "",
+    "brightness": "",
+    "bt_off": "",
+    "frozen_apps": [],
+    "frozen_pids": [],
+    "pending_commands": [],
+    "power_origin": {
+      "ac_prof": "lowpowermode 0 sleep 0 displaysleep 0 powernap 1 tcpkeepalive 1 womp 1 standby 1 hibernatemode 3 ttyskeepawake 1 disksleep 10 networkoversleep 0",
+      "batt_prof": "lowpowermode 0 sleep 1 displaysleep 10 powernap 0 tcpkeepalive 1 womp 0 standby 1 hibernatemode 3 ttyskeepawake 1 disksleep 10 lessbright 1 networkoversleep 0",
+      "sleepdisabled": "1"
+    },
+    "profile": "",
+    "quit_apps": [],
+    "saved_at": "<TIME>",
+    "sleepdisabled": "",
+    "spotlight_off": "",
+    "unloaded_svcs": [
+      "<ROOT>/Library/LaunchAgents/org.demo.worker.plist"
+    ],
+    "unloaded_sys_svcs": [],
+    "version": 3,
+    "wifi_off": ""
+  }
+}

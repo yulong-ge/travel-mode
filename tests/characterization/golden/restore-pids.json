@@ -1,0 +1,61 @@
+{
+  "commands": [
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "kill",
+      "-CONT",
+      "910002"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "kill",
+      "-CONT",
+      "910099"
+    ]
+  ],
+  "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
+  "exit_code": 0,
+  "messages": [
+    [
+      "ok",
+      "Thawed: Freeze Demo"
+    ]
+  ],
+  "output": "",
+  "result": [
+    1,
+    0
+  ],
+  "state": {
+    "ac_prof": "",
+    "anchored_at": "<TIME>",
+    "batt_prof": "",
+    "brightness": "",
+    "bt_off": "",
+    "frozen_apps": [],
+    "frozen_pids": [],
+    "power_origin": {},
+    "profile": "",
+    "quit_apps": [],
+    "saved_at": "<TIME>",
+    "sleepdisabled": "",
+    "spotlight_off": "",
+    "unloaded_svcs": [],
+    "unloaded_sys_svcs": [],
+    "version": 3,
+    "wifi_off": ""
+  }
+}

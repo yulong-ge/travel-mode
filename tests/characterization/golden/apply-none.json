@@ -1,0 +1,94 @@
+{
+  "commands": [
+    [
+      "pmset",
+      "-g",
+      "custom"
+    ],
+    [
+      "pmset",
+      "-g"
+    ],
+    [
+      "pmset",
+      "-g"
+    ],
+    [
+      "pmset",
+      "-g",
+      "assertions"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-ww",
+      "-axo",
+      "pid=,command="
+    ],
+    [
+      "pmset",
+      "-g",
+      "assertions"
+    ],
+    [
+      "pmset",
+      "-g",
+      "assertions"
+    ],
+    [
+      "pmset",
+      "-g",
+      "custom"
+    ],
+    [
+      "pmset",
+      "-g",
+      "custom"
+    ],
+    [
+      "pmset",
+      "-g",
+      "cap"
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,%cpu=,command="
+    ],
+    [
+      "launchctl",
+      "list"
+    ],
+    [
+      "mdutil",
+      "-s",
+      "/"
+    ],
+    [
+      "pmset",
+      "-g",
+      "assertions"
+    ],
+    [
+      "pmset",
+      "-g"
+    ],
+    [
+      "pmset",
+      "-g",
+      "batt"
+    ]
+  ],
+  "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
+  "exit_code": 0,
+  "output": "───────────────────────────────────────── 1. Sleep blockers (highest priority) ─────────────────────────────────────────\n✗ SleepDisabled=1 (sleep disabled globally; closing the lid will not sleep)\n  ? Fix: pmset disablesleep 0 [Y/n] ! Keeping sleep disabled\n! caffeinate prevents sleep: PID 919999: /usr/bin/caffeinate -d; parent PID 919997: \n/Applications/Terminal.app/Contents/MacOS/Terminal\n  ? ⚠ Terminate caffeinate PID 919999? (irreversible; a process with -t also expires on its own) [y/N] ! System sleep-blocking assertions found\n  ? Quit the configured daemon app? [Y/n] ! Audio assertion: \"audio\" (quit the app playing audio to release it)\n───────────────────────────────────────── 2. Power settings (battery profile) ──────────────────────────────────────────\n  ? Set lowpowermode=1? (current 0 → recommended 1) Low Power Mode [Y/n]   ? Set sleep=5? (current 1 → recommended 5) Idle minutes before system sleep [Y/n]   ? Set displaysleep=3? (current 10 → recommended 3) Minutes before display sleep [Y/n] ✓ powernap is already 0 (Power Nap)\n✓ tcpkeepalive is already 1 (Keep TCP connections during sleep)\n✓ womp is already 0 (Wake on network access)\n✓ standby is already 1 (Deep standby)\n✓ hibernatemode is already 3 (Hibernation mode)\n✓ ttyskeepawake is already 1 (Prevent sleep while a terminal is active)\n✓ disksleep is already 10 (Minutes before disk sleep)\n✓ lessbright is already 1 (Dim display on battery)\n✓ networkoversleep is already 0 (Network during sleep)\n  ? ⚠ Use hibernatemode=25? (write RAM to disk on lid close; slow wake; intended for extended sleep) [y/N]   ? ⚠ Reduce brightness to 15%? (off restores the original value) [y/N] ──────────────────────────────────── 2b. AC profile (also applies while plugged in) ────────────────────────────────────\n  ? Reduce AC activity too? (disable powernap+womp only) [y/N] ─────────────────────────────────────────────── 3. High-energy GUI apps ────────────────────────────────────────────────\n  ? Quit Demo (CPU 1.0%) [Y]quit [f]freeze [n]skip   ? Freeze Demo (CPU 1.0%) [y]quit [F]freeze [n]skip · Keeping Skip Demo (skip)\n  ? Ask Demo (CPU 1.0%) [Y]quit [f]freeze [n]skip · Keeping Remote Demo (skip)\n───────────────────────────────────────────────── 4. Background agents ─────────────────────────────────────────────────\n  ? unload org.demo.worker? (pid -, CPU ?%) [Y/n]   ? ⚠ Stop Spotlight indexing? (mdutil -i off; off restores it) [y/N] ────────────────────────────────────── 5. Remote / network apps (kept by default) ──────────────────────────────────────\n  ? ⚠ Disconnect completely? Quit configured network apps (aTrust, Sangfor, EasyConnect, Clash Party, ClashX Meta, Mihomo Party, V2rayU, Cloudflare WARP, UURemote, Tailscale, ClashX, ClashX Pro, Clash Verge, Surge, Shadowrocket, WireGuard, Network Demo, Remote Demo) [y/N] ─────────────────────────────────────────────── 6. Final assertion audit ───────────────────────────────────────────────\n  pid 919999(caffeinate): PreventUserIdleDisplaySleep named: \"caffeinate -d\"\n  pid 910001(Quit Demo): PreventUserIdleDisplaySleep named: \"audio\"\n✗ SleepDisabled is still 1 — closing the lid will not sleep!\n  -InternalBattery-0 (id=1) 87%;\n· No changes made; no snapshot created\n  ? ⚠ Turn off the display now? (pmset displaysleepnow; move the mouse or press a key to wake) [y/N] ",
+  "state": null
+}

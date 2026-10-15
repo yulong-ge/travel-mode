@@ -1,0 +1,138 @@
+{
+  "active": "p-power",
+  "commands": [
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "pmset",
+      "-b",
+      "lowpowermode",
+      "1",
+      "sleep",
+      "5",
+      "displaysleep",
+      "3",
+      "hibernatemode",
+      "25"
+    ],
+    [
+      "sudo",
+      "pmset",
+      "-b",
+      "lowpowermode",
+      "1",
+      "sleep",
+      "5",
+      "displaysleep",
+      "3",
+      "hibernatemode",
+      "25"
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "pmset",
+      "-c",
+      "powernap",
+      "0",
+      "womp",
+      "0"
+    ],
+    [
+      "sudo",
+      "pmset",
+      "-c",
+      "powernap",
+      "0",
+      "womp",
+      "0"
+    ],
+    [
+      "brightness",
+      "-l"
+    ],
+    [
+      "brightness",
+      "-l"
+    ],
+    [
+      "brightness",
+      "0.15"
+    ]
+  ],
+  "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
+  "exit_code": null,
+  "labels": [
+    "Battery profile — select changes for one atomic pmset update",
+    "Battery profile: these values apply to battery power. They do not change the current AC state until that power source is selected.",
+    "powernap: 0 → 0",
+    "tcpkeepalive: 1 → 1",
+    "womp: 0 → 0",
+    "standby: 1 → 1",
+    "hibernatemode: 3 → 3",
+    "ttyskeepawake: 1 → 1",
+    "disksleep: 10 → 10",
+    "lessbright: 1 → 1",
+    "networkoversleep: 0 → 0"
+  ],
+  "log": [
+    [
+      "dim",
+      "Executing: Apply selected (4)"
+    ],
+    [
+      "ok",
+      "lowpowermode → 1"
+    ],
+    [
+      "ok",
+      "sleep → 5"
+    ],
+    [
+      "ok",
+      "displaysleep → 3"
+    ],
+    [
+      "ok",
+      "hibernatemode → 25"
+    ],
+    [
+      "ok",
+      "Disabled powernap+womp on AC"
+    ],
+    [
+      "ok",
+      "Brightness → 15% (was 0.8)"
+    ]
+  ],
+  "output": "",
+  "refresh_requests": [
+    "refresh"
+  ],
+  "state": {
+    "ac_prof": "powernap 1 womp 1",
+    "anchored_at": "<TIME>",
+    "batt_prof": "lowpowermode 0 sleep 1 displaysleep 10 hibernatemode 3",
+    "brightness": "0.8",
+    "bt_off": "",
+    "frozen_apps": [],
+    "frozen_pids": [],
+    "pending_commands": [],
+    "power_origin": {
+      "ac_prof": "lowpowermode 0 sleep 0 displaysleep 0 powernap 1 tcpkeepalive 1 womp 1 standby 1 hibernatemode 3 ttyskeepawake 1 disksleep 10 networkoversleep 0",
+      "batt_prof": "lowpowermode 0 sleep 1 displaysleep 10 powernap 0 tcpkeepalive 1 womp 0 standby 1 hibernatemode 3 ttyskeepawake 1 disksleep 10 lessbright 1 networkoversleep 0",
+      "sleepdisabled": "1"
+    },
+    "profile": "",
+    "quit_apps": [],
+    "saved_at": "<TIME>",
+    "sleepdisabled": "",
+    "spotlight_off": "",
+    "unloaded_svcs": [],
+    "unloaded_sys_svcs": [],
+    "version": 3,
+    "wifi_off": ""
+  }
+}

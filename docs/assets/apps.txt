@@ -1,0 +1,36 @@
+ ○                                            travel-mode — Travel mode                                        02:09:42
+ Overview  Power  Apps  Background services  Network / restore
+━━━━━━━━━━━━━━━━━╸━━━━╺━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ Default actions come from config.toml                                                           ┌────────────────────┐
+                                                                                                 │ Apply all defaults │
+                                                                                                 └────────────────────┘
+ Demo Editor CPU 1.2% · default freeze                                                     ┌──────┐ ┌────────┐ ┌──────┐
+                                                                                           │ Quit │ │ Freeze │ │ Skip │
+                                                                                           └──────┘ └────────┘ └──────┘
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+╭─ Log ────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│○ Invalid LaunchAgent /tmp/demo-broken.plist: missing Label                                                           │
+│○ Invalid LaunchAgent /tmp/demo-xml.plist: invalid property list                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ q Quit  l Language  r Refresh

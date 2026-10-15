@@ -1,0 +1,114 @@
+{
+  "active": "p-apps",
+  "commands": [
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "osascript",
+      "-e",
+      "with timeout of 8 seconds",
+      "-e",
+      "tell application id \"org.demo.app910001\" to quit",
+      "-e",
+      "end timeout"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "pmset",
+      "-g",
+      "assertions"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "kill",
+      "-STOP",
+      "910002"
+    ]
+  ],
+  "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
+  "exit_code": null,
+  "labels": [
+    "Default actions come from config.toml",
+    "[green]✔ Quit Demo quit[/]",
+    "Ask Demo [dim]CPU 1.0% · default ask[/]",
+    "[green]✔ Freeze Demo frozen[/]",
+    "○ Skip Demo [dim](Skip)[/]",
+    "○ Remote Demo [dim](Skip)[/]"
+  ],
+  "log": [
+    [
+      "dim",
+      "Executing: Apply all defaults"
+    ],
+    [
+      "ok",
+      "Quit Demo quit"
+    ],
+    [
+      "dim",
+      "Default action for Ask Demo is ask — skipped; handle each app manually"
+    ],
+    [
+      "ok",
+      "Freeze Demo frozen"
+    ],
+    [
+      "ok",
+      "Batch complete: 1 quit / 1 frozen / ask requires manual action: Ask Demo"
+    ]
+  ],
+  "output": "",
+  "refresh_requests": [
+    "refresh"
+  ],
+  "state": {
+    "ac_prof": "",
+    "anchored_at": "<TIME>",
+    "batt_prof": "",
+    "brightness": "",
+    "bt_off": "",
+    "frozen_apps": [
+      "<ROOT>/Applications/Freeze Demo.app"
+    ],
+    "frozen_pids": [
+      {
+        "command": "<ROOT>/Applications/Freeze Demo.app/Contents/MacOS/Freeze Demo",
+        "path": "<ROOT>/Applications/Freeze Demo.app",
+        "pid": 910002,
+        "started": "Thu Oct 15 12:00:00 2026"
+      }
+    ],
+    "power_origin": {
+      "ac_prof": "lowpowermode 0 sleep 0 displaysleep 0 powernap 1 tcpkeepalive 1 womp 1 standby 1 hibernatemode 3 ttyskeepawake 1 disksleep 10 networkoversleep 0",
+      "batt_prof": "lowpowermode 0 sleep 1 displaysleep 10 powernap 0 tcpkeepalive 1 womp 0 standby 1 hibernatemode 3 ttyskeepawake 1 disksleep 10 lessbright 1 networkoversleep 0",
+      "sleepdisabled": "1"
+    },
+    "profile": "",
+    "quit_apps": [
+      "<ROOT>/Applications/Quit Demo.app"
+    ],
+    "saved_at": "<TIME>",
+    "sleepdisabled": "",
+    "spotlight_off": "",
+    "unloaded_svcs": [],
+    "unloaded_sys_svcs": [],
+    "version": 3,
+    "wifi_off": ""
+  }
+}

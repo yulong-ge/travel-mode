@@ -1,0 +1,57 @@
+{
+  "commands": [
+    [
+      "open",
+      "<ROOT>/Applications/Quit Demo.app"
+    ],
+    [
+      "open",
+      "<ROOT>/Applications/Ask Demo.app"
+    ],
+    [
+      "open",
+      "<ROOT>/Applications/Network Demo.app"
+    ]
+  ],
+  "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
+  "exit_code": 0,
+  "messages": [
+    [
+      "ok",
+      "Started: <ROOT>/Applications/Quit Demo.app"
+    ],
+    [
+      "ok",
+      "Started: <ROOT>/Applications/Ask Demo.app"
+    ],
+    [
+      "ok",
+      "Started: <ROOT>/Applications/Network Demo.app"
+    ]
+  ],
+  "output": "",
+  "result": [
+    3,
+    0
+  ],
+  "state": {
+    "ac_prof": "",
+    "anchored_at": "<TIME>",
+    "batt_prof": "",
+    "brightness": "",
+    "bt_off": "",
+    "frozen_apps": [],
+    "frozen_pids": [],
+    "pending_commands": [],
+    "power_origin": {},
+    "profile": "",
+    "quit_apps": [],
+    "saved_at": "<TIME>",
+    "sleepdisabled": "",
+    "spotlight_off": "",
+    "unloaded_svcs": [],
+    "unloaded_sys_svcs": [],
+    "version": 3,
+    "wifi_off": ""
+  }
+}

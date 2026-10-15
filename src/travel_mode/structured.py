@@ -1,0 +1,101 @@
+"""只读结构化输出，stdout 仅由 CLI 输出 JSON。"""
+
+from __future__ import annotations
+
+import re
+
+from travel_mode.system import apps as system_apps
+from travel_mode.system import launchd, pmset, processes, spotlight
+
+from . import __version__
+from .config import load_config
+from .i18n import t
+from .state import load_state
+from .system.platform import map_pmset_key, supported_pmset_keys
+from .system.shell import run_rc
+
+
+def read_command(command: list[str], timeout=30) -> str:
+    output, rc = run_rc(command, timeout=timeout)
+    if rc:
+        raise RuntimeError(t("json.command_failed", command=" ".join(command), rc=rc, detail=output))
+    return output
+
+
+def check_data() -> dict:
+    raw = read_command(["pmset", "-g", "batt"]).strip()
+    match = re.search(r"(\d+)%;", raw)
+    source = "ac" if pmset.on_ac_power() else "battery"
+    blockers = [
+        {
+            "level": "bad" if pmset.sleep_disabled() == "1" else "ok",
+            "kind": "sleep_disabled",
+            "message": f"SleepDisabled={pmset.sleep_disabled()}",
+        }
+    ]
+    for target in processes.caffeinate_procs():
+        blockers.append(
+            {"level": "warn", "kind": "caffeinate", "message": target.describe(), "pid": target.process.pid}
+        )
+    for row in pmset.configured_sleep_blocking_assertions():
+        if not row["pid"]:
+            continue  # 系统汇总计数不属于进程持有者。
+        blockers.append(
+            {"level": "warn", "kind": "assertion", "message": row["line"], "pid": int(row["pid"])}
+        )
+    audio = pmset.audio_assertion()
+    if audio:
+        blockers.append({"level": "warn", "kind": "audio", "message": audio})
+    supported = supported_pmset_keys()
+    config = load_config()
+    current = pmset.pmset_custom().get("b", {})
+    power = []
+    for key, _, recommended in pmset.POWER_KEYS:
+        actual = map_pmset_key(key, supported)
+        power.append(
+            {
+                "key": key,
+                "current": current.get(actual),
+                "recommended": config.power_overrides.get(key, recommended),
+                "supported": actual is not None,
+                "description": t(f"power.{key}.desc"),
+                "values": t(f"power.{key}.values"),
+                "effect": t(f"power.{key}.effect"),
+            }
+        )
+    apps = [
+        {
+            "name": app["name"],
+            "path": app["path"],
+            "cpu": float(app["cpu"]) if app["cpu"] else None,
+            "default_action": app["defact"],
+        }
+        for app in system_apps.scan_apps()["running"]
+    ]
+    services = launchd.svc_scan()
+    state = load_state()
+    return {
+        "version": __version__.split(".dev", 1)[0],
+        "battery": {"percent": int(match[1]) if match else None, "source": source, "raw": raw},
+        "blockers": blockers,
+        "power": power,
+        "apps": apps,
+        "services": {key: services[key] for key in ("unloadable", "candidates", "kept")},
+        "spotlight_indexing": spotlight.spotlight_on(),
+        "snapshot": {
+            "exists": state is not None,
+            "anchored_at": state.get("anchored_at", "") if state else None,
+            "profile": state.get("profile", "") if state else None,
+        },
+    }
+
+
+def report_data() -> dict:
+    from .flows.report import parse_darkwake_reasons, parse_sleep_segments
+
+    output = read_command(["pmset", "-g", "log"])
+    return {
+        "version": __version__.split(".dev", 1)[0],
+        "sleep_segments": parse_sleep_segments(output),
+        "darkwake_reasons": parse_darkwake_reasons(output),
+    }

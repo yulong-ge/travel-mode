@@ -1,0 +1,277 @@
+"""Dashboard presentation and action selection."""
+
+from __future__ import annotations
+
+import shutil
+
+from rich.markup import escape
+from textual.containers import Vertical
+from textual.widgets import Checkbox, Label, Static
+
+from travel_mode import network_apps as network_api
+from travel_mode.actions.apps import (
+    ForceQuitApp,
+    FreezeApp,
+    QuitApp,
+    QuitDaemonApp,
+    UnloadAgent,
+    configured_daemon,
+)
+from travel_mode.actions.network import BluetoothOff, WifiOff
+from travel_mode.actions.power import (
+    SetPowerProfile,
+    StopSpotlight,
+)
+from travel_mode.flows import check as flow_check
+from travel_mode.i18n import t
+from travel_mode.system import apps as system_apps
+from travel_mode.system import launchd, pmset, spotlight
+from travel_mode.system import network as system_network
+from travel_mode.tui.widgets import Button, _ellip, status_row
+
+
+class DashboardPage:
+    def compose_dashboard(self):
+        self._dash_status = Vertical(
+            Label(t("impl.scanning"), classes="srow"), id="dash-status", classes="card"
+        )
+        self._dash_status.border_title = t("impl.status")
+        yield self._dash_status
+        quick = Vertical(classes="card")
+        quick.border_title = t("impl.save_power_before_departure")
+        with quick:
+            yield Checkbox(
+                t("impl.recommended_power_settings_battery_profile"),
+                True,
+                id="q-power",
+                classes="scope",
+            )
+            yield Checkbox(
+                t("impl.quit_freeze_apps_configured_default_actions"),
+                True,
+                id="q-apps",
+                classes="scope",
+            )
+            yield Checkbox(t("impl.unload_configured_background_agents"), True, id="q-svc", classes="scope")
+            yield Checkbox(
+                t("impl.stop_spotlight_indexing"),
+                self.profile_values.get("spotlight") == "off",
+                id="q-spot",
+                classes="scope",
+            )
+            yield Checkbox(
+                t("impl.disconnect_quit_network_apps_disable_wi"),
+                self.profile_values.get("network", {}).get("disconnect", False),
+                id="q-net",
+                classes="scope",
+            )
+            yield Button(t("impl.run_selected_actions"), id="b-quick", variant="success")
+        yield Static(t("impl.sampling"), id="dash-audit")
+
+    async def build_dash(self, blocks, ac, batt, spot):
+        box = self._dash_status
+        await box.remove_children()
+        source = t("impl.ac_power") if ac else t("impl.battery_power")
+        battery = escape(batt or t("impl.battery_status_unknown"))
+        w = [status_row(f"[dim]{battery} · {source}[/]", compact=True)]
+        napps = len(self.scan["running"])
+        nsvc = len(self.svc["unloadable"])
+        self.caffeinate_targets = {target.process.pid: target for target in blocks.caffeinate_targets}
+        caff_messages = {
+            t("impl.caffeinate_prevents_sleep", v0=target.describe()): target
+            for target in self.caffeinate_targets.values()
+        }
+        for kind, msg in blocks:
+            if "SleepDisabled=1" in msg:
+                w.append(
+                    status_row(
+                        escape(msg),
+                        icon="[red]✘[/]",
+                        button=Button(t("impl.fix"), id="b-fixsleep", classes="btn"),
+                    )
+                )
+            elif msg in caff_messages:
+                w.append(
+                    status_row(
+                        escape(msg),
+                        icon="[yellow]▲[/]",
+                        button=Button(
+                            t("impl.terminate"),
+                            id=f"b-killcaff-{caff_messages[msg].process.pid}",
+                            classes="btn",
+                        ),
+                    )
+                )
+            elif "daemon app" in msg and kind == "warn":
+                w.append(
+                    status_row(
+                        escape(msg),
+                        icon="[yellow]▲[/]",
+                        button=Button(t("impl.quit_2"), id="b-quituu", classes="btn"),
+                    )
+                )
+            elif t("impl.audio") in msg and kind != "ok":
+                w.append(status_row(escape(msg), icon="[yellow]▲[/]", compact=True))
+            elif "SleepDisabled" in msg:
+                w.append(status_row(escape(msg), icon="[green]✔[/]", compact=True))
+        apps = (
+            t("impl.high_energy_apps_running", v0=napps, v1="" if napps else t("impl.none"))
+            if "p-apps" in self.pages_ready
+            else t("impl.scanning")
+        )
+        w.append(status_row(apps, button=Button(t("impl.review"), id="b-dash-apps", classes="btn")))
+        services = (
+            t("impl.background_agents_unloadable", v0=nsvc, v1="" if nsvc else t("impl.none"))
+            if "p-svc" in self.pages_ready
+            else t("impl.scanning")
+        )
+        w.append(status_row(services, button=Button(t("impl.review"), id="b-dash-svc", classes="btn")))
+        if spot:
+            icon, text = t("impl.spotlight_indexing_enabled").split(" ", 1)
+            w.append(
+                status_row(
+                    text,
+                    icon=icon,
+                    button=Button(t("impl.disable"), id="b-spot", classes="btn"),
+                )
+            )
+        else:
+            icon, text = t("impl.spotlight_indexing_disabled_2").split(" ", 1)
+            w.append(status_row(text, icon=icon, compact=True))
+        await box.mount(*w)
+
+    async def act_quick(self, btn):
+        scope = {
+            k: self.query_one(f"#q-{k}", Checkbox).value for k in ("power", "apps", "svc", "spot", "net")
+        }
+        if not any(scope.values()):
+            self.notify(t("impl.no_action_groups_selected"), severity="warning")
+            return
+
+        def flow():
+            if scope["power"]:
+                self.tlog("dim", t("impl.applying_recommended_power_settings"))
+                chg = []
+                recommendations = pmset.power_recommendations()
+                for k, _, rec in recommendations:
+                    chg += [k, rec]
+                _, rc = self.execute(SetPowerProfile([*chg]))
+                self.tlog(
+                    "ok" if rc == 0 else "warn",
+                    t("impl.battery_profile_updated_settings", v0=len(recommendations))
+                    if rc == 0
+                    else t("impl.applying_pmset_failed"),
+                )
+                if rc == 0:
+                    self.save()  # 电源变更落盘 (否则 off 无法回滚且污染下次锚点)
+            if scope["apps"]:
+                nq = nf = 0
+                ask_pending = []
+                for app in system_apps.scan_apps()["running"]:
+                    name, path, dfl = app["name"], app["path"], app["defact"]
+                    if dfl == "ask":
+                        # conf 的 ask = "问我" — 一键流程无人应答, 跳过并列出, 绝不强杀
+                        ask_pending.append(name)
+                        self.tlog("dim", t("impl.default_action_for_is_ask_skipped", v0=name))
+                        continue
+                    if dfl == "quit":
+                        spec = configured_daemon(name)
+                        if spec is not None:
+                            _, okq, msg = self.execute(QuitDaemonApp(spec, self.st, self.save))
+                            self.tlog("ok" if okq else "warn", msg)
+                            nq += int(okq)
+                            continue
+                        if self.execute(QuitApp(path, name)) or self.execute(ForceQuitApp(path)):
+                            self.save()
+                            nq += 1
+                            self.tlog("ok", t("impl.quit", v0=name))
+                        else:
+                            self.tlog("warn", t("impl.did_not_quit", v0=name))
+                    elif dfl == "freeze":
+                        for _line in system_apps.app_sleep_assertions(name)[:1]:
+                            self.tlog("warn", t("impl.holds_a_sleep_assertion_freezing_will_2", v0=name))
+                        if self.execute(FreezeApp(path)):
+                            self.save()
+                            nf += 1
+                            self.tlog("ok", t("impl.frozen_2", v0=name))
+                        else:
+                            self.tlog("warn", t("impl.freezing_failed", v0=name))
+                msg = t(
+                    "impl.apps_done_quit_frozen",
+                    v0=nq,
+                    v1=nf,
+                    v2=t("impl.ask_requires_manual_action", v0=", ".join(ask_pending)) if ask_pending else "",
+                )
+                self.tlog("ok", msg)
+            if scope["svc"]:
+                n = 0
+                for s in launchd.svc_scan()["unloadable"]:
+                    _, rc = self.execute(UnloadAgent(s["plist_path"]))
+                    if rc == 0:
+                        self.save()
+                        n += 1
+                        self.tlog("ok", t("impl.unloaded", v0=s["label"]))
+                    else:
+                        self.tlog("warn", t("impl.unloading_failed_2", v0=s["label"]))
+                self.tlog("dim", t("impl.agents_unloaded", v0=n))
+            if scope["spot"]:
+                if not spotlight.spotlight_on():
+                    self.tlog("dim", t("impl.spotlight_indexing_already_disabled_no_action"))
+                else:
+                    _, rc = self.execute(StopSpotlight())
+                    if rc == 0:
+                        self.save()
+                        self.tlog("ok", t("impl.spotlight_indexing_disabled"))
+                    else:
+                        self.tlog("warn", t("impl.mdutil_failed"))
+            if scope["net"]:
+                for name in network_api.configured_names():
+                    spec = configured_daemon(name)
+                    if spec is not None:
+                        # root daemon 会被 launchd 拉活且持防睡断言, grace_quit 是假成功
+                        p_uu = system_apps.app_path(name)
+                        if (p_uu and system_apps.app_running(p_uu)) or pmset.sleep_blocking_assertion():
+                            _, okq, msg = self.execute(QuitDaemonApp(spec, self.st, self.save))
+                            self.tlog("ok" if okq else "warn", f"{name}: {msg}")
+                        continue
+                    p = system_apps.app_path(name)
+                    if p and system_apps.app_running(p):
+                        if self.execute(QuitApp(p, name)) or self.execute(ForceQuitApp(p)):
+                            self.save()
+                            self.tlog("ok", t("impl.quit", v0=name))
+                        else:
+                            self.tlog("warn", t("impl.did_not_quit", v0=name))
+                dev = system_network.wifi_dev()
+                if dev:
+                    if not system_network.wifi_powered(dev):
+                        self.tlog("dim", t("impl.wi_fi_already_disabled_no_action"))
+                    else:
+                        _, rc = self.execute(WifiOff(dev))
+                        if rc == 0:
+                            self.save()
+                            self.tlog("ok", t("impl.wi_fi_disabled_2", v0=dev))
+                if shutil.which("blueutil"):
+                    if not system_network.bt_powered():
+                        self.tlog("dim", t("impl.bluetooth_already_disabled_no_action_needed"))
+                    else:
+                        _, rc = self.execute(BluetoothOff())
+                        if rc == 0:
+                            self.save()
+                            self.tlog("ok", t("impl.bluetooth_disabled"))
+            sd = pmset.sleep_disabled()
+            self.tlog(
+                "bad" if sd == "1" else "ok",
+                t(
+                    "impl.final_audit_sleepdisabled",
+                    v0=sd,
+                    v1="" if sd != "1" else t("impl.still_prevents_sleep"),
+                ),
+            )
+            for kind, msg in flow_check.blockers_lines():
+                if t("impl.audio") in msg or "daemon app" in msg:
+                    self.tlog(kind, t("impl.final_audit", v0=_ellip(msg, 70)))
+            self.tlog("ok", t("impl.power_saving_actions_complete_snapshot_updated"))
+
+        await self.busy(btn, flow)
+        self.notify(t("impl.power_saving_actions_complete"), severity="information")
+        self.action_refresh()

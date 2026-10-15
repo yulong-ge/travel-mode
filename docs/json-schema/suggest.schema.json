@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["version", "samples", "apps", "assertions", "services", "daemon_apps", "with_daemon", "toml", "warnings"],
+  "properties": {
+    "version": {"type": "string"},
+    "samples": {"type": "integer", "minimum": 1},
+    "apps": {"type": "array"},
+    "assertions": {"type": "array"},
+    "services": {"type": "array"},
+    "daemon_apps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "path", "bundle_id", "matches", "confidence", "running", "assertion", "recommended"],
+        "properties": {
+          "name": {"type": "string"},
+          "path": {"type": "string"},
+          "bundle_id": {"type": "string"},
+          "confidence": {"enum": ["path", "associated", "bundle-id-prefix"]},
+          "matches": {"type": "array"},
+          "system_daemons": {"type": "array", "items": {"type": "string"}},
+          "user_agents": {"type": "array", "items": {"type": "string"}},
+          "match": {"enum": ["path", "associated", "bundle-id-prefix"]},
+          "running": {"type": "boolean"},
+          "assertion": {"type": "boolean"},
+          "recommended": {"type": "boolean"}
+        }
+      }
+    },
+    "with_daemon": {"type": "array"},
+    "toml": {"type": "string"},
+    "warnings": {"type": "array", "items": {"type": "object", "required": ["path", "error"]}}
+  }
+}

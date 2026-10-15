@@ -1,0 +1,23 @@
+{
+  "active": "p-apps",
+  "commands": [],
+  "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
+  "exit_code": null,
+  "labels": [
+    "Default actions come from config.toml",
+    "Quit Demo [dim]CPU 1.0% · default quit[/]",
+    "Ask Demo [dim]CPU 1.0% · default ask[/]",
+    "[dim]○ Freeze Demo skipped[/]",
+    "○ Skip Demo [dim](Skip)[/]",
+    "○ Remote Demo [dim](Skip)[/]"
+  ],
+  "log": [
+    [
+      "dim",
+      "Executing: Skip"
+    ]
+  ],
+  "output": "",
+  "refresh_requests": [],
+  "state": null
+}

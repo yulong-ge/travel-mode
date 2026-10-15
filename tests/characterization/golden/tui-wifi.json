@@ -1,0 +1,89 @@
+{
+  "active": "p-net",
+  "commands": [
+    [
+      "networksetup",
+      "-listallhardwareports"
+    ],
+    [
+      "networksetup",
+      "-getairportpower",
+      "en0"
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "networksetup",
+      "-setairportpower",
+      "en0",
+      "off"
+    ],
+    [
+      "sudo",
+      "networksetup",
+      "-setairportpower",
+      "en0",
+      "off"
+    ]
+  ],
+  "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
+  "exit_code": null,
+  "labels": [
+    "[dim]aTrust: app not found[/]",
+    "[dim]Sangfor: app not found[/]",
+    "[dim]EasyConnect: app not found[/]",
+    "[dim]Clash Party: app not found[/]",
+    "[dim]ClashX Meta: app not found[/]",
+    "[dim]Mihomo Party: app not found[/]",
+    "[dim]V2rayU: app not found[/]",
+    "[dim]Cloudflare WARP: app not found[/]",
+    "[dim]UURemote: app not found[/]",
+    "[dim]Tailscale: app not found[/]",
+    "[dim]ClashX: app not found[/]",
+    "[dim]ClashX Pro: app not found[/]",
+    "[dim]Clash Verge: app not found[/]",
+    "[dim]Surge: app not found[/]",
+    "[dim]Shadowrocket: app not found[/]",
+    "[dim]WireGuard: app not found[/]",
+    "Network Demo: running · CPU 1.0%",
+    "Remote Demo: running · CPU 1.0%",
+    "[dim]Unload configured LaunchAgents on the Background services tab to stop their background activity[/]"
+  ],
+  "log": [
+    [
+      "dim",
+      "Executing: Disable Wi-Fi (en0)"
+    ],
+    [
+      "ok",
+      "Wi-Fi (en0) disabled (off restores it)"
+    ]
+  ],
+  "output": "",
+  "refresh_requests": [],
+  "state": {
+    "ac_prof": "",
+    "anchored_at": "<TIME>",
+    "batt_prof": "",
+    "brightness": "",
+    "bt_off": "",
+    "frozen_apps": [],
+    "frozen_pids": [],
+    "pending_commands": [],
+    "power_origin": {
+      "ac_prof": "lowpowermode 0 sleep 0 displaysleep 0 powernap 1 tcpkeepalive 1 womp 1 standby 1 hibernatemode 3 ttyskeepawake 1 disksleep 10 networkoversleep 0",
+      "batt_prof": "lowpowermode 0 sleep 1 displaysleep 10 powernap 0 tcpkeepalive 1 womp 0 standby 1 hibernatemode 3 ttyskeepawake 1 disksleep 10 lessbright 1 networkoversleep 0",
+      "sleepdisabled": "1"
+    },
+    "profile": "",
+    "quit_apps": [],
+    "saved_at": "<TIME>",
+    "sleepdisabled": "",
+    "spotlight_off": "",
+    "unloaded_svcs": [],
+    "unloaded_sys_svcs": [],
+    "version": 3,
+    "wifi_off": "en0"
+  }
+}

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# travel-mode 便捷包装：从真实仓库目录调用项目脚本。
+SOURCE="$0"
+while [ -L "$SOURCE" ]; do
+  BASE="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  case "$SOURCE" in
+    /*) ;;
+    *) SOURCE="$BASE/$SOURCE" ;;
+  esac
+done
+ROOT="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+exec uv run --project "$ROOT" travel-mode "$@"

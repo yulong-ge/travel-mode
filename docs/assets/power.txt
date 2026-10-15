@@ -1,0 +1,36 @@
+ ○                                            travel-mode — Travel mode                                        02:09:42
+ Overview  Power  Apps  Background services  Network / restore
+━━━━━━━━╺━━━━━╸━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Battery profile — select changes for one atomic pmset update
+
+
+  Battery profile: these values apply to battery power. They do not change the current AC state until that power
+  source is selected.
+
+   ▐X▌ lowpowermode: 0 → 1
+     Meaning: Reduce CPU/GPU frequency and brightness to save energy.
+     Values: 0=off, 1=on                                                                                             ▅▅
+     Cost: On saves energy but reduces performance.
+
+   ▐X▌ sleep: 1 → 5
+     Meaning: Sleep after N idle minutes.
+     Values: 0=never
+     Cost: Shorter time saves energy but interrupts idle work sooner.
+
+   ▐X▌ displaysleep: 10 → 3
+     Meaning: Turn off the display after N idle minutes.
+     Values: 0=never
+     Cost: Shorter time saves energy but turns the screen off sooner.
+
+   powernap: 0 → 0
+     Meaning: Periodically wake during sleep for background updates.
+     Values: 0=off, 1=on
+     Cost: Off saves energy but delays updates and backups.
+╭─ Log ────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│○ Invalid LaunchAgent /tmp/demo-broken.plist: missing Label                                                           │
+│○ Invalid LaunchAgent /tmp/demo-xml.plist: invalid property list                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ q Quit  l Language  r Refresh

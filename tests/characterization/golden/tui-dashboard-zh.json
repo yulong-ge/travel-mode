@@ -1,0 +1,26 @@
+{
+  "active": "p-dash",
+  "commands": [],
+  "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
+  "exit_code": null,
+  "labels": [
+    "",
+    "[dim]-InternalBattery-0 (id=1) 87%; · 电池供电[/]",
+    "[red]✘[/]",
+    "SleepDisabled=1 (全局禁用睡眠, 合盖也不睡)",
+    "[yellow]▲[/]",
+    "caffeinate 阻断睡眠: PID 919999：/usr/bin/caffeinate -d；父进程 PID 919997：/Applications/Terminal.app/Contents/MacOS/Terminal",
+    "[yellow]▲[/]",
+    "音频断言: \"audio\" (退出在出声的 app 可解)",
+    "",
+    "高耗电 app: [b]5[/] 个运行中",
+    "",
+    "后台守护: [b]1[/] 个可卸载",
+    "[yellow]▲[/]",
+    "Spotlight 索引开启中"
+  ],
+  "log": [],
+  "output": "",
+  "refresh_requests": [],
+  "state": null
+}

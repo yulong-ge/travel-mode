@@ -1,0 +1,43 @@
+# Changelog
+
+All notable changes follow Keep a Changelog.
+
+## [Unreleased]
+
+## [1.1.0] - 2026-10-15
+
+### Added
+
+- English and Chinese terminal dashboards with five pages, keyboard/mouse navigation, immediate language switching and comment-preserving configuration writes.
+- Power-setting explanations, values and trade-offs; built-in flight, overnight and cafe profiles; supported-key detection including equivalent power-mode keys.
+- Read-only energy suggestions that discover app daemons, explain matching confidence, report malformed plists and optionally write confirmed configuration entries.
+- JSON reports and schemas, XDG configuration/state paths, extra app search directories, SwiftBar and Shortcuts integration, and deterministic demo screenshots.
+- Isolated CLI/TUI end-to-end harnesses with explicit skip reasons, recovery checks and a separately guarded native brightness round trip.
+
+### Changed
+
+- Request sudo credentials only before a command that needs them. Check permission for the exact command, keep credentials for the active operation and use non-interactive sudo for privileged observations.
+- Share actions and recovery rules across CLI and TUI. Separate system adapters, flows and page presenters so both interfaces apply the same safeguards.
+- Reuse app/process discovery within a refresh, load pages independently, reject stale refresh results and retain missing/stopped inventory rows with explanations.
+- Show configured service matches, invalid plist diagnostics and read-only Time Machine status. Keep system-managed backup services out of unload targets.
+- Make hibernatemode 25 an independent TUI selection when supported, including when the current value already matches the ordinary recommendation.
+- Install from Git with uv or pipx for the initial public release; mark PyPI and Homebrew distribution as not yet published.
+
+### Fixed
+
+- Restore only power keys actually changed, in the original battery or AC domain. Keep the first original value across repeated actions and leave unrelated settings alone.
+- Persist recovery intent before mutation and checkpoint each successful restore. Keep failed or uncertain records for retry instead of reporting success or deleting recovery data.
+- Freeze, resume and terminate exact process identities after checking birth time and executable; protect the terminal, ancestor processes and system apps. Resume only recorded processes during normal restore.
+- Limit caffeinate termination to verified sleep-assertion holders, show full command/parent details and confirm each PID independently.
+- Validate every daemon plist and selector before applying actions, match exact service labels during restore and escape application identifiers in AppleScript.
+- Isolate dry-run configuration, migration, language and recovery writes. Preserve uncertainty and return failure when required privileged observations cannot be read.
+- Serialize TUI mutation transactions, reject duplicate queued clicks, preserve row identity across refresh/recompose and avoid updating detached controls.
+- Surface failed commands, invalid state and unsupported recovery operations explicitly; avoid resetting factory power defaults without separate interactive confirmation when no snapshot exists.
+
+### Removed
+
+- Machine-specific configuration examples and internal development/verification logs from public files and distribution archives.
+
+## [1.0.0] - 2026-10-11
+
+Initial version.

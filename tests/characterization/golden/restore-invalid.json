@@ -1,0 +1,54 @@
+{
+  "commands": [
+    [
+      "sudo",
+      "-n",
+      "launchctl",
+      "list"
+    ],
+    [
+      "launchctl",
+      "list"
+    ]
+  ],
+  "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
+  "exit_code": 1,
+  "messages": [
+    [
+      "warn",
+      "<ROOT>/org.demo.daemon.plist: invalid or protected launchd Label 123"
+    ],
+    [
+      "warn",
+      "[Errno 2] No such file or directory: '<ROOT>/Library/LaunchAgents/org.demo.worker.plist'"
+    ]
+  ],
+  "output": "",
+  "result": [
+    0,
+    2
+  ],
+  "state": {
+    "ac_prof": "",
+    "anchored_at": "<TIME>",
+    "batt_prof": "",
+    "brightness": "",
+    "bt_off": "",
+    "frozen_apps": [],
+    "frozen_pids": [],
+    "power_origin": {},
+    "profile": "",
+    "quit_apps": [],
+    "saved_at": "<TIME>",
+    "sleepdisabled": "",
+    "spotlight_off": "",
+    "unloaded_svcs": [
+      "<ROOT>/Library/LaunchAgents/org.demo.worker.plist"
+    ],
+    "unloaded_sys_svcs": [
+      "<ROOT>/org.demo.daemon.plist"
+    ],
+    "version": 3,
+    "wifi_off": ""
+  }
+}

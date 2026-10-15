@@ -1,0 +1,53 @@
+{
+  "active": "p-dash",
+  "commands": [
+    [
+      "pmset",
+      "-g",
+      "assertions"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "kill",
+      "-TERM",
+      "919999"
+    ]
+  ],
+  "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
+  "exit_code": null,
+  "labels": [
+    "",
+    "[dim]-InternalBattery-0 (id=1) 87%; · Battery power[/]",
+    "[red]✘[/]",
+    "SleepDisabled=1 (sleep disabled globally; closing the lid will not sleep)",
+    "[yellow]▲[/]",
+    "caffeinate prevents sleep: PID 919999: /usr/bin/caffeinate -d; parent PID 919997: /Applications/Terminal.app/Contents/MacOS/Terminal",
+    "[yellow]▲[/]",
+    "Audio assertion: \"audio\" (quit the app playing audio to release it)",
+    "",
+    "High-energy apps: [b]5[/] running",
+    "",
+    "Background agents: [b]1[/] unloadable",
+    "[yellow]▲[/]",
+    "Spotlight indexing enabled"
+  ],
+  "log": [
+    [
+      "dim",
+      "Executing: Terminate"
+    ],
+    [
+      "ok",
+      "caffeinate terminated"
+    ]
+  ],
+  "output": "",
+  "refresh_requests": [
+    "refresh"
+  ],
+  "state": null
+}

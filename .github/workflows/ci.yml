@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.x"
+      - run: uv sync --group dev
+      - run: uv run ruff check
+      - run: uv run ruff format --check
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.x"
+      - run: uv sync --group dev --python ${{ matrix.python }}
+      - run: uv run pytest --cov=travel_mode --cov-report=term-missing
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.x"
+      - run: uv build
+      - name: Check wheel and sdist contents
+        run: uv run python scripts/check_dist.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: travel-mode-wheel
+          path: dist/*

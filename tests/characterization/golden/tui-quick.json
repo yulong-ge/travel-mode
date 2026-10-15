@@ -1,0 +1,525 @@
+{
+  "active": "p-dash",
+  "commands": [
+    [
+      "pmset",
+      "-g",
+      "custom"
+    ],
+    [
+      "pmset",
+      "-g",
+      "cap"
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "pmset",
+      "-b",
+      "lowpowermode",
+      "1",
+      "sleep",
+      "5",
+      "displaysleep",
+      "3",
+      "powernap",
+      "0",
+      "tcpkeepalive",
+      "1",
+      "womp",
+      "0",
+      "standby",
+      "1",
+      "hibernatemode",
+      "3",
+      "ttyskeepawake",
+      "1",
+      "disksleep",
+      "10",
+      "lessbright",
+      "1",
+      "networkoversleep",
+      "0"
+    ],
+    [
+      "sudo",
+      "pmset",
+      "-b",
+      "lowpowermode",
+      "1",
+      "sleep",
+      "5",
+      "displaysleep",
+      "3",
+      "powernap",
+      "0",
+      "tcpkeepalive",
+      "1",
+      "womp",
+      "0",
+      "standby",
+      "1",
+      "hibernatemode",
+      "3",
+      "ttyskeepawake",
+      "1",
+      "disksleep",
+      "10",
+      "lessbright",
+      "1",
+      "networkoversleep",
+      "0"
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,%cpu=,command="
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "osascript",
+      "-e",
+      "with timeout of 8 seconds",
+      "-e",
+      "tell application id \"org.demo.app910001\" to quit",
+      "-e",
+      "end timeout"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "pmset",
+      "-g",
+      "assertions"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "kill",
+      "-STOP",
+      "910002"
+    ],
+    [
+      "launchctl",
+      "list"
+    ],
+    [
+      "launchctl",
+      "unload",
+      "<ROOT>/Library/LaunchAgents/org.demo.worker.plist"
+    ],
+    [
+      "mdutil",
+      "-s",
+      "/"
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "mdutil",
+      "-i",
+      "off",
+      "/"
+    ],
+    [
+      "sudo",
+      "mdutil",
+      "-i",
+      "off",
+      "/"
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "osascript",
+      "-e",
+      "with timeout of 8 seconds",
+      "-e",
+      "tell application id \"org.demo.app910006\" to quit",
+      "-e",
+      "end timeout"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "launchctl",
+      "list"
+    ],
+    [
+      "sudo",
+      "-n",
+      "launchctl",
+      "list"
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "launchctl",
+      "unload",
+      "<ROOT>/org.demo.daemon.plist"
+    ],
+    [
+      "sudo",
+      "launchctl",
+      "unload",
+      "<ROOT>/org.demo.daemon.plist"
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "osascript",
+      "-e",
+      "with timeout of 8 seconds",
+      "-e",
+      "tell application id \"org.demo.app910005\" to quit",
+      "-e",
+      "end timeout"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "networksetup",
+      "-listallhardwareports"
+    ],
+    [
+      "networksetup",
+      "-getairportpower",
+      "en0"
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "networksetup",
+      "-setairportpower",
+      "en0",
+      "off"
+    ],
+    [
+      "sudo",
+      "networksetup",
+      "-setairportpower",
+      "en0",
+      "off"
+    ],
+    [
+      "blueutil",
+      "-p"
+    ],
+    [
+      "blueutil",
+      "-p",
+      "0"
+    ],
+    [
+      "pmset",
+      "-g"
+    ],
+    [
+      "pmset",
+      "-g",
+      "assertions"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-ww",
+      "-axo",
+      "pid=,command="
+    ],
+    [
+      "pmset",
+      "-g"
+    ],
+    [
+      "pmset",
+      "-g",
+      "assertions"
+    ],
+    [
+      "pmset",
+      "-g",
+      "assertions"
+    ]
+  ],
+  "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
+  "exit_code": null,
+  "labels": [
+    "",
+    "[dim]-InternalBattery-0 (id=1) 87%; · Battery power[/]",
+    "[red]✘[/]",
+    "SleepDisabled=1 (sleep disabled globally; closing the lid will not sleep)",
+    "[yellow]▲[/]",
+    "caffeinate prevents sleep: PID 919999: /usr/bin/caffeinate -d; parent PID 919997: /Applications/Terminal.app/Contents/MacOS/Terminal",
+    "[yellow]▲[/]",
+    "Audio assertion: \"audio\" (quit the app playing audio to release it)",
+    "",
+    "High-energy apps: [b]5[/] running",
+    "",
+    "Background agents: [b]1[/] unloadable",
+    "[yellow]▲[/]",
+    "Spotlight indexing enabled"
+  ],
+  "log": [
+    [
+      "dim",
+      "Executing: Run selected actions"
+    ],
+    [
+      "dim",
+      "Applying recommended power settings…"
+    ],
+    [
+      "ok",
+      "Battery profile updated (12 settings)"
+    ],
+    [
+      "ok",
+      "Quit Demo quit"
+    ],
+    [
+      "ok",
+      "Freeze Demo frozen"
+    ],
+    [
+      "dim",
+      "Default action for Ask Demo is ask — skipped; handle it manually"
+    ],
+    [
+      "ok",
+      "Apps done: 1 quit / 1 frozen / ask requires manual action: Ask Demo"
+    ],
+    [
+      "ok",
+      "org.demo.worker unloaded"
+    ],
+    [
+      "dim",
+      "Agents unloaded: 1"
+    ],
+    [
+      "ok",
+      "Spotlight indexing disabled"
+    ],
+    [
+      "ok",
+      "Network Demo quit"
+    ],
+    [
+      "ok",
+      "Remote Demo: System daemon unloaded: <ROOT>/org.demo.daemon.plist; Remote Demo quit (off restores it)"
+    ],
+    [
+      "ok",
+      "Wi-Fi (en0) disabled"
+    ],
+    [
+      "ok",
+      "Bluetooth disabled"
+    ],
+    [
+      "bad",
+      "Final audit: SleepDisabled=1 still prevents sleep!"
+    ],
+    [
+      "warn",
+      "Final audit: Audio assertion: \"audio\" (quit the app playing audio to release it)"
+    ],
+    [
+      "ok",
+      "Power-saving actions complete — snapshot updated; travel-mode off restores it"
+    ]
+  ],
+  "output": "",
+  "refresh_requests": [
+    "refresh"
+  ],
+  "state": {
+    "ac_prof": "",
+    "anchored_at": "<TIME>",
+    "batt_prof": "lowpowermode 0 sleep 1 displaysleep 10 powernap 0 tcpkeepalive 1 womp 0 standby 1 hibernatemode 3 ttyskeepawake 1 disksleep 10 lessbright 1 networkoversleep 0",
+    "brightness": "",
+    "bt_off": "1",
+    "frozen_apps": [
+      "<ROOT>/Applications/Freeze Demo.app"
+    ],
+    "frozen_pids": [
+      {
+        "command": "<ROOT>/Applications/Freeze Demo.app/Contents/MacOS/Freeze Demo",
+        "path": "<ROOT>/Applications/Freeze Demo.app",
+        "pid": 910002,
+        "started": "Thu Oct 15 12:00:00 2026"
+      }
+    ],
+    "pending_commands": [],
+    "power_origin": {
+      "ac_prof": "lowpowermode 0 sleep 0 displaysleep 0 powernap 1 tcpkeepalive 1 womp 1 standby 1 hibernatemode 3 ttyskeepawake 1 disksleep 10 networkoversleep 0",
+      "batt_prof": "lowpowermode 0 sleep 1 displaysleep 10 powernap 0 tcpkeepalive 1 womp 0 standby 1 hibernatemode 3 ttyskeepawake 1 disksleep 10 lessbright 1 networkoversleep 0",
+      "sleepdisabled": "1"
+    },
+    "profile": "",
+    "quit_apps": [
+      "<ROOT>/Applications/Quit Demo.app",
+      "<ROOT>/Applications/Network Demo.app",
+      "<ROOT>/Applications/Remote Demo.app"
+    ],
+    "saved_at": "<TIME>",
+    "sleepdisabled": "",
+    "spotlight_off": "1",
+    "unloaded_svcs": [
+      "<ROOT>/Library/LaunchAgents/org.demo.worker.plist"
+    ],
+    "unloaded_sys_svcs": [
+      "<ROOT>/org.demo.daemon.plist"
+    ],
+    "version": 3,
+    "wifi_off": "en0"
+  }
+}

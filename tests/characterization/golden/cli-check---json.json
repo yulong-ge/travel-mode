@@ -1,0 +1,95 @@
+{
+  "commands": [
+    [
+      "pmset",
+      "-g",
+      "custom"
+    ],
+    [
+      "pmset",
+      "-g",
+      "cap"
+    ],
+    [
+      "pmset",
+      "-g",
+      "batt"
+    ],
+    [
+      "pmset",
+      "-g",
+      "ps"
+    ],
+    [
+      "pmset",
+      "-g"
+    ],
+    [
+      "pmset",
+      "-g"
+    ],
+    [
+      "pmset",
+      "-g",
+      "assertions"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-ww",
+      "-axo",
+      "pid=,command="
+    ],
+    [
+      "pmset",
+      "-g",
+      "assertions"
+    ],
+    [
+      "pmset",
+      "-g",
+      "assertions"
+    ],
+    [
+      "pmset",
+      "-g",
+      "custom"
+    ],
+    [
+      "pmset",
+      "-g",
+      "cap"
+    ],
+    [
+      "pmset",
+      "-g",
+      "custom"
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,%cpu=,command="
+    ],
+    [
+      "launchctl",
+      "list"
+    ],
+    [
+      "mdutil",
+      "-s",
+      "/"
+    ]
+  ],
+  "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
+  "exit_code": 0,
+  "output": "{\"version\": \"1.1.0\", \"battery\": {\"percent\": 87, \"source\": \"battery\", \"raw\": \"Now drawing from 'Battery Power'\\n -InternalBattery-0 (id=1)\\t87%;\"}, \"blockers\": [{\"level\": \"bad\", \"kind\": \"sleep_disabled\", \"message\": \"SleepDisabled=1\"}, {\"level\": \"warn\", \"kind\": \"caffeinate\", \"message\": \"PID 919999: /usr/bin/caffeinate -d; parent PID 919997: /Applications/Terminal.app/Contents/MacOS/Terminal\", \"pid\": 919999}, {\"level\": \"warn\", \"kind\": \"assertion\", \"message\": \"pid 910005(Remote Demo): PreventSystemSleep named: \\\"Remote Demo\\\"\", \"pid\": 910005}, {\"level\": \"warn\", \"kind\": \"audio\", \"message\": \"pid 910001(Quit Demo): PreventUserIdleDisplaySleep named: \\\"audio\\\"\"}], \"power\": [{\"key\": \"lowpowermode\", \"current\": \"0\", \"recommended\": \"1\", \"supported\": true, \"description\": \"Reduce CPU/GPU frequency and brightness to save energy.\", \"values\": \"0=off, 1=on\", \"effect\": \"On saves energy but reduces performance.\"}, {\"key\": \"sleep\", \"current\": \"1\", \"recommended\": \"5\", \"supported\": true, \"description\": \"Sleep after N idle minutes.\", \"values\": \"0=never\", \"effect\": \"Shorter time saves energy but interrupts idle work sooner.\"}, {\"key\": \"displaysleep\", \"current\": \"10\", \"recommended\": \"3\", \"supported\": true, \"description\": \"Turn off the display after N idle minutes.\", \"values\": \"0=never\", \"effect\": \"Shorter time saves energy but turns the screen off sooner.\"}, {\"key\": \"powernap\", \"current\": \"0\", \"recommended\": \"0\", \"supported\": true, \"description\": \"Periodically wake during sleep for background updates.\", \"values\": \"0=off, 1=on\", \"effect\": \"Off saves energy but delays updates and backups.\"}, {\"key\": \"tcpkeepalive\", \"current\": \"1\", \"recommended\": \"1\", \"supported\": true, \"description\": \"Keep TCP connections available during sleep.\", \"values\": \"0=off, 1=on\", \"effect\": \"Off saves energy but can prevent Find My from locating this Mac.\"}, {\"key\": \"womp\", \"current\": \"0\", \"recommended\": \"0\", \"supported\": true, \"description\": \"Wake for network access.\", \"values\": \"0=off, 1=on\", \"effect\": \"Off saves energy but disables network wake.\"}, {\"key\": \"standby\", \"current\": \"1\", \"recommended\": \"1\", \"supported\": true, \"description\": \"Hibernate automatically after sleeping.\", \"values\": \"0=off, 1=on\", \"effect\": \"On saves energy during long sleep but wake takes longer.\"}, {\"key\": \"hibernatemode\", \"current\": \"3\", \"recommended\": \"3\", \"supported\": true, \"description\": \"Choose how memory is saved during sleep.\", \"values\": \"0=RAM only; 3=RAM plus disk image; 25=disk image only\", \"effect\": \"25 saves more energy but sleeps and wakes more slowly; 0 loses context if power is lost.\"}, {\"key\": \"ttyskeepawake\", \"current\": \"1\", \"recommended\": \"1\", \"supported\": true, \"description\": \"Keep the Mac awake while an active terminal session exists.\", \"values\": \"0=allow sleep, 1=prevent idle sleep\", \"effect\": \"On prevents interruption but uses more energy.\"}, {\"key\": \"disksleep\", \"current\": \"10\", \"recommended\": \"10\", \"supported\": true, \"description\": \"Put disks to sleep after N idle minutes.\", \"values\": \"0=never\", \"effect\": \"Shorter time saves energy but may add wake latency.\"}, {\"key\": \"lessbright\", \"current\": \"1\", \"recommended\": \"1\", \"supported\": true, \"description\": \"Slightly dim the display on battery.\", \"values\": \"0=off, 1=on\", \"effect\": \"On saves energy but reduces brightness.\"}, {\"key\": \"networkoversleep\", \"current\": \"0\", \"recommended\": \"0\", \"supported\": true, \"description\": \"Control network services presented during sleep.\", \"values\": \"0=off, 1=on (platform dependent)\", \"effect\": \"On preserves more network availability but can use more energy.\"}], \"apps\": [{\"name\": \"Quit Demo\", \"path\": \"<ROOT>/Applications/Quit Demo.app\", \"cpu\": 1.0, \"default_action\": \"quit\"}, {\"name\": \"Freeze Demo\", \"path\": \"<ROOT>/Applications/Freeze Demo.app\", \"cpu\": 1.0, \"default_action\": \"freeze\"}, {\"name\": \"Skip Demo\", \"path\": \"<ROOT>/Applications/Skip Demo.app\", \"cpu\": 1.0, \"default_action\": \"skip\"}, {\"name\": \"Ask Demo\", \"path\": \"<ROOT>/Applications/Ask Demo.app\", \"cpu\": 1.0, \"default_action\": \"ask\"}, {\"name\": \"Remote Demo\", \"path\": \"<ROOT>/Applications/Remote Demo.app\", \"cpu\": 1.0, \"default_action\": \"skip\"}], \"services\": {\"unloadable\": [{\"label\": \"org.demo.worker\", \"plist_path\": \"<ROOT>/Library/LaunchAgents/org.demo.worker.plist\", \"name\": \"org.demo.worker\", \"pid\": \"-\", \"cpu\": \"\"}], \"candidates\": [], \"kept\": []}, \"spotlight_indexing\": true, \"snapshot\": {\"exists\": false, \"anchored_at\": null, \"profile\": null}}\n",
+  "state": null
+}

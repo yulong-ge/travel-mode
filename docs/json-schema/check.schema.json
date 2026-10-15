@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["version", "battery", "blockers", "power", "apps", "services", "spotlight_indexing", "snapshot"],
+  "properties": {
+    "version": {"type": "string"},
+    "battery": {"type": "object", "required": ["percent", "source", "raw"], "properties": {"percent": {"type": ["integer", "null"]}, "source": {"enum": ["battery", "ac"]}, "raw": {"type": "string"}}},
+    "blockers": {"type": "array", "items": {"type": "object", "required": ["level", "kind", "message"], "properties": {"level": {"enum": ["bad", "warn", "ok"]}, "kind": {"enum": ["sleep_disabled", "caffeinate", "assertion", "audio"]}, "message": {"type": "string"}, "pid": {"type": "integer"}}}},
+    "power": {"type": "array", "items": {"type": "object", "required": ["key", "current", "recommended", "supported"], "properties": {"key": {"type": "string"}, "current": {"type": ["string", "null"]}, "recommended": {"type": "string"}, "supported": {"type": "boolean"}}}},
+    "apps": {"type": "array", "items": {"type": "object", "required": ["name", "path", "cpu", "default_action"], "properties": {"name": {"type": "string"}, "path": {"type": "string"}, "cpu": {"type": ["number", "null"]}, "default_action": {"type": "string"}}}},
+    "services": {"type": "object", "required": ["unloadable", "candidates", "kept"]},
+    "spotlight_indexing": {"type": "boolean"},
+    "snapshot": {"type": "object", "required": ["exists", "anchored_at", "profile"], "properties": {"exists": {"type": "boolean"}, "anchored_at": {"type": ["string", "null"]}, "profile": {"type": ["string", "null"]}}}
+  }
+}
