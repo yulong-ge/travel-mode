@@ -11,6 +11,7 @@ from travel_mode import cli
 from travel_mode.actions.runtime import command_lifecycle
 from travel_mode.system.shell import CmdResult
 from travel_mode.tui.app import TravelApp
+from tui_interaction import toggle_language
 
 
 def fingerprint(path):
@@ -44,12 +45,12 @@ async def test_tui_startup_refresh_and_explicit_language_write_are_distinct(tmp_
     original = tomlkit.parse(path.read_text()).unwrap()
     app = TravelApp()
     async with app.run_test() as pilot:
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         await pilot.press("r")
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert fingerprint(path) == before
-        await pilot.press("l")
-        await app.workers.wait_for_complete()
+        await toggle_language(pilot)
+        await app.wait_for_idle()
     changed = tomlkit.parse(path.read_text()).unwrap()
     assert fingerprint(path)[0] != before[0]  # atomic replacement
     assert changed["options"].pop("language") in {"en", "zh"}
@@ -72,9 +73,9 @@ def test_dry_run_tui_language_write_replaces_only_the_isolated_copy(tmp_paths):
         assert copy != path
         app = TravelApp(dry_run=True)
         async with app.run_test() as pilot:
-            await app.workers.wait_for_complete()
-            await pilot.press("l")
-            await app.workers.wait_for_complete()
+            await app.wait_for_idle()
+            await toggle_language(pilot)
+            await app.wait_for_idle()
         observed["copy"] = copy
 
     command_lifecycle(["--dry-run"], lambda argv: asyncio.run(interact()))
@@ -98,9 +99,9 @@ def test_e2e_environment_tui_language_write_stays_in_fixture(tmp_paths, monkeypa
 
     async def interact():
         async with TravelApp().run_test() as pilot:
-            await pilot.app.workers.wait_for_complete()
-            await pilot.press("l")
-            await pilot.app.workers.wait_for_complete()
+            await pilot.app.wait_for_idle()
+            await toggle_language(pilot)
+            await pilot.app.wait_for_idle()
 
     with product_environment(root, fake_runner):
         asyncio.run(interact())

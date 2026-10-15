@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-
 from textual.containers import Vertical
 from textual.widgets import Checkbox, Label, Static, TabbedContent
 
@@ -116,7 +114,7 @@ class PowerPage:
             self.notify(t("impl.no_power_settings_selected"), severity="warning")
             return
         if chg:
-            _, rc = await asyncio.to_thread(self.execute, SetPowerProfile([*chg]))
+            _, rc = await self.in_thread(self.execute, SetPowerProfile([*chg]))
             if rc == 0:
                 self.save()  # 电源变更必须落盘, 否则 off 无法回滚且会污染下次锚点
                 for i in range(0, len(chg), 2):
@@ -124,9 +122,7 @@ class PowerPage:
             else:
                 self.logline("warn", t("impl.applying_pmset_failed_2", v0=" ".join(chg)))
         if ac_wanted:
-            _, rc2 = await asyncio.to_thread(
-                self.execute, SetPowerProfile(["powernap", "0", "womp", "0"], "-c")
-            )
+            _, rc2 = await self.in_thread(self.execute, SetPowerProfile(["powernap", "0", "womp", "0"], "-c"))
             if rc2 == 0:
                 self.save()
             self.logline(
@@ -134,8 +130,8 @@ class PowerPage:
                 t("impl.disabled_powernap_womp_on_ac") if rc2 == 0 else t("impl.changing_ac_settings_failed"),
             )
         if bright_wanted:
-            orig = await asyncio.to_thread(brightness.current_brightness)
-            _, rcb = await asyncio.to_thread(
+            orig = await self.in_thread(brightness.current_brightness)
+            _, rcb = await self.in_thread(
                 self.execute, SetBrightness(self.profile_values.get("brightness", 0.15))
             )
             if rcb == 0:

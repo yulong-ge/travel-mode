@@ -57,12 +57,12 @@ async def test_category_button_journals_each_identity_once_and_off_restores(mach
     )
     app = TravelApp(scenario="work")
     async with app.run_test(size=(140, 55)) as pilot:
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         await pilot.press("4")
         await pilot.pause()
         machine["fake"].calls.clear()
         await pilot.click("#b-category-sync")
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         await pilot.pause()
         snapshot = state.load_state()
         assert snapshot["quit_apps"] == [machine["paths"]["Quit Demo"]]
@@ -83,13 +83,13 @@ async def test_work_profile_brightness_is_opt_in_and_uses_configured_target(mach
         stream.write("\n[profiles.work]\nbrightness=0.42\n")
     app = TravelApp(scenario="work")
     async with app.run_test(size=(140, 55)) as pilot:
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         await pilot.pause()
         machine["fake"].calls.clear()
         from tui_interaction import click_after_layout
 
         await click_after_layout(pilot, "#b-quick")
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         await pilot.pause()
         assert ("brightness", "0.42") in machine["fake"].calls
         assert state.load_state()["brightness"] == "0.8"

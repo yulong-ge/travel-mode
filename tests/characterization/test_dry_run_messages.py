@@ -48,7 +48,7 @@ def test_tui_dry_run_quit_freeze_and_unload_messages_are_plans(language, machine
 
         app.logline = log
         async with app.run_test(size=(140, 55)) as pilot:
-            await app.workers.wait_for_complete()
+            await app.wait_for_idle()
             await pilot.press("3")
             await pilot.pause()
             freeze_row = next(index for index, row in app.app_rows.items() if row["name"] == "Freeze Demo")

@@ -1,5 +1,6 @@
 """Shared Textual widgets."""
 
+import asyncio
 import unicodedata
 
 from textual.widgets import Button as TextualButton
@@ -21,6 +22,11 @@ class Button(TextualButton):
 
     _mutation_done = False
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dispatch_posted = asyncio.Event()
+        self.last_dispatch = None
+
     async def _on_click(self, event):
         event.stop()
         event.prevent_default()
@@ -30,7 +36,13 @@ class Button(TextualButton):
     def post_message(self, message):
         if isinstance(message, TextualButton.Pressed):
             message.travel_generation = self.app._mutation_generation
-        return super().post_message(message)
+            message.travel_completion = self.app.track_input()
+            self.last_dispatch = message.travel_completion
+            self.dispatch_posted.set()
+        posted = super().post_message(message)
+        if not posted and isinstance(message, TextualButton.Pressed):
+            self.app.complete_input(message.travel_completion)
+        return posted
 
     def on_mount(self):
         self.app._disable_mutation_button(self)

@@ -252,7 +252,7 @@ class DashboardPage:
 
             def progress(message):
                 self.tlog("dim", message)
-                self.call_from_thread(self.query_one("#measurement-progress", Static).update, escape(message))
+                self.call_from_thread(self.update_measurement_progress, message)
 
             clock = measurement.CancellableClock(self._measurement_cancelled)
             before = measurement.begin(

@@ -146,8 +146,7 @@ async def test_tui_fixture_plan_excludes_foreign_apps_and_health_controls(dirty_
             harness.setup()
             app = FixtureDebugApp(tmp_path / "layout.json", scenario=scenario)
             async with app.run_test(size=(120, 45)):
-                await app.workers.wait_for_complete()
-                await app.workers.wait_for_complete()
+                await app.wait_for_idle()
                 assert app.refresh_complete
                 assert not app.caffeinate_targets
                 assert all(Path(row["path"]).is_relative_to(harness.root) for row in app.scan["running"])

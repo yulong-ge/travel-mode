@@ -207,7 +207,7 @@ async def test_debug_scroll_updates_widget_coordinates(debug_modules, tmp_path, 
     app = debug.DebugApp(telemetry, scenario="away")
     async with app.run_test(size=(120, 36)) as pilot:
         await pilot.pause()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         await pilot.pause()
         checkbox = app.query_one("#q-power")
         scroll = next(parent for parent in checkbox.ancestors if isinstance(parent, VerticalScroll))
@@ -241,7 +241,7 @@ async def test_debug_scrolled_page_bottom_is_not_blank(
     app = debug.DebugApp(telemetry, scenario="away")
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         app.action_goto(page)
         await pilot.pause()
         if page == "p-dash":

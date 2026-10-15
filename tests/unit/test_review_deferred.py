@@ -76,7 +76,7 @@ async def entered(blocker):
 
 async def settled(app, pilot):
     await pilot.pause()
-    await app.workers.wait_for_complete()
+    await app.wait_for_idle()
     await pilot.pause()
 
 
@@ -220,7 +220,7 @@ async def test_tui_refresh_recompose_batch_uses_original_rows(action_ui, fake_ru
             await entered(blocker)
             action_ui[:] = [dict(action_ui[1], name="Replacement", path="/Replacement.app")]
             await app.action_toggle_language()
-            await app.workers.wait_for_complete()
+            await app.wait_for_idle()
             assert app.app_rows[0]["path"] == "/Replacement.app"
         finally:
             blocker.release.set()
@@ -331,6 +331,7 @@ async def test_tui_transaction_disables_mutations_across_recompose(
     async with app.run_test() as pilot:
         await settled(app, pilot)
         task = asyncio.create_task(app.on_button_pressed(Button.Pressed(app.query_one(f"#{first}"))))
+        switch = None
         try:
             await entered(blocker)
             assert app._mutation_lock.locked()
@@ -344,8 +345,16 @@ async def test_tui_transaction_disables_mutations_across_recompose(
             await app.on_button_pressed(Button.Pressed(Button(id="b-killcaff-777")))
             assert ("kill", "-TERM", "777") not in fake_runner.calls
             view = app.display_state()
-            await app.action_toggle_language()
-            await app.workers.wait_for_complete()
+            old_health = app.query_one("#dash-health")
+            language_started = asyncio.Event()
+
+            async def language():
+                language_started.set()
+                await app.action_toggle_language()
+
+            switch = asyncio.create_task(language())
+            await asyncio.wait_for(language_started.wait(), 5)
+            assert not switch.done() and old_health.is_attached
             assert app.display_state() == view
             assert t("impl.executing_action", action=app._mutation_action) == app.sub_title
             assert all(
@@ -356,7 +365,10 @@ async def test_tui_transaction_disables_mutations_across_recompose(
         finally:
             blocker.release.set()
             await task
+            if switch is not None:
+                await switch
         await settled(app, pilot)
+        assert not old_health.is_attached
         assert not app._mutation_lock.locked()
         assert not app.query_one("#b-apps-all", Button).disabled
 

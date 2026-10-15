@@ -65,7 +65,7 @@ def test_caffeinate_pid_reuse_refuses_signal(fake_runner, replacement):
 async def test_hib25_alone_when_original_equals_recommendation(monkeypatch):
     app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         for _, _, checkbox in app.pw_boxes:
             checkbox.value = False
         app.query_one("#cb-hib25", Checkbox).value = True
@@ -89,7 +89,7 @@ async def test_hib25_hidden_when_key_unsupported(fake_runner):
     )
     app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         await pilot.pause()
         assert not list(app.query("#cb-hib25"))
 
@@ -155,7 +155,7 @@ async def test_tui_has_one_button_per_holder_and_terminates_only_selected(fake_r
     two_assertion_holders(fake_runner)
     app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         await pilot.pause()
         assert {b.id for b in app.query("Button") if b.id and b.id.startswith("b-killcaff-")} == {
             "b-killcaff-101",

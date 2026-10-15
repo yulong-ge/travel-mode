@@ -22,6 +22,7 @@ from travel_mode.system import apps as system_apps
 from travel_mode.system import launchd, network
 from travel_mode.system.shell import CmdResult
 from travel_mode.tui.app import TravelApp
+from tui_interaction import PageSignals, toggle_language
 from user_data_snapshot import assert_unchanged, snapshot_user_data
 
 
@@ -68,7 +69,7 @@ def readonly_tui(monkeypatch, tmp_paths):
 
 async def wait_for_dashboard(app, pilot):
     await pilot.pause()
-    await app.workers.wait_for_complete()
+    await app.wait_for_idle()
     await pilot.pause()
     assert app.query_one(TabbedContent).active == "p-dash"
     for selector in ("#power-list", "#apps-box", "#dash-status", "#svc-box", "#net-box"):
@@ -156,11 +157,11 @@ async def test_tui_pilot_read_only(demo_app, readonly_tui):
         assert checkbox.value is False
 
         tb.active = "p-dash"
-        await pilot.pause(0.5)
+        await app.screen.wait_for_refresh()
         scroll = app.query_one("#p-dash VerticalScroll", VerticalScroll)
         assert scroll.virtual_size.height > scroll.size.height
         scroll.scroll_end(animate=False)
-        await pilot.pause(0.5)
+        await app.screen.wait_for_refresh()
         assert scroll.scroll_offset.y > 0
 
 
@@ -171,7 +172,7 @@ async def test_tui_language_toggle_recomposes_and_persists(demo_app, monkeypatch
     async with app.run_test(size=(110, 30)) as pilot:
         await wait_for_dashboard(app, pilot)
         assert "Language" in str(app._bindings.key_to_bindings["l"][0].description)
-        await pilot.press("l")
+        await toggle_language(pilot)
         await pilot.pause()
         assert get_language() == "zh"
         assert "语言" in str(app._bindings.key_to_bindings["l"][0].description)
@@ -237,7 +238,7 @@ async def test_tui_network_page_bottom_controls_stay_visible(demo_app, readonly_
         tb = app.query_one(TabbedContent)
         tb.active = "p-net"
         await pilot.pause()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         await pilot.pause()
         screen = app.screen.region
         # Wi-Fi and restore controls live in the pinned bottom cards, never under the log
@@ -267,7 +268,7 @@ async def test_first_active_tab_renders_after_worker_without_switching(
     def slow_network():
         assert threading.current_thread() is not threading.main_thread()
         started.set()
-        assert release.wait(10), "test did not release network sampling"
+        assert release.wait(30), "test did not release network sampling"
         return [
             {
                 "name": "Demo",
@@ -284,14 +285,14 @@ async def test_first_active_tab_renders_after_worker_without_switching(
     app = TravelApp(scenario="away")
     try:
         async with app.run_test(size=size) as pilot:
-            assert await asyncio.to_thread(started.wait, 5)
+            assert await asyncio.to_thread(started.wait, 30)
             # This key must respond while host sampling is blocked; it was frozen on old code.
             await pilot.press(key)
             tab = app.query_one(TabbedContent).active
             assert tab == ("p-dash", "p-power", "p-apps", "p-svc", "p-net")[int(key) - 1]
             assert not app.refresh_complete
             release.set()
-            await app.workers.wait_for_complete()
+            await app.wait_for_idle()
             await pilot.pause()
             assert app.refresh_complete
             assert app.query_one(TabbedContent).active == tab
@@ -350,9 +351,9 @@ async def test_debug_telemetry_survives_recompose_and_empty_active(
         assert {"no-active-panel"} <= {issue["kind"] for issue in data["issues"]}
 
         tb.active = "p-dash"
-        await pilot.press("l")
+        await toggle_language(pilot)
         await pilot.pause()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         await pilot.pause()
         app.write_layout()
         data = json.loads(telemetry.read_text())
@@ -375,7 +376,7 @@ async def test_debug_frame_records_atomic_content_after_worker_completion(demo_a
 
     def network_sample():
         sampled.set()
-        assert resume_sample.wait(10)
+        assert resume_sample.wait(30)
         return []
 
     monkeypatch.setattr(network_apps, "network_scan", network_sample)
@@ -398,12 +399,15 @@ async def test_debug_frame_records_atomic_content_after_worker_completion(demo_a
         await build_net(*args)
 
     monkeypatch.setattr(app, "build_net", delayed_net)
+    pages = PageSignals()
     try:
-        async with app.run_test(size=(80, 24)) as pilot:
-            assert await asyncio.to_thread(sampled.wait, 5)
+        async with app.run_test(size=(80, 24), message_hook=pages) as pilot:
+            assert await asyncio.to_thread(sampled.wait, 30)
+            await pages.wait("p-svc")
             await pilot.press("4")
             resume_sample.set()
             await asyncio.wait_for(pending.wait(), 5)
+            write_layout()  # Its bool is overall readiness, intentionally false here.
             layout = json.loads(app.telemetry.read_text())
             assert layout["active"] == "p-svc"
             assert not layout["refresh_complete"]
@@ -414,7 +418,7 @@ async def test_debug_frame_records_atomic_content_after_worker_completion(demo_a
             assert app._batch_count > 0
             rendered.clear()
             resume_apply.set()
-            await app.workers.wait_for_complete()
+            await app.wait_for_idle()
             await asyncio.wait_for(rendered.wait(), 5)
             layout = json.loads(app.telemetry.read_text())
             assert layout["refresh_complete"]
@@ -445,7 +449,7 @@ async def test_language_recompose_rejects_cancelled_refresh_payload(
         name = "Stale" if old else "Current"
         if old:
             started.set()
-            assert release.wait(10)
+            assert release.wait(30)
             returned.set()
         return [
             {
@@ -474,14 +478,14 @@ async def test_language_recompose_rejects_cancelled_refresh_payload(
     monkeypatch.setattr(app, "build_net", record_net)
     try:
         async with app.run_test(size=(120, 36)) as pilot:
-            assert await asyncio.to_thread(started.wait, 5)
-            await pilot.press("l")
-            await app.workers.wait_for_complete()
+            assert await asyncio.to_thread(started.wait, 30)
+            await toggle_language(pilot)
+            await app.wait_for_idle()
             await pilot.pause()
             assert get_language() == "en" and app.refresh_complete
             assert calls == ["Current"]
             release.set()
-            assert await asyncio.to_thread(returned.wait, 5)
+            assert await asyncio.to_thread(returned.wait, 30)
             await pilot.pause()
             assert calls == ["Current"]
             assert app.query_one("#dash-status").children
@@ -505,14 +509,16 @@ async def test_pages_load_independently_while_app_scan_is_pending(
     def slow_apps():
         assert threading.current_thread() is not threading.main_thread()
         started.set()
-        assert release.wait(10), "app scan was not released"
+        assert release.wait(30), "app scan was not released"
         return original()
 
     monkeypatch.setattr(system_apps, "scan_apps", slow_apps)
     app = TravelApp(scenario="away")
+    pages = PageSignals()
     try:
-        async with app.run_test(size=(140, 45)) as pilot:
-            assert await asyncio.to_thread(started.wait, 5)
+        async with app.run_test(size=(140, 45), message_hook=pages) as pilot:
+            assert await asyncio.to_thread(started.wait, 30)
+            await pages.wait("p-dash", "p-power", "p-svc", "p-net")
             await pilot.press("3")
             await pilot.pause()
             body = app.query_one("#apps-box")
@@ -529,7 +535,7 @@ async def test_pages_load_independently_while_app_scan_is_pending(
             )
             await pilot.press("3")
             release.set()
-            await app.workers.wait_for_complete()
+            await app.wait_for_idle()
             await pilot.pause()
             assert app.refresh_complete
             assert app.query_one(TabbedContent).active == "p-apps"
@@ -554,7 +560,7 @@ async def test_every_page_has_initial_loading_placeholder(
     release = threading.Event()
 
     def delayed_runner(command, timeout=None, interactive=False):
-        assert release.wait(10), "initial scans were not released"
+        assert release.wait(30), "initial scans were not released"
         return fake_runner(command, timeout, interactive)
 
     set_runner(delayed_runner)
@@ -573,7 +579,7 @@ async def test_every_page_has_initial_loading_placeholder(
                 assert app.screen.region.contains_region(labels[0].region)
             assert not app.refresh_complete
             release.set()
-            await app.workers.wait_for_complete()
+            await app.wait_for_idle()
             await pilot.pause()
             assert app.refresh_complete
     finally:
@@ -606,21 +612,22 @@ async def test_dashboard_counts_update_when_slow_apps_arrive(
 
     def slow_apps():
         started.set()
-        assert release.wait(10)
+        assert release.wait(30)
         return original()
 
     monkeypatch.setattr(system_apps, "scan_apps", slow_apps)
     app = TravelApp(scenario="away")
+    pages = PageSignals()
     try:
-        async with app.run_test(size=(140, 45)) as pilot:
-            assert await asyncio.to_thread(started.wait, 5)
-            await pilot.pause()
+        async with app.run_test(size=(140, 45), message_hook=pages) as pilot:
+            assert await asyncio.to_thread(started.wait, 30)
+            await pages.wait("p-dash")
             assert "p-dash" in app.pages_ready
             labels = [str(label.content) for label in app.query("#dash-status Label")]
             assert translate("impl.scanning") in labels
             assert not any("High-energy apps: 0" in label for label in labels)
             release.set()
-            await app.workers.wait_for_complete()
+            await app.wait_for_idle()
             await pilot.pause()
             labels = [str(label.content) for label in app.query("#dash-status Label")]
             assert translate("impl.high_energy_apps_running", v0=1, v1="") in labels

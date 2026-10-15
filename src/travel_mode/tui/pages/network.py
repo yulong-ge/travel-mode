@@ -148,7 +148,9 @@ class NetworkPage:
             from travel_mode import sessions
             from travel_mode.tui.session_screen import SessionScreen
 
-            self.push_screen(SessionScreen("\n".join(sessions.describe(report, sessions.read_history()))))
+            await self.push_screen(
+                SessionScreen("\n".join(sessions.describe(report, sessions.read_history())))
+            )
         if fails:
             self.logline("bad", t("impl.restores_failed_snapshot_retained_resolve_failures", v0=fails))
             self.notify(t("impl.restores_failed_snapshot_retained", v0=fails), severity="error")
@@ -159,12 +161,11 @@ class NetworkPage:
         self.action_refresh()
 
     async def show_history(self):
-        import asyncio
 
         from travel_mode import sessions
 
-        rows = await asyncio.to_thread(sessions.read_history)
+        rows = await self.in_thread(sessions.read_history)
         text = "\n\n".join("\n".join(sessions.describe(row, rows)) for row in reversed(rows))
         from travel_mode.tui.session_screen import SessionScreen
 
-        self.push_screen(SessionScreen(text or t("session.history_empty")))
+        await self.push_screen(SessionScreen(text or t("session.history_empty")))

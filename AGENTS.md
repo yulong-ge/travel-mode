@@ -49,6 +49,7 @@ the filtered product view.
   commands and host subprocesses; register responses and assert the recorded calls. Do not depend
   on the host's sudoers, fonts, locale, terminal width, platform or installed apps.
 - Run new or modified TUI/asynchronous tests repeatedly to verify stability before committing.
+  Run at least 30 consecutive suite iterations under CPU load: `uv run python scripts/stress_tui.py --runs 30 --coverage` (defaults to one concurrent pytest process per CPU; all processes exit after the finite run). Wait for button completion, current refresh generation and committed layout; worker snapshots and fixed sleeps do not establish action completion.
 - Characterization goldens record ordered commands, final state, output and exit codes. A mismatch
   means behavior changed: investigate, don't regenerate to make it pass. Intentional changes go
   through `tests/characterization/update_golden.py ... --acknowledge-behavior-change`, listed and
@@ -102,7 +103,8 @@ cli.py → flows/ (apply, restore, check, report, suggest, configuration, thaw)
   and VM programs by public bundle id, launchd label, app name or executable path. Rules must use
   public product identifiers only, each with a source comment.
 - TUI: `tui/app.py` (TravelApp, refresh worker, language switch), `layout.py`, `dispatch.py`
-  (admits button events), `pages/` (render and choose Actions), `style.tcss`. A refresh builds one
+  (admits button events), `lifecycle.py` (input completion and draining Action threads before
+  teardown), `pages/` (render and choose Actions), `style.tcss`. A refresh builds one
   `system/app_snapshot.py` snapshot (app index + a single `ps`) and redraws each page atomically.
 
 ## Repository workflow

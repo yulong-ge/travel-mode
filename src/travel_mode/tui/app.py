@@ -11,6 +11,7 @@ from rich.markup import escape
 from textual import work
 from textual.app import App
 from textual.binding import Binding
+from textual.compose import compose
 from textual.containers import VerticalScroll
 from textual.widgets import RichLog, Static, TabbedContent
 
@@ -30,6 +31,7 @@ from travel_mode.system.shell import is_dry_run
 
 from .dispatch import Dispatch
 from .layout import Layout
+from .lifecycle import Lifecycle
 from .pages.apps import AppsPage
 from .pages.dashboard import DashboardPage
 from .pages.network import NetworkPage
@@ -37,7 +39,9 @@ from .pages.power import PowerPage
 from .pages.services import ServicesPage
 
 
-class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPage, NetworkPage, App):
+class TravelApp(
+    Lifecycle, Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPage, NetworkPage, App
+):
     TITLE = "travel-mode"
 
     SUB_TITLE = t("impl.travel_mode_dry_run") if is_dry_run() else t("impl.travel_mode")
@@ -61,6 +65,10 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
 
     def __init__(self, dry_run=False, *, scenario=None, measure=None):
         super().__init__()
+        self._init_lifecycle()
+        self._recomposing = False
+        self._pending_logs = []
+        self._pending_progress = None
         self._dry_run = dry_run
         self.measure_enabled = measure
         import threading
@@ -118,8 +126,33 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
         return state_snapshot(self._transaction_view if self._transaction_view is not None else self.st)
 
     def logline(self, kind, msg):
+        if self._recomposing:
+            self._pending_logs.append((kind, msg))
+            return
         mark = {"ok": "[green]✔[/]", "warn": "[yellow]▲[/]", "bad": "[red]✘[/]", "dim": "[dim]○[/]"}[kind]
         self.query_one("#log", RichLog).write(f"{mark} {escape(msg)}")
+
+    def update_measurement_progress(self, message):
+        self._pending_progress = message
+        if not self._recomposing:
+            self.query_one("#measurement-progress", Static).update(escape(message))
+
+    async def recompose(self):
+        self._recomposing = True
+        try:
+            # A restore can open a report before a queued language switch runs.
+            # Rebuild the product screen, preserving the report's own widget tree.
+            screen = self.default_screen
+            async with screen.batch():
+                await screen.query("*").exclude(".-textual-system").remove()
+                await screen.mount_all(compose(self))
+        finally:
+            self._recomposing = False
+        logs, self._pending_logs = self._pending_logs, []
+        for kind, message in logs:
+            self.logline(kind, message)
+        if self._pending_progress is not None:
+            self.update_measurement_progress(self._pending_progress)
 
     def tlog(self, kind, msg):
         self.call_from_thread(self.logline, kind, msg)
@@ -144,6 +177,17 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
         self.merged = True
 
     async def action_toggle_language(self):
+        completion = self.track_input()
+        self.last_language_dispatch = completion
+        self.language_posted.set()
+        try:
+            async with self._mutation_lock:
+                if not self._interface_closing:
+                    await self._toggle_language()
+        finally:
+            self.complete_input(completion)
+
+    async def _toggle_language(self):
         from travel_mode.config import write_language
         from travel_mode.i18n import get_language, set_language
 
@@ -158,6 +202,7 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
         self._refresh_generation += 1
         self.workers.cancel_group(self, "dash")
         self.workers.cancel_group(self, "audit")
+        self.workers.cancel_group(self, "battery")
         # 重组与回填共用锁，旧回填不能挂载到已经移除的页面。
         async with self._refresh_lock:
             self.refresh_complete = False
@@ -186,7 +231,7 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
     async def busy(self, btn, fn, *a):
         btn.loading = True
         try:
-            return await asyncio.to_thread(fn, *a)
+            return await self.in_thread(fn, *a)
         except Exception as e:
             self.logline("bad", t("impl.operation_failed", v0=type(e).__name__, v1=e))
             self.notify(t("impl.operation_failed_2", v0=e), severity="error")
@@ -355,10 +400,15 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
             from textual.worker import get_current_worker
 
             worker = get_current_worker()
+            generation = self._refresh_generation
 
             async def apply():
                 async with self._refresh_lock:
-                    if not worker.is_cancelled:
+                    if (
+                        not worker.is_cancelled
+                        and generation == self._refresh_generation
+                        and not self._interface_closing
+                    ):
                         self.query_one("#dash-audit", Static).update("\n".join(lines))
 
             try:
@@ -371,8 +421,20 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
                 if not worker.is_cancelled:
                     self.call_from_thread(apply)
             except Exception as e:
-                self.call_from_thread(self.logline, "bad", t("impl.audit_failed", v0=type(e).__name__, v1=e))
-                self.call_from_thread(self.notify, t("impl.audit_failed_2", v0=e), severity="error")
+                if worker.is_cancelled or generation != self._refresh_generation or self._interface_closing:
+                    return
+
+                def report_error(error):
+                    if (
+                        worker.is_cancelled
+                        or generation != self._refresh_generation
+                        or self._interface_closing
+                    ):
+                        return
+                    self.logline("bad", t("impl.audit_failed", v0=type(error).__name__, v1=error))
+                    self.notify(t("impl.audit_failed_2", v0=error), severity="error")
+
+                self.call_from_thread(report_error, e)
                 raise RuntimeError(t("impl.tui_audit_failed", v0=e)) from e
 
     @work(exclusive=True, group="battery")
@@ -382,15 +444,24 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
         from travel_mode.system import battery
         from travel_mode.system.shell import ReadError
 
+        generation = self._refresh_generation
         try:
             reading = await asyncio.to_thread(battery.read)
         except (ReadError, battery.BatteryError) as exc:
-            if not get_current_worker().is_cancelled and self.is_running:
+            if (
+                not get_current_worker().is_cancelled
+                and generation == self._refresh_generation
+                and not self._interface_closing
+            ):
                 message = t("measurement.failed", reason=str(exc))
                 self.query_one("#dash-battery", Static).update(escape(message))
                 self.logline("warn", message)
             return
-        if not get_current_worker().is_cancelled and self.is_running:
+        if (
+            not get_current_worker().is_cancelled
+            and generation == self._refresh_generation
+            and not self._interface_closing
+        ):
             self._observed_external |= reading.get("reason") in {"external_power", "charging"}
             if not self._mutation_lock.locked():
                 self.flush_session_observations()
@@ -425,7 +496,7 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
             from travel_mode.system.shell import ReadError
 
             try:
-                self.st, self.merged = await asyncio.to_thread(snapshots.snapshot_origin)
+                origin, merged = await asyncio.to_thread(snapshots.snapshot_origin)
             except ReadError as exc:
                 self._origin_error = str(exc)
                 from .widgets import Button
@@ -436,6 +507,11 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
                 self.refresh_dash()
                 self.refresh_battery()
                 return
+            from textual.worker import get_current_worker
+
+            if get_current_worker().is_cancelled or self._interface_closing:
+                return
+            self.st, self.merged = origin, merged
             self.st["scenario"] = config.options.scenario
             self.origin_ready = True
             self.start_pages()
@@ -473,6 +549,8 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
             self._battery_timer = self.set_interval(30, self.refresh_battery)
 
     def action_refresh(self):
+        if self._interface_closing:
+            return
         if self.scenario == "ask" or (not self.origin_ready and self._origin_error is None):
             return
         self._refresh_generation += 1
@@ -500,21 +578,18 @@ class TravelApp(Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPa
         ):
             tb.focus()
 
-        async def fix():
-            pane = None
-            for _ in range(40):
-                pane = self.query_one(f"#{tb.active}")
-                if pane.display and pane.size.height > 0:
-                    break
-                await asyncio.sleep(0.05)
-            if pane is None or not pane.display:
+        def fix():
+            if self._interface_closing or not tb.is_attached or not tb.active:
+                return
+            pane = tb.get_pane(tb.active)
+            if not pane.display or not pane.size.height:
                 return
             pane.refresh(layout=True)
             f = self.focused
             if f is None or (f is not tb and f is not pane and pane not in f.ancestors):
                 pane.query_one(VerticalScroll).focus()
 
-        self.run_worker(fix, group="tabfix", exclusive=True)
+        self.call_after_refresh(fix)
 
 
 def tui(return_class=False, dry_run=False, measure=None):

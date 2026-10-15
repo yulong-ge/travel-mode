@@ -24,7 +24,7 @@ async def test_picker_precedes_scans_and_work_selection(language, fake_runner):
         assert fake_runner.calls == []
         assert not state_path().exists()
         await pilot.click("#scenario-work")
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert app.scenario == "work" and app.st["scenario"] == "work"
         assert app.query_one("#q-sync", Checkbox).value
         assert app.query_one("#q-updater", Checkbox).value
@@ -39,7 +39,7 @@ async def test_configured_scenario_skips_picker(scenario):
     config_path().write_text(f'[options]\nscenario="{scenario}"\n')
     app = TravelApp()
     async with app.run_test() as pilot:
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert not app.query("#scenario-work")
         assert app.query_one(TabbedContent).active == "p-dash"
         await pilot.pause()

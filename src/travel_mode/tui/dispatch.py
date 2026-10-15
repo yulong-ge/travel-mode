@@ -24,6 +24,16 @@ from travel_mode.tui.widgets import Button
 
 class Dispatch:
     async def on_button_pressed(self, ev):
+        completion = getattr(ev, "travel_completion", None)
+        if completion is None:
+            completion = self.track_input()
+        try:
+            if not self._interface_closing:
+                await self._handle_button_pressed(ev)
+        finally:
+            self.complete_input(completion)
+
+    async def _handle_button_pressed(self, ev):
         from travel_mode.actions.journal import mutation_scope
         from travel_mode.state import StateError, _path
 
@@ -65,7 +75,7 @@ class Dispatch:
 
                 self.logline("dim", t("impl.sudo_required_enter_your_password_in"))
                 with self.suspend():
-                    keepalive = await asyncio.to_thread(SudoKeepAlive().__enter__)
+                    keepalive = await self.in_thread(SudoKeepAlive().__enter__)
                 self.logline("ok", t("impl.sudo_credentials_acquired"))
                 return keepalive
 
@@ -120,18 +130,18 @@ class Dispatch:
             await self.busy(ev.button, reapply, self.st, self.execute, self.save)
             self.action_refresh()
         elif bid == "b-fixsleep":
-            _, rc = await asyncio.to_thread(self.execute, EnableSleep())
+            _, rc = await self.in_thread(self.execute, EnableSleep())
             self.logline("ok" if rc == 0 else "warn", "disablesleep → 0" if rc == 0 else t("impl.fix_failed"))
             if rc == 0:
                 self.save()
             self.action_refresh()
         elif bid.startswith("b-killcaff-"):
             target = self.caffeinate_targets[int(bid.removeprefix("b-killcaff-"))]
-            await asyncio.to_thread(self.execute, KillCaffeinate(target))
+            await self.in_thread(self.execute, KillCaffeinate(target))
             self.logline("ok", t("impl.caffeinate_terminated"))
             self.action_refresh()
         elif bid == "b-quituu":
-            _, okq, msg = await asyncio.to_thread(self.execute, QuitConfiguredDaemons(self.st, self.save))
+            _, okq, msg = await self.in_thread(self.execute, QuitConfiguredDaemons(self.st, self.save))
             self.logline("ok" if okq else "warn", f"daemon app: {msg}")
             self.action_refresh()
         elif bid == "b-dash-apps":
@@ -153,12 +163,12 @@ class Dispatch:
         elif bid.startswith("svc-"):
             await self.act_svc(int(bid[4:]), ev.button)
         elif bid in ("b-spot", "b-svc-spot"):
-            if not await asyncio.to_thread(spotlight.spotlight_on):
+            if not await self.in_thread(spotlight.spotlight_on):
                 self.logline("dim", t("impl.spotlight_indexing_already_disabled_no_action"))
                 ev.button.disabled = True
                 ev.button._mutation_done = True
                 return
-            _, rc = await asyncio.to_thread(self.execute, StopSpotlight())
+            _, rc = await self.in_thread(self.execute, StopSpotlight())
             if rc == 0:
                 self.save()
                 self.logline("ok", t("impl.spotlight_indexing_disabled_off_restores_it"))
@@ -170,12 +180,12 @@ class Dispatch:
             await self.act_net(int(bid[4:]), ev.button)
         elif bid == "b-wifi":
             dev = system_network.wifi_dev()
-            if dev and not await asyncio.to_thread(system_network.wifi_powered, dev):
+            if dev and not await self.in_thread(system_network.wifi_powered, dev):
                 self.logline("dim", t("impl.wi_fi_already_disabled_no_action"))
                 ev.button.disabled = True
                 ev.button._mutation_done = True
             elif dev:
-                _, rc = await asyncio.to_thread(self.execute, WifiOff(dev))
+                _, rc = await self.in_thread(self.execute, WifiOff(dev))
                 if rc == 0:
                     self.save()
                     self.logline("ok", t("impl.wi_fi_disabled_off_restores_it", v0=dev))
@@ -184,12 +194,12 @@ class Dispatch:
                 else:
                     self.logline("warn", t("impl.disabling_wi_fi_failed"))
         elif bid == "b-bt":
-            if not await asyncio.to_thread(system_network.bt_powered):
+            if not await self.in_thread(system_network.bt_powered):
                 self.logline("dim", t("impl.bluetooth_already_disabled_no_action_needed"))
                 ev.button.disabled = True
                 ev.button._mutation_done = True
             else:
-                _, rc = await asyncio.to_thread(self.execute, BluetoothOff())
+                _, rc = await self.in_thread(self.execute, BluetoothOff())
                 if rc == 0:
                     self.save()
                     self.logline("ok", t("impl.bluetooth_disabled_off_restores_it"))

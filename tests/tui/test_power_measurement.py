@@ -32,17 +32,16 @@ async def test_battery_timer_is_30_seconds_and_energy_is_button_only(tmp_paths, 
 
     monkeypatch.setattr(app, "set_interval", set_interval)
     async with app.run_test(size=(120, 45)) as pilot:
-        await app.workers.wait_for_complete()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert app.refresh_complete
         assert observed["seconds"] == 30
         assert not any(call[0] == "top" for call in fake_runner.calls)
         fake_runner.calls.clear()
         observed["callback"]()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert fake_runner.calls == [tuple(battery.COMMAND)]
         await click_after_layout(pilot, "#b-energy")
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert sum(call[0] == "top" for call in fake_runner.calls) == 1
     assert observed["timer"].stopped
     assert app._measurement_cancelled.is_set()
@@ -74,14 +73,13 @@ async def test_tui_work_comparison_uses_fake_clock_and_persists(tmp_paths, fake_
     monkeypatch.setattr(measurement, "CancellableClock", lambda event: clock)
     app = TravelApp(scenario="work")
     async with app.run_test(size=(140, 55)) as pilot:
-        await app.workers.wait_for_complete()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert app.refresh_complete
         for checkbox in app.query("#p-dash Checkbox"):
             checkbox.value = checkbox.id in {"q-power", "q-measure"}
         assert app.query_one("#q-measure", Checkbox).value
         await click_after_layout(pilot, "#b-quick")
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert app.st["measurement"]["saved_watts"] == 6
         assert clock.now == 14
         assert str(app.query_one("#measurement-progress", Static).content)
@@ -125,12 +123,11 @@ async def test_measurement_read_failure_keeps_tui_action_and_report_available(
     monkeypatch.setattr(measurement, "CancellableClock", lambda event: Clock())
     app = TravelApp(scenario="work")
     async with app.run_test(size=(140, 55)) as pilot:
-        await app.workers.wait_for_complete()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         for checkbox in app.query("#p-dash Checkbox"):
             checkbox.value = checkbox.id in {"q-power", "q-measure"}
         await click_after_layout(pilot, "#b-quick")
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert any(c[:3] == ("sudo", "pmset", "-b") for c in fake_runner.calls)
         saved = state.load_state()
         result = saved["measurement"]
@@ -149,15 +146,14 @@ async def test_overview_battery_read_failure_does_not_stop_tui(language, monkeyp
     set_language(language)
     app = TravelApp(scenario="away")
     async with app.run_test(size=(120, 45)):
-        await app.workers.wait_for_complete()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
 
         def fail():
             raise ReadError("fixture ioreg timeout")
 
         monkeypatch.setattr(battery, "read", fail)
         app.refresh_battery()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert app.is_running and app.refresh_complete
         assert t("measurement.failed", reason="fixture ioreg timeout") in str(
             app.query_one("#dash-battery", Static).content

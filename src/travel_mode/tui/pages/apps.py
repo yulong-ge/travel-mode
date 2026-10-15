@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-
 from rich.markup import escape
 from textual.containers import ItemGrid, Vertical
 from textual.widgets import Label
@@ -211,7 +209,7 @@ class AppsPage:
             if row.get("frozen"):
                 # 已冻结 → 按钮变为解冻: CONT 并移出恢复列表 (用户明确表示这次要带着它)
 
-                if not await asyncio.to_thread(self.execute, ThawApp(path, self.st)):
+                if not await self.in_thread(self.execute, ThawApp(path, self.st)):
                     raise RuntimeError(t("impl.thaw_failed", v0=path))
                 if path in self.st.get("frozen_apps", []):
                     self.save()
@@ -220,13 +218,13 @@ class AppsPage:
                 )
                 self.logline("ok", t("impl.thawed_3", v0=name))
                 return
-            for line in (await asyncio.to_thread(system_apps.app_sleep_assertions, name))[:1]:
+            for line in (await self.in_thread(system_apps.app_sleep_assertions, name))[:1]:
                 self.logline(
                     "warn", t("impl.holds_a_sleep_assertion_freezing_will", v0=name, v1=_ellip(line, 70))
                 )
             okf = await self.busy(btn, self.execute, FreezeApp(path))
             if okf:
-                n = await asyncio.to_thread(system_apps.freeze_result_count, path)
+                n = await self.in_thread(system_apps.freeze_result_count, path)
                 self.save()
                 self.mark_row_done(
                     i, t("impl.frozen_processes_off_resumes_them", v0=name, v1=n), expected_path=path

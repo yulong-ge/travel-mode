@@ -17,6 +17,6 @@ async def test_tui_snapshot_honors_extra_app_dirs(monkeypatch, tmp_path):
     monkeypatch.setattr(AppSnapshot, "capture", record)
     app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         await pilot.pause()
     assert observed and all(extra in dirs for dirs in observed)

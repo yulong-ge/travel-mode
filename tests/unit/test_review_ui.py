@@ -86,6 +86,7 @@ async def test_tui_failed_thaw_retains_receipt(fake_runner):
     )
     saved, messages, done = [], [], []
     app = SimpleNamespace(
+        in_thread=asyncio.to_thread,
         app_rows={0: {"name": "Demo", "path": path, "done": False, "kill": False, "frozen": True}},
         st={"frozen_apps": [path]},
         save=lambda *args: saved.append(True),
@@ -176,23 +177,19 @@ async def test_tui_batch_completion_does_not_mark_replacement_row(monkeypatch, t
             raise TimeoutError("test did not release frozen app operation")
         return True
 
-    async def wait_until_entered():
-        while not entered.is_set():
-            await asyncio.sleep(0.01)
-
     monkeypatch.setattr(system_apps, "freeze_app", freeze)
     app = TravelApp(scenario="away")
     async with app.run_test(size=(110, 30)) as pilot:
         await pilot.pause()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         action = asyncio.create_task(app.act_apps_all(app.query_one("#b-apps-all")))
         try:
-            await asyncio.wait_for(wait_until_entered(), timeout=5)
+            assert await asyncio.to_thread(entered.wait, 5)
             rows[:] = [
                 {"name": "DemoB", "path": str(tmp_paths / "DemoB.app"), "cpu": "0", "defact": "freeze"}
             ]
             app.action_refresh()
-            await app.workers.wait_for_complete()
+            await app.wait_for_idle()
             observed = []
             original = app.mark_row_done
 
@@ -203,7 +200,7 @@ async def test_tui_batch_completion_does_not_mark_replacement_row(monkeypatch, t
             app.mark_row_done = mark
             release.set()
             await action
-            await app.workers.wait_for_complete()
+            await app.wait_for_idle()
             await pilot.pause()
             assert ("DemoB", True) not in observed
             assert path in app.st["frozen_apps"]
@@ -234,13 +231,13 @@ async def test_tui_removed_snapshot_preflight_prevents_mutation(
     app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
         await pilot.pause()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         state_path().unlink()
         try:
             with pytest.raises(StateError):
                 await app.on_button_pressed(Button.Pressed(Button(id=button_id)))
         finally:
-            await app.workers.wait_for_complete()
+            await app.wait_for_idle()
             await pilot.pause()
         assert ("blueutil", "-p", "0") not in fake_runner.calls
         assert not any(command[0] == "open" for command in fake_runner.calls)
@@ -279,14 +276,14 @@ async def test_tui_apps_daemon_batch_dispatches_configured_spec(quick, monkeypat
     app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
         await pilot.pause()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         if quick:
             for key in ("power", "svc", "spot", "net"):
                 app.query_one(f"#q-{key}", Checkbox).value = False
             await app.act_quick(app.query_one("#b-quick"))
         else:
             await app.act_apps_all(app.query_one("#b-apps-all"))
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert calls == [spec]
 
 

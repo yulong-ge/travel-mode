@@ -28,8 +28,7 @@ async def test_health_overview_refresh_and_executor_button(language, fake_runner
 
     monkeypatch.setattr(app.executor, "execute", execute)
     async with app.run_test(size=(120, 36)) as pilot:
-        await app.workers.wait_for_complete()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert app.refresh_complete and "health" in app.pages_ready
         text = "\n".join(str(widget.content) for widget in app.query("#dash-health Static"))
         summary = "\n".join(str(w.content) for w in app.query("#dash-status Label"))
@@ -40,11 +39,11 @@ async def test_health_overview_refresh_and_executor_button(language, fake_runner
         assert len(app.query("#dash-health Button")) == 2
         native_reads = fake_runner.calls.count(tuple(health.native_command("displays")))
         await click_after_layout(pilot, "#b-doctor")
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert app.refresh_complete
         assert fake_runner.calls.count(tuple(health.native_command("displays"))) == native_reads + 1
         await click_after_layout(pilot, "#b-fixsleep")
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert len(admitted) == 1 and isinstance(admitted[0], EnableSleep)
         assert app.merged and not app._mutation_lock.locked()
 
@@ -52,16 +51,15 @@ async def test_health_overview_refresh_and_executor_button(language, fake_runner
 async def test_health_language_recomposition_replaces_descriptors_without_stale_mounts(fake_runner):
     app = TravelApp(scenario="away")
     async with app.run_test(size=(120, 36)) as pilot:
-        await app.workers.wait_for_complete()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         old = app.query_one("#dash-health")
         await app.action_toggle_language()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert app.refresh_complete and not old.is_attached
         text = "\n".join(str(widget.content) for widget in app.query("#dash-health Static"))
         assert t("health.low_power.title") in text
         await click_after_layout(pilot, "#b-doctor")
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert app.refresh_complete
 
 
@@ -74,14 +72,13 @@ async def test_health_survives_shared_read_failure_and_blocks_mutation(fake_runn
 
     monkeypatch.setattr(app.executor, "execute", forbidden)
     async with app.run_test(size=(120, 36)) as pilot:
-        await app.workers.wait_for_complete()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert app.refresh_complete and not app.origin_ready and app._origin_error
         text = "\n".join(str(w.content) for w in app.query("#dash-health Static"))
         assert t("health.backup.title") in text and "read denied" in text
         assert t("health.unknown") in text
         await click_after_layout(pilot, "#b-doctor")
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert app.refresh_complete
         assert all(button.disabled for button in app.query("#dash-health Button"))
         assert app.query_one("#b-quick").disabled

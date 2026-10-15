@@ -16,15 +16,14 @@ async def test_restore_report_and_history_share_scrollable_view(
     set_language(language)
     app = TravelApp(scenario="work", measure=False)
     async with app.run_test(size=(120, 36)) as pilot:
-        await app.workers.wait_for_complete()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         # A persisted session with no outstanding system mutations is enough to
         # exercise report archival, deletion ordering, display and local history.
         sessions.begin(app.st)
         app.save()
         app.action_goto("p-net")
         await click_after_layout(pilot, "#b-off")
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         text = str(app.screen.query_one("#session-text", Static).content)
         assert t("session.heading", scenario="work") in text
         assert not state._path().exists() and len(sessions.read_history()) == 1
@@ -45,8 +44,7 @@ async def test_overview_has_one_status_health_region_and_one_sleep_fact(fake_run
     fake_runner.responses[("pmset", "-g")] = CmdResult("SleepDisabled 1\nlowpowermode 0\n", "", 0)
     app = TravelApp(scenario="away")
     async with app.run_test(size=(80, 24)):
-        await app.workers.wait_for_complete()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert len(app.query("#overview-health.card")) == 1
         assert not app.query("#dash-status.card") and not app.query("#dash-health.card")
         text = "\n".join(str(w.content) for w in app.query("#overview-health Static"))
@@ -63,6 +61,5 @@ async def test_e2e_scenario_selector_is_mounted_and_enters_requested_scenario(sc
         button = app.query_one("#scenario-" + scenario)
         assert button.is_attached and app.screen.region.contains_region(button.region)
         assert await pilot.click(button, offset=(button.region.width // 2, 1))
-        await app.workers.wait_for_complete()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert app.scenario == scenario and app.refresh_complete

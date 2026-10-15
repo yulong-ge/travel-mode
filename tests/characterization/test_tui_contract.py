@@ -12,6 +12,7 @@ import travel_mode.flows.check as flow_check
 import travel_mode.snapshots as snapshots
 from travel_mode import state
 from travel_mode.tui.app import tui
+from tui_interaction import toggle_language
 
 from .conftest import artifact, assert_golden
 
@@ -75,7 +76,7 @@ async def test_tui_action_contract(case, page, button, machine, monkeypatch, cap
         set_language("zh")
     app = tui(return_class=True)(scenario="away")
     async with app.run_test(size=(140, 55)) as pilot:
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         await pilot.pause()
         await pilot.press(page)
         await pilot.pause()
@@ -105,14 +106,14 @@ async def test_tui_action_contract(case, page, button, machine, monkeypatch, cap
         machine["fake"].calls.clear()
         capsys.readouterr()
         if case == "language":
-            await pilot.press("l")
+            await toggle_language(pilot)
         elif not case.startswith("dashboard-"):
             control = app.query_one(f"#{button}")
             control.scroll_visible(animate=False, immediate=True)
             await pilot.pause()
             assert await pilot.click(f"#{button}")
         await pilot.pause()
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         await pilot.pause()
         assert not app._mutation_lock.locked()
         captured = capsys.readouterr()

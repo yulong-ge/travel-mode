@@ -44,15 +44,14 @@ async def test_tui_overview_reapply_button_uses_same_actions(machine):
     paused_snapshot(machine)
     app = TravelApp(scenario="work", measure=False)
     async with app.run_test(size=(140, 55)) as pilot:
-        # Origin creates page workers; wait for both lifecycle stages.
-        await app.workers.wait_for_complete()
-        await app.workers.wait_for_complete()
+        # Drain admitted events and every worker generation they create.
+        await app.wait_for_idle()
         await pilot.pause()
         assert app.refresh_complete
         assert {row["kind"] for row in app.resurrected} == {"agent", "app", "pid"}
         button = app.query_one("#b-reapply")
         assert button.display and not button.disabled
         await click_after_layout(pilot, "#b-reapply")
-        await app.workers.wait_for_complete()
+        await app.wait_for_idle()
         assert resurrection.detect(app.st) == []
         assert not app.query_one("#b-reapply").display
