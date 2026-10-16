@@ -21,10 +21,11 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import e2e_battery
-from e2e_fake import BatteryMachine, InstantClock, Machine, SimulatedBrightness
+from e2e_fake import BatteryMachine, InstantClock, Machine, SimulatedBrightness, VirtualMachine
 from e2e_guard import GuardRunner, LocalBackend
 from e2e_isolation import write_fixture_config
 from e2e_local import Harness, create_fixtures, fixture_paths, preflight, print_plan, product_environment
+from harness_evidence import EvidenceError, acknowledged, read_json, read_layout, write_json, write_text
 from terminal_render import render
 from tui_debug import ROOT, DebugApp, Session, isolated_env
 
@@ -32,12 +33,6 @@ from travel_mode import measurement, sessions, state
 from travel_mode.cli import main as product_main
 from travel_mode.i18n import set_language, t
 from travel_mode.system import apps, brightness, pmset, processes
-
-
-def write_json(path, value):
-    temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2))
-    temporary.replace(path)
 
 
 def wait_for(predicate, message, timeout=30):
@@ -353,8 +348,9 @@ def select_answer(prompt, policy):
 
 def child(args):
     root = args.root.resolve()
+    demo_machine = VirtualMachine if args.demo_vm else BatteryMachine if args.battery_measure else Machine
     backend = (
-        (BatteryMachine(root) if args.battery_measure else Machine(root))
+        demo_machine(root)
         if args.demo
         else LocalBackend(
             [
@@ -375,7 +371,7 @@ def child(args):
         runner,
         Path(args.real_state),
         brightness_loader=None
-        if args.battery_measure
+        if args.battery_measure or args.demo_vm
         else (SimulatedBrightness if args.demo else brightness.NativeBrightness.load),
         **({"pause": lambda _: None} if args.demo else {}),
     )
@@ -386,6 +382,7 @@ def child(args):
         "interface": args.child,
         "scenario": args.scenario,
         "battery_measure": args.battery_measure,
+        "demo_vm": args.demo_vm,
         "status": "FAIL",
     }
     # Evidence survives temporary fixture cleanup.
@@ -450,15 +447,6 @@ def child(args):
 
                         def write_layout(self):
                             result = super().write_layout()
-                            layout_path = evidence / "layout.json"
-                            if result:
-                                layout = json.loads(layout_path.read_text())
-                                layout.update(
-                                    action_generation=self._mutation_generation,
-                                    mutation_busy=self._mutation_lock.locked(),
-                                    focused_id=self.focused.id if self.focused else None,
-                                )
-                                write_json(layout_path, layout)
                             request = evidence / "assert-on.request"
                             if (
                                 request.exists()
@@ -503,7 +491,7 @@ def child(args):
 
 
 class UISession(Session):
-    def __init__(self, evidence, fixture, interface, demo, scenario, *, battery_measure=False):
+    def __init__(self, evidence, fixture, interface, demo, scenario, *, battery_measure=False, demo_vm=False):
         self.scenario = scenario
         self.battery_measure = battery_measure
         self.root = evidence
@@ -539,6 +527,8 @@ class UISession(Session):
         ]
         if demo:
             command.append("--demo")
+        if demo_vm:
+            command.append("--demo-vm")
         if battery_measure:
             command.append("--battery-measure")
         self.tmux(
@@ -551,7 +541,7 @@ class UISession(Session):
     def shot(self, name):
         plain = self.tmux("capture-pane", "-p")
         ansi = self.tmux("capture-pane", "-p", "-e")
-        (self.root / (name + ".txt")).write_text(plain)
+        write_text(self.root / (name + ".txt"), plain)
         render(ansi, self.root / (name + ".png"), self.cols, self.rows)
         self.captures.append({"step": name, "screenshot": str(self.root / (name + ".png"))})
 
@@ -568,7 +558,7 @@ class UISession(Session):
     def finish(self):
         result = wait_for(
             lambda: (
-                json.loads((self.root / "result.json").read_text())
+                read_json(self.root / "result.json", required={"status": str, "guard_tripped": bool})
                 if (self.root / "result.json").exists()
                 else None
             ),
@@ -582,16 +572,16 @@ class UISession(Session):
 
 def drive_cli(session):
     count = 0
-    while not (session.root / "on.json").exists():
+    while not acknowledged(session.root / "on.json"):
 
         def next_event(count=count):
             path = session.root / "prompt.json"
             if (session.root / "result.json").exists():
                 raise AssertionError("CLI failed before on assertion")
-            if (session.root / "on.json").exists():
+            if acknowledged(session.root / "on.json"):
                 return "on"
             if path.exists():
-                event = json.loads(path.read_text())
+                event = read_json(path, required={"count": int, "prompt": str, "key": str, "answer": str})
                 if event["count"] > count:
                     return event
 
@@ -607,11 +597,11 @@ def drive_cli(session):
 
 def mutate(session, widget, step):
     path = session.root / "layout.json"
-    generation = json.loads(path.read_text())["action_generation"]
+    generation = read_layout(path)["action_generation"]
     if widget in {"b-power", "b-quick"}:
         # Keyboard focus scrolls the bottom button into view on long detail pages.
         for _ in range(80):
-            if json.loads(path.read_text()).get("focused_id") == widget:
+            if read_layout(path)["focused_id"] == widget:
                 break
             session.keys("Tab")
         else:
@@ -622,7 +612,7 @@ def mutate(session, widget, step):
         session.widget_click(widget)
 
     def completed():
-        layout = json.loads(path.read_text())
+        layout = read_layout(path)
         if (session.root / "result.json").exists():
             raise AssertionError(f"TUI exited while executing {widget}")
         return layout["action_generation"] > generation and not layout["mutation_busy"] and layout["ready"]
@@ -645,15 +635,15 @@ def drive_tui(session):
         finish_tui(session)
         return
     capabilities = session.root / "capabilities.json"
-    power_capabilities = json.loads(capabilities.read_text()) if capabilities.exists() else {}
-    if power_capabilities.get("fixture_only_power"):
+    power_capabilities = read_json(capabilities, required={"fixture_only_power": bool, "sleep_switch": bool})
+    if power_capabilities["fixture_only_power"]:
         select_battery_quick(session, measure=False)
         session.shot("02-vm-fixture-selection")
         mutate(session, "b-quick", "03-vm-fixture-applied")
         finish_tui(session)
         return
     # Fix SleepDisabled through its real button. No unsafe diagnostic buttons.
-    if session.scenario == "away" and power_capabilities.get("sleep_switch", True):
+    if session.scenario == "away" and power_capabilities["sleep_switch"]:
         mutate(session, "b-fixsleep", "02-fixsleep")
     session.keys("2")
     session.wait_complete()
@@ -677,7 +667,7 @@ def select_battery_quick(session, *, measure=True):
     path = session.root / "layout.json"
 
     def selected(widget, value):
-        layout = json.loads(path.read_text())
+        layout = read_layout(path)
         return layout["ready"] and any(
             row["id"] == widget and row["value"] is value for row in layout["widgets"]
         )
@@ -696,7 +686,9 @@ def finish_tui(session):
     (session.root / "assert-on.request").touch()
     # A harmless refresh provides a rendered completion point for the assertion.
     session.keys("r")
-    wait_for(lambda: (session.root / "on.json").exists(), "TUI on assertions did not finish", session.timeout)
+    wait_for(
+        lambda: acknowledged(session.root / "on.json"), "TUI on assertions did not finish", session.timeout
+    )
     session.shot("09-on-verified")
     session.keys("5")
     session.wait_complete()
@@ -719,6 +711,9 @@ def main(argv=None):
     parser.add_argument("--plan", action="store_true")
     parser.add_argument("--demo", action="store_true")
     parser.add_argument(
+        "--demo-vm", action="store_true", help="Recorded hosted VM capabilities; requires --demo"
+    )
+    parser.add_argument(
         "--battery-measure",
         action="store_true",
         help="Battery-only work measurement with fixture freeze; no power or brightness writes",
@@ -731,6 +726,8 @@ def main(argv=None):
     parser.add_argument("--evidence", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--real-state", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+    if args.demo_vm and (not args.demo or args.battery_measure):
+        parser.error("--demo-vm requires --demo and cannot be combined with --battery-measure")
     if args.battery_measure:
         args.scenario = "work"
     if args.plan:
@@ -784,11 +781,17 @@ def main(argv=None):
         evidence.mkdir()
         fixture = Path(tempfile.mkdtemp(prefix="travel-mode-e2e-ui-"))
         session = UISession(
-            evidence, fixture, interface, args.demo, scenario, battery_measure=args.battery_measure
+            evidence,
+            fixture,
+            interface,
+            args.demo,
+            scenario,
+            battery_measure=args.battery_measure,
+            demo_vm=args.demo_vm,
         )
         try:
             driver(session)
-        except (RuntimeError, TimeoutError, AssertionError, OSError):
+        except (RuntimeError, TimeoutError, AssertionError, OSError, EvidenceError):
             session.shot("failure")
             if not (evidence / "result.json").exists():
                 if interface == "tui":

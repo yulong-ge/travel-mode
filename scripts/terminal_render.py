@@ -164,4 +164,7 @@ def render(text: str, path: Path, cols: int = 120, rows: int = 36) -> None:
         font = bold_font if style.bold and family == "mono" else fonts[family]
         # All fonts share a baseline; glyph width never changes terminal positioning.
         draw.text((x, y + 18), char, font=font, fill=fg, anchor="ls", stroke_width=0)
-    image.save(path)
+    from harness_evidence import atomic_output
+
+    with atomic_output(path) as temporary:
+        image.save(temporary)

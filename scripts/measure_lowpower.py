@@ -12,6 +12,8 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from harness_evidence import write_json
+
 from travel_mode import measurement, state
 from travel_mode.i18n import set_language, t
 from travel_mode.system import battery, shell
@@ -227,7 +229,7 @@ def run_experiment(output, *, runner=None, clock=None, state_path=None):
         report["finished_at"] = datetime.now(timezone.utc).isoformat()
         report["commands"] = guard.calls
         shell.set_runner(previous)
-        (output / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
+        write_json(output / "report.json", report)
         print(t("lowpower.evidence", path=output / "report.json"), flush=True)
     return report
 

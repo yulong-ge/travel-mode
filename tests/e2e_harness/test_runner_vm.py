@@ -4,36 +4,13 @@ from pathlib import Path
 
 import pytest
 import yaml
-from e2e_fake import Machine
+from e2e_fake import VirtualMachine
 from e2e_guard import GuardRunner
 from e2e_local import fixture_paths, product_environment
 from e2e_ui import InteractiveHarness, answers, select_answer
 
 from travel_mode import cli
 from travel_mode.i18n import set_language
-from travel_mode.system import pmset
-from travel_mode.system.shell import CmdResult
-
-RECORDINGS = Path(__file__).parents[1] / "fixtures/hosted-vm"
-
-
-class VirtualMachine(Machine):
-    def __init__(self, root):
-        super().__init__(root)
-        self.battery = {}
-        self.ac = pmset.parse_custom((RECORDINGS / "pmset-custom-recorded.txt").read_text())["a"]
-        self.tcc = "Not authorized to send Apple events (-1743)"
-
-    def power_text(self):
-        # Verbatim runner output includes multiword settings, not just known keys.
-        return (RECORDINGS / "pmset-custom-recorded.txt").read_text()
-
-    def __call__(self, cmd, timeout=None, interactive=False):
-        if cmd in (["/usr/bin/pmset", "-g"], ["ioreg", "-rn", "AppleSmartBattery"]):
-            self.calls.append(tuple(cmd))
-            filename = "pmset-g-synthetic.txt" if cmd[0] == "/usr/bin/pmset" else "ioreg-empty-recorded.txt"
-            return CmdResult((RECORDINGS / filename).read_text(), "", 0)
-        return super().__call__(cmd, timeout, interactive)
 
 
 class NoBacklight:

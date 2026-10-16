@@ -8,7 +8,6 @@ Default tests inject the stateful fake backend and isolated paths.
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import plistlib
 import pwd
@@ -36,6 +35,7 @@ from e2e_guard import (
     LocalBackend,
 )
 from e2e_isolation import discovery_scope, write_fixture_config
+from harness_evidence import write_json
 
 from travel_mode import state
 from travel_mode.actions.apps import ForceQuitApp, FreezeApp, QuitApp, UnloadAgent
@@ -960,8 +960,8 @@ def main(argv=None):
             original_pmset_g=harness.original_pmset_g,
             original_sleepdisabled=harness.original_sleep,
         )
-        (evidence / "result.json").write_text(json.dumps(report, indent=2) + "\n")
-        (evidence / "command_trace.json").write_text(json.dumps(runner.trace, indent=2) + "\n")
+        write_json(evidence / "result.json", report)
+        write_json(evidence / "command_trace.json", runner.trace)
         print(f"Evidence: {evidence}")
     return 0
 

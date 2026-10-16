@@ -167,6 +167,30 @@ class Machine:
         return CmdResult(out, "", 0)
 
 
+class VirtualMachine(Machine):
+    """Recorded hosted VM capabilities, with no Battery Power profile or sleep switch."""
+
+    recordings = Path(__file__).resolve().parents[1] / "tests/fixtures/hosted-vm"
+
+    def __init__(self, root):
+        super().__init__(root)
+        from travel_mode.system.pmset import parse_custom
+
+        self.battery = {}
+        self.ac = parse_custom(self.power_text())["a"]
+        self.tcc = "Not authorized to send Apple events (-1743)"
+
+    def power_text(self):
+        return (self.recordings / "pmset-custom-recorded.txt").read_text()
+
+    def __call__(self, cmd, timeout=None, interactive=False):
+        if cmd in (["/usr/bin/pmset", "-g"], ["ioreg", "-rn", "AppleSmartBattery"]):
+            self.calls.append(tuple(cmd))
+            filename = "pmset-g-synthetic.txt" if cmd[0] == "/usr/bin/pmset" else "ioreg-empty-recorded.txt"
+            return CmdResult((self.recordings / filename).read_text(), "", 0)
+        return super().__call__(cmd, timeout, interactive)
+
+
 class InstantClock:
     """Finite-window demo clock; advances without sleeping or a sampler thread."""
 

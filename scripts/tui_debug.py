@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import re
 import shlex
@@ -15,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
+from harness_evidence import read_layout, write_json, write_layout, write_text
 from terminal_render import render, text_width
 
 import travel_mode.config as config_api
@@ -203,7 +203,7 @@ class Session:
             if "Traceback" in capture or "CSS parsing failed" in capture:
                 raise RuntimeError(f"TUI crashed while waiting for {text!r}:\n{capture}")
             telemetry = self.root / "layout.json"
-            if text in capture and telemetry.exists() and json.loads(telemetry.read_text())["ready"]:
+            if text in capture and telemetry.exists() and read_layout(telemetry)["ready"]:
                 time.sleep(0.25)
                 return
             time.sleep(0.15)
@@ -217,7 +217,7 @@ class Session:
             if "Traceback" in text or "CSS parsing failed" in text:
                 raise RuntimeError(f"TUI crashed:\n{text}")
             layout = self.root / "layout.json"
-            if layout.exists() and (json.loads(layout.read_text())["refresh_complete"] or log_has_text(text)):
+            if layout.exists() and (read_layout(layout)["refresh_complete"] or log_has_text(text)):
                 return True
             time.sleep(0.1)
         return False
@@ -226,7 +226,7 @@ class Session:
         deadline = time.monotonic() + self.timeout
         while time.monotonic() < deadline:
             path = self.root / "layout.json"
-            if path.exists() and json.loads(path.read_text())["active"]:
+            if path.exists() and read_layout(path)["active"]:
                 return
             time.sleep(0.05)
         raise TimeoutError("TUI did not mount its initial tab")
@@ -234,7 +234,7 @@ class Session:
     def wait_complete(self) -> None:
         deadline = time.monotonic() + self.timeout
         while time.monotonic() < deadline:
-            if json.loads((self.root / "layout.json").read_text())["ready"]:
+            if read_layout(self.root / "layout.json")["ready"]:
                 time.sleep(0.25)
                 return
             time.sleep(0.1)
@@ -252,7 +252,7 @@ class Session:
 
     def widget_click(self, widget_id: str) -> None:
         for _ in range(80):
-            layout = json.loads((self.root / "layout.json").read_text())
+            layout = read_layout(self.root / "layout.json")
             widget = next(row for row in layout["widgets"] if row["id"] == widget_id)
             x, y, width, height = widget["region"]
             if width and height and y >= 3 and y + height <= self.rows - 7:
@@ -267,12 +267,12 @@ class Session:
     def capture(self, name: str, tab: str, language: str | None = None, *, observed: bool = True) -> dict:
         plain = self.tmux("capture-pane", "-p")
         ansi = self.tmux("capture-pane", "-p", "-e")
-        (self.root / f"{name}.txt").write_text(plain, encoding="utf-8")
-        (self.root / f"{name}.ansi").write_text(ansi, encoding="utf-8")
+        write_text(self.root / f"{name}.txt", plain)
+        write_text(self.root / f"{name}.ansi", ansi)
         render(ansi, self.root / f"{name}.png", self.cols, self.rows)
         issues = lint_text(plain, language=language or self.language, cols=self.cols, rows=self.rows, tab=tab)
-        layout = json.loads((self.root / "layout.json").read_text())
-        (self.root / f"{name}.layout.json").write_text(json.dumps(layout, indent=2))
+        layout = read_layout(self.root / "layout.json")
+        write_json(self.root / f"{name}.layout.json", layout)
         issues.extend(layout["issues"])
         issues.extend(lint_active_tab(plain, layout, observed=observed))
         expected = {
@@ -418,6 +418,7 @@ class DebugApp(TravelApp):
             issues.append({"kind": "telemetry-error", "detail": f"{type(error).__name__}: {error}"})
             ready = complete = False
         payload = {
+            "schema_version": 1,
             "active": active,
             "widgets": widgets,
             "issues": issues,
@@ -426,10 +427,11 @@ class DebugApp(TravelApp):
             "refresh_complete": ready,
             "body_visible": body_visible,
             "content_visible": content_visible,
+            "action_generation": self._mutation_generation,
+            "mutation_busy": self._mutation_lock.locked(),
+            "focused_id": self.focused.id if self.focused else None,
         }
-        temporary = self.telemetry.with_suffix(".tmp")
-        temporary.write_text(json.dumps(payload), encoding="utf-8")
-        temporary.replace(self.telemetry)
+        write_layout(self.telemetry, payload)
         return True
 
 
@@ -465,7 +467,7 @@ def write_report(output: Path, results: list[dict], mode: str, error: str | None
     if error:
         report["failure"] = error
         report["issue_count"] = issues + 1
-    (output / "lint.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    write_json(output / "lint.json", report)
     return report
 
 
@@ -476,7 +478,7 @@ def run_group(output: Path, cols: int, rows: int, language: str, args, results: 
         session = Session(root, cols, rows, language, args.live_readonly, args.config)
         try:
             session.wait_started()
-            if json.loads((session.root / "layout.json").read_text())["active"] == "scenario":
+            if read_layout(session.root / "layout.json")["active"] == "scenario":
                 if tab == "dashboard":
                     results.append(session.capture("scenario", "scenario"))
                 session.keys("w")
@@ -494,7 +496,7 @@ def run_group(output: Path, cols: int, rows: int, language: str, args, results: 
     session = Session(root, cols, rows, language, args.live_readonly, args.config)
     try:
         session.wait_started()
-        if json.loads((session.root / "layout.json").read_text())["active"] == "scenario":
+        if read_layout(session.root / "layout.json")["active"] == "scenario":
             session.keys("w")
         session.wait_text("SleepDisabled")
         if args.wait_text:
@@ -512,10 +514,10 @@ def run_group(output: Path, cols: int, rows: int, language: str, args, results: 
                 session.keys("Home")
         if cols == 120:
             session.keys("1")
-            before = json.loads((root / "layout.json").read_text())
+            before = read_layout(root / "layout.json")
             value = next(w["value"] for w in before["widgets"] if w["id"] == "q-power")
             session.widget_click("q-power")
-            after = json.loads((root / "layout.json").read_text())
+            after = read_layout(root / "layout.json")
             changed_value = next(w["value"] for w in after["widgets"] if w["id"] == "q-power")
             if changed_value == value:
                 raise AssertionError("Mouse click did not toggle q-power")

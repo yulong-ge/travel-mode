@@ -12,6 +12,8 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 
+from harness_evidence import write_json
+
 from travel_mode import automation, cli
 from travel_mode.actions.automation import InstallAutomation, UninstallAutomation
 from travel_mode.actions.base import Context
@@ -159,7 +161,7 @@ def run():
                     Executor(Context(None)).execute(UninstallAutomation())
             finally:
                 shell.set_runner(original)
-                (root / "guard.json").write_text(__import__("json").dumps(guard.calls, indent=2))
+                write_json(root / "guard.json", guard.calls)
     print("Test agent removed; retained evidence: " + str(root))
     return 0
 
