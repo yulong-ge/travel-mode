@@ -23,10 +23,15 @@ def snapshot_origin():
     st = state_api.new_state()
     profs = pmset.pmset_custom()
     st["power_origin"] = {
-        "batt_prof": state_api.profile_string(profs, "b"),
-        "ac_prof": state_api.profile_string(profs, "a"),
-        "sleepdisabled": pmset.sleep_disabled(),
+        field: state_api.profile_string(profs, domain)
+        for field, domain in (("batt_prof", "b"), ("ac_prof", "a"))
+        if profs.get(domain)
     }
+    sleep = pmset.sleep_disabled()
+    if sleep is not None:
+        st["power_origin"]["sleepdisabled"] = sleep
+    else:
+        st.pop("sleepdisabled", None)
     from .profiles import active_name, active_scenario
 
     st["profile"] = active_name()

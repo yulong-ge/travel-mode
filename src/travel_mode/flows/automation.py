@@ -63,13 +63,15 @@ def apply_work_safe(config, details):
         executor = Executor(Context(st, state.save_state))
         actions = []
         key = map_pmset_key("lowpowermode", supported_pmset_keys())
-        if key is None:
-            raise automation.AutomationError(t("automation.action_failed", action="lowpowermode/powermode"))
-        output, rc = shell.run_rc(["sudo", "-n", "-l", "pmset", "-b", key, "1"], timeout=5)
-        if rc:
-            details.append(t("automation.sudo_skipped", detail=output.strip()))
+        original = st.get("power_origin", {}).get("batt_prof", "").split()
+        if key is None or key not in original[::2]:
+            details.append(t("power.battery_unavailable"))
         else:
-            actions.append(SetPowerProfile([key, "1"]))
+            output, rc = shell.run_rc(["sudo", "-n", "-l", "pmset", "-b", key, "1"], timeout=5)
+            if rc:
+                details.append(t("automation.sudo_skipped", detail=output.strip()))
+            else:
+                actions.append(SetPowerProfile([key, "1"]))
         actions.extend(
             UnloadAgent(row["plist_path"])
             for row in launchd.svc_scan()["unloadable"]

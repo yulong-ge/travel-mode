@@ -320,7 +320,7 @@ def parse(text: str, *, endpoint=False) -> dict:
         return common
     current_field = "Amperage" if "Amperage" in properties else "InstantAmperage"
     current = integer(current_field, signed=True) if data is None or current_field in properties else None
-    minutes = integer("TimeRemaining")
+    minutes = integer("TimeRemaining") if "TimeRemaining" in properties else None
     if data is None and current >= 0:
         return unavailable("not_discharging")
     watts = (

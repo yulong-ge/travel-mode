@@ -32,7 +32,7 @@ def quiet_apply(monkeypatch):
 def test_power_receipt_survives_interruption(monkeypatch, fake_runner, tmp_paths, interruption):
     quiet_apply(monkeypatch)
     monkeypatch.setattr(pmset, "sleep_disabled", lambda: "0")
-    monkeypatch.setattr(pmset, "power_recommendations", lambda: [("sleep", "sleep", "5")])
+    monkeypatch.setattr(pmset, "power_recommendations", lambda profiles=None: [("sleep", "sleep", "5")])
     original = pmset.pmset_custom
     reads = 0
 
@@ -103,8 +103,7 @@ def test_failed_critical_probe_is_error(fake_runner, probe):
 
 def test_missing_sleepdisabled_does_not_synthesize_zero(fake_runner):
     fake_runner.responses[("pmset", "-g")] = CmdResult("System-wide power settings:\n", "", 0)
-    with pytest.raises(RuntimeError, match="SleepDisabled"):
-        pmset.sleep_disabled()
+    assert pmset.sleep_disabled() is None
 
 
 def test_restore_matches_exact_plist_label(tmp_paths, fake_runner):
@@ -166,16 +165,17 @@ def test_empty_config_selectors_rejected(tmp_paths, text):
         load_config(path)
 
 
-def test_logical_lowpowermode_override_survives_mapping(monkeypatch, tmp_paths):
+def test_logical_lowpowermode_override_survives_mapping(monkeypatch, tmp_paths, fake_runner):
     (tmp_paths / "config.toml").write_text("[power.battery]\nlowpowermode=0\n")
     monkeypatch.setattr("travel_mode.system.platform.supported_pmset_keys", lambda: frozenset({"powermode"}))
+    fake_runner.responses[("pmset", "-g", "custom")] = CmdResult("Battery Power:\n powermode 2\n", "", 0)
     assert pmset.power_recommendations()[0][::2] == ("powermode", "0")
 
 
 def test_recovery_intent_precedes_first_mutation(monkeypatch, fake_runner):
     quiet_apply(monkeypatch)
     monkeypatch.setattr(pmset, "sleep_disabled", lambda: "0")
-    monkeypatch.setattr(pmset, "power_recommendations", lambda: [("sleep", "sleep", "5")])
+    monkeypatch.setattr(pmset, "power_recommendations", lambda profiles=None: [("sleep", "sleep", "5")])
     original_runner = fake_runner.__call__
     observed = []
 
@@ -210,7 +210,7 @@ def test_recovery_intent_precedes_first_mutation(monkeypatch, fake_runner):
 def test_failed_journal_write_prevents_system_mutation(monkeypatch, fake_runner):
     quiet_apply(monkeypatch)
     monkeypatch.setattr(pmset, "sleep_disabled", lambda: "0")
-    monkeypatch.setattr(pmset, "power_recommendations", lambda: [("sleep", "sleep", "5")])
+    monkeypatch.setattr(pmset, "power_recommendations", lambda profiles=None: [("sleep", "sleep", "5")])
     fake_runner.responses[("sudo", "pmset")] = CmdResult("", "", 0)
     monkeypatch.setattr(brightness, "current_brightness", lambda: "0.8")
 

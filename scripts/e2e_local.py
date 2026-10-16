@@ -186,6 +186,7 @@ class Harness:
         self.plist = root / "agent.plist"
         self.apps = fixture_paths(root)
         self.original_power = None
+        self.original_pmset_g = None
         self.original_values = None
         self.power_dirty = False
         self.agent_attempted = False
@@ -450,6 +451,12 @@ class Harness:
         if not profiles.get("b"):
             self.skip("power", "No Battery Power profile; battery-setting round trip unavailable")
             return
+        battery, ac = profiles.get("b", {}), profiles.get("a", {})
+        mode = "lowpowermode" if "lowpowermode" in battery else "powermode"
+        keys = ["displaysleep", "sleep", "powernap", mode, "hibernatemode"]
+        if not all(k in battery for k in keys) or not all(k in ac for k in ("powernap", "womp")):
+            self.skip("power", "Selected power keys have no observed originals; round trip unavailable")
+            return
         permission = self.runner(
             ["sudo", "-n", "-l", "/usr/bin/pmset", "-a", "disablesleep", "0"], timeout=10
         )
@@ -457,7 +464,8 @@ class Harness:
             self.skip("power", f"pmset-only sudo permission unavailable: {permission.stderr}")
             return
         self.original_power = self.command(["pmset", "-g", "custom"])
-        self.original_sleep = pmset.sleep_disabled()
+        self.original_pmset_g = self.command(["pmset", "-g"])
+        self.original_sleep = pmset.parse_sleep_disabled(self.original_pmset_g)
         self.check_power(pmset.on_ac_power(), "AC connected; battery settings cannot affect current work")
         profiles = pmset.pmset_custom()
         battery, ac = profiles.get("b", {}), profiles.get("a", {})
@@ -467,13 +475,17 @@ class Harness:
             all(k in battery for k in keys) and all(k in ac for k in ("powernap", "womp")),
             "All selected power keys have observed originals",
         )
-        self.check_power(self.original_sleep in {"0", "1"}, "SleepDisabled original is valid")
+        if self.original_sleep is None:
+            self.skip("sleep-switch", "pmset did not report SleepDisabled; no change or restore attempted")
         self.original_values = [part for key in keys for part in (key, battery[key])]
         self.rollback_commands = [
             ["sudo", "-n", "/usr/bin/pmset", "-b", *self.original_values],
             ["sudo", "-n", "/usr/bin/pmset", "-c", "powernap", ac["powernap"], "womp", ac["womp"]],
-            ["sudo", "-n", "/usr/bin/pmset", "-a", "disablesleep", self.original_sleep],
         ]
+        if self.original_sleep is not None:
+            self.rollback_commands.append(
+                ["sudo", "-n", "/usr/bin/pmset", "-a", "disablesleep", self.original_sleep]
+            )
         for command in self.rollback_commands:
             self.runner.validate(command)
             self.check_power(
@@ -486,13 +498,14 @@ class Harness:
         st["power_origin"] = {
             "batt_prof": " ".join(self.original_values),
             "ac_prof": f"powernap {ac['powernap']} womp {ac['womp']}",
-            "sleepdisabled": self.original_sleep,
         }
+        if self.original_sleep is not None:
+            st["power_origin"]["sleepdisabled"] = self.original_sleep
         self.power_dirty = True
         executor = Executor(Context(st))
         target = {"displaysleep": "2", "sleep": "2", "powernap": "0", mode: "1", "hibernatemode": "25"}
         for action in (
-            EnableSleep(),
+            *([EnableSleep()] if self.original_sleep is not None else []),
             SetPowerProfile([p for k, v in target.items() for p in (k, v)]),
             SetPowerProfile(["powernap", "0", "womp", "0"], "-c"),
         ):
@@ -501,7 +514,8 @@ class Harness:
         changed = pmset.pmset_custom()
         self.check_profile(battery, changed["b"], target, "Battery")
         self.check_profile(ac, changed["a"], {"powernap": "0", "womp": "0"}, "AC")
-        self.check_power(pmset.sleep_disabled() == "0", "Product repaired SleepDisabled")
+        if self.original_sleep is not None:
+            self.check_power(pmset.sleep_disabled() == "0", "Product repaired SleepDisabled")
         self.off(st)
         self.stage("power-off")
         self.verify_power()
@@ -509,7 +523,7 @@ class Harness:
 
     def record_power_originals(self):
         print("ORIGINAL pmset -g custom:\n" + self.original_power)
-        print("ORIGINAL SleepDisabled=" + self.original_sleep)
+        print(f"ORIGINAL SleepDisabled={self.original_sleep}")
         for command in self.rollback_commands:
             print("EMERGENCY rollback argv: " + shlex.join(command))
 
@@ -537,7 +551,10 @@ class Harness:
             "Full pmset output restored byte for byte",
         )
         self.check_power(
-            pmset.sleep_disabled() == self.original_sleep, "SleepDisabled restored to captured original"
+            pmset.sleep_disabled() == self.original_sleep,
+            "SleepDisabled remains unavailable; no restore attempted"
+            if self.original_sleep is None
+            else "SleepDisabled restored to captured original",
         )
 
     def brightness(self):
@@ -940,6 +957,7 @@ def main(argv=None):
             guard_tripped=runner.tripped,
             violations=runner.violations,
             original_power=harness.original_power,
+            original_pmset_g=harness.original_pmset_g,
             original_sleepdisabled=harness.original_sleep,
         )
         (evidence / "result.json").write_text(json.dumps(report, indent=2) + "\n")

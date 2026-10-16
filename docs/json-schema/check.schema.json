@@ -272,7 +272,7 @@
                 "enum": [
                   "hit",
                   "clear",
-                  "unknown"
+                  "unknown", "unavailable"
                 ]
               },
               "error": {

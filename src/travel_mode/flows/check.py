@@ -34,6 +34,8 @@ def blockers_lines():
     lines.append(
         ("bad", t("impl.sleepdisabled_sleep_disabled_globally_closing_the", v0=sd))
         if sd == "1"
+        else ("dim", t("power.sleep_switch_unavailable"))
+        if sd is None
         else ("ok", "SleepDisabled=0")
     )
     for target in lines.caffeinate_targets:
@@ -106,7 +108,7 @@ def _mode_check():
     profs = pmset.pmset_custom()
     from ..system.platform import map_pmset_key, supported_pmset_keys
 
-    supported = supported_pmset_keys()
+    supported = supported_pmset_keys() & profs.get("b", {}).keys()
     for key, _desc, rec in pmset.POWER_KEYS:
         actual = map_pmset_key(key, supported)
         cur = pmset.pmget(actual, "b", profs) if actual else None

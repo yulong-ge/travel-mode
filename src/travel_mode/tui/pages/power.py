@@ -37,7 +37,15 @@ class PowerPage:
         yield Button(t("impl.apply_selected"), id="b-power", variant="primary", classes="scope")
 
     async def build_power(self, profs, supported):
-        self.hib25_supported = "hibernatemode" in supported
+        supported = supported & profs.get("b", {}).keys()
+        self.hib25_supported = "hibernatemode" in supported and "hibernatemode" in profs.get("b", {})
+        ac_control = self.query_one("#cb-ac", Checkbox)
+        ac_control.disabled = not all(key in profs.get("a", {}) for key in ("powernap", "womp"))
+        if ac_control.disabled:
+            ac_control.value = False
+        ac_control.label = t(
+            "power.ac_unavailable" if ac_control.disabled else "impl.disable_powernap_womp_on_ac_too"
+        )
         hib = self.query_one("#hib25-control")
         if self.hib25_supported and not list(self.query("#cb-hib25")):
             await hib.mount(
@@ -63,8 +71,8 @@ class PowerPage:
                 continue
             rec = overrides.get(key, rec)
             actual = map_pmset_key(key, supported)
-            cur = pmset.pmget(actual, "b", profs) if actual else None
-            cur = cur or t("power.unsupported")
+            observed = pmset.pmget(actual, "b", profs) if actual else None
+            cur = observed if observed is not None else t("power.unsupported")
             title = f"{actual or key}: {cur} → {rec}"
             detail = "\n".join(
                 "  "
@@ -75,7 +83,7 @@ class PowerPage:
                 )
                 for part in ("desc", "values", "effect")
             )
-            if actual is None or cur == rec:
+            if actual is None or observed is None or cur == rec:
                 heading = Label(title, classes="power-title")
             else:
                 heading = Checkbox(title, True, id=f"pw-{key}")
@@ -108,7 +116,8 @@ class PowerPage:
                     break
             else:
                 chg += ["hibernatemode", "25"]
-        ac_wanted = self.query_one("#cb-ac", Checkbox).value
+        ac_control = self.query_one("#cb-ac", Checkbox)
+        ac_wanted = ac_control.value and not ac_control.disabled
         bright_wanted = any(cb.value for cb in self.query("#cb-bright"))
         if not chg and not ac_wanted and not bright_wanted:
             self.notify(t("impl.no_power_settings_selected"), severity="warning")

@@ -58,7 +58,10 @@ def sleep_blocking_assertions(lines=None, daemon_apps=()):
 
 def pmset_custom():
     """pmset -g custom -> {"a": {...}, "b": {...}, "c": {...}}"""
-    out = _read(["pmset", "-g", "custom"])
+    return parse_custom(_read(["pmset", "-g", "custom"]))
+
+
+def parse_custom(out):
     profs, cur = {}, None
     for line in out.splitlines():
         s = line.strip()
@@ -70,8 +73,19 @@ def pmset_custom():
             cur = "c"
         elif cur:
             parts = s.split()
+            if parts and parts[0] in {*POWER_KEY_ORDER, "powermode"}:
+                if len(parts) != 2 or not re.fullmatch(r"\d+", parts[1]):
+                    raise ReadError(
+                        t("power.invalid_field", command="pmset -g custom", field=parts[0], value=s)
+                    )
+                if parts[0] in profs.get(cur, {}):
+                    raise ReadError(
+                        t("power.invalid_field", command="pmset -g custom", field=parts[0], value=s)
+                    )
             if len(parts) >= 2:
                 profs.setdefault(cur, {})[parts[0]] = parts[1]
+        if cur:
+            profs.setdefault(cur, {})
     if not profs:
         raise ReadError(t("safety.missing_power_profiles"))
     return profs
@@ -93,10 +107,30 @@ def pmset_g():
 
 
 def sleep_disabled():
-    value = pmset_g().get("SleepDisabled")
-    if value not in {"0", "1"}:
-        raise ReadError(t("safety.missing_sleepdisabled"))
-    return value
+    return parse_sleep_disabled(_read(["pmset", "-g"]))
+
+
+def parse_optional_setting(output, key, allowed):
+    if not output.strip():
+        raise ReadError(t("power.empty_output", command="pmset -g"))
+    rows = [line.split() for line in output.splitlines() if line.split()[:1] == [key]]
+    if not rows:
+        known = {*POWER_KEY_ORDER, "powermode", "SleepDisabled"}
+        if not any(
+            line.strip() in {"System-wide power settings:", "Currently in use:"}
+            or bool(line.split() and line.split()[0] in known)
+            for line in output.splitlines()
+        ):
+            raise ReadError(t("power.invalid_field", command="pmset -g", field=key, value=output))
+        return None
+    if len(rows) != 1 or len(rows[0]) != 2 or rows[0][1] not in allowed:
+        raise ReadError(t("power.invalid_field", command="pmset -g", field=key, value=repr(rows)))
+    return rows[0][1]
+
+
+def parse_sleep_disabled(output):
+    """Absence is an unsupported capability; a present malformed value is an error."""
+    return parse_optional_setting(output, "SleepDisabled", {"0", "1"})
 
 
 def pmset_assertions():
@@ -133,7 +167,11 @@ def battery_line():
 
 def on_ac_power():
     out = _read(["pmset", "-g", "ps"])
-    return "AC Power" in out
+    if "AC Power" in out:
+        return True
+    if "Battery Power" in out or "UPS Power" in out:
+        return False
+    raise ReadError(t("power.invalid_field", command="pmset -g ps", field="power source", value=out))
 
 
 def _profile_args(profile: str) -> list[str]:
@@ -153,9 +191,9 @@ def _profile_args(profile: str) -> list[str]:
     return result
 
 
-def power_recommendations():
+def power_recommendations(profiles=None):
     from ..i18n import t
-    from ..system.platform import filter_power_keys
+    from ..system.platform import filter_power_keys, supported_pmset_keys
 
     overrides = load_config().power_overrides
     descriptions = {
@@ -175,4 +213,11 @@ def power_recommendations():
     recommendations = [(key, desc, overrides.get(key, rec)) for key, desc, rec in POWER_KEYS]
     if load_config().options.scenario == "work":
         recommendations = [row for row in recommendations if row[0] == "lowpowermode"]
-    return [(key, descriptions.get(key, desc), rec) for key, desc, rec in filter_power_keys(recommendations)]
+    current = (pmset_custom() if profiles is None else profiles).get("b", {})
+    if not current:
+        return []
+    supported = supported_pmset_keys() & current.keys()
+    return [
+        (key, descriptions.get(key, desc), rec)
+        for key, desc, rec in filter_power_keys(recommendations, supported)
+    ]

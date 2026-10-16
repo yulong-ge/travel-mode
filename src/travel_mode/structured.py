@@ -41,11 +41,14 @@ def _audit_data() -> dict:
     raw = read_command(["pmset", "-g", "batt"]).strip()
     match = re.search(r"(\d+)%;", raw)
     source = "ac" if pmset.on_ac_power() else "battery"
+    sd = pmset.sleep_disabled()
     blockers = [
         {
-            "level": "bad" if pmset.sleep_disabled() == "1" else "ok",
+            "level": "warn" if sd is None else "bad" if sd == "1" else "ok",
             "kind": "sleep_disabled",
-            "message": f"SleepDisabled={pmset.sleep_disabled()}",
+            "message": t("power.sleep_switch_unavailable")
+            if sd is None
+            else f"SleepDisabled={pmset.sleep_disabled()}",
         }
     ]
     for target in processes.caffeinate_procs():
@@ -64,6 +67,7 @@ def _audit_data() -> dict:
     supported = supported_pmset_keys()
     config = load_config()
     current = pmset.pmset_custom().get("b", {})
+    supported = supported & current.keys()
     power = []
     for key, _, recommended in pmset.POWER_KEYS:
         actual = map_pmset_key(key, supported)
@@ -72,7 +76,7 @@ def _audit_data() -> dict:
                 "key": key,
                 "current": current.get(actual),
                 "recommended": config.power_overrides.get(key, recommended),
-                "supported": actual is not None,
+                "supported": actual is not None and actual in current,
                 "description": t(f"power.{key}.desc"),
                 "values": t(f"power.{key}.values"),
                 "effect": t(f"power.{key}.effect"),

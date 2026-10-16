@@ -112,7 +112,7 @@ class DashboardPage:
 
         self.health_report = report
         for row in display_checks(report):
-            if row["id"] == "sleep_disabled" and row["status"] != "unknown":
+            if row["id"] == "sleep_disabled" and row["status"] in {"hit", "clear"}:
                 continue
             if row["id"] == "keep_awake":
                 import re
@@ -218,7 +218,7 @@ class DashboardPage:
                 )
             elif t("impl.audio") in msg and kind != "ok":
                 w.append(status_row(escape(msg), icon="[yellow]▲[/]", compact=True))
-            elif "SleepDisabled" in msg:
+            elif "SleepDisabled" in msg and kind == "ok":
                 w.append(status_row(escape(msg), icon="[green]✔[/]", compact=True))
         apps = (
             t("impl.high_energy_apps_running", v0=napps, v1="" if napps else t("impl.none"))
@@ -284,11 +284,16 @@ class DashboardPage:
                 recommendations = pmset.power_recommendations()
                 for k, _, rec in recommendations:
                     chg += [k, rec]
-                _, rc = self.execute(SetPowerProfile([*chg]))
+                if chg:
+                    _, rc = self.execute(SetPowerProfile([*chg]))
+                else:
+                    rc = None
                 self.tlog(
-                    "ok" if rc == 0 else "warn",
+                    "ok" if rc == 0 else "dim" if rc is None else "warn",
                     t("impl.battery_profile_updated_settings", v0=len(recommendations))
                     if rc == 0
+                    else t("power.battery_unavailable")
+                    if rc is None
                     else t("impl.applying_pmset_failed"),
                 )
                 if rc == 0:
@@ -416,8 +421,10 @@ class DashboardPage:
                             self.tlog("ok", t("impl.bluetooth_disabled"))
             sd = pmset.sleep_disabled()
             self.tlog(
-                "bad" if sd == "1" else "ok",
-                t(
+                "dim" if sd is None else "bad" if sd == "1" else "ok",
+                t("power.sleep_switch_unavailable")
+                if sd is None
+                else t(
                     "impl.final_audit_sleepdisabled",
                     v0=sd,
                     v1="" if sd != "1" else t("impl.still_prevents_sleep"),

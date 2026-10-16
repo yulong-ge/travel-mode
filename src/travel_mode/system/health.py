@@ -32,6 +32,10 @@ class ObservationError(RuntimeError):
     """A bounded observation could not produce a valid result."""
 
 
+class CapabilityUnavailable(ObservationError):
+    """A valid observation does not advertise this optional capability."""
+
+
 def native_command(operation):
     return [sys.executable, "-m", "travel_mode.system.health_native", operation]
 
@@ -150,11 +154,16 @@ class Session:
 
 def sleep_disabled(s):
     output = s.read(["pmset", "-g"])
-    match = re.search(r"^\s*SleepDisabled\s+([01])\s*$", output, re.M)
-    if not match:
-        raise ObservationError("pmset -g: missing or invalid SleepDisabled")
-    hit = match[1] == "1"
-    return hit, [f"SleepDisabled={match[1]}"], [dict(kind="sleep")] if hit else []
+    from .shell import ReadError
+
+    try:
+        value = pmset.parse_sleep_disabled(output)
+    except ReadError as exc:
+        raise ObservationError(str(exc)) from exc
+    if value is None:
+        raise CapabilityUnavailable(t("power.sleep_switch_reason"))
+    hit = value == "1"
+    return hit, [f"SleepDisabled={value}"], [dict(kind="sleep")] if hit else []
 
 
 def keep_awake(s):
@@ -263,11 +272,21 @@ def low_power(s):
     if not s.battery():
         return False, [t("health.on_ac")], []
     output = s.read(["pmset", "-g"])
-    match = re.search(r"^\s*(lowpowermode|powermode)\s+(\d+)\b", output, re.M)
-    if not match or match[2] not in {"0", "1", "2"}:
-        raise ObservationError(f"pmset -g: missing or invalid lowpowermode/powermode: {output!r}")
-    hit = match[2] != "1"
-    return hit, [f"{match[1]}={match[2]}"], [dict(kind="low_power", key=match[1])] if hit else []
+    from .shell import ReadError
+
+    try:
+        for key in ("lowpowermode", "powermode"):
+            value = pmset.parse_optional_setting(output, key, {"0", "1", "2"})
+            if value is not None:
+                break
+        else:
+            raise CapabilityUnavailable(t("power.low_power_unavailable"))
+        if key not in pmset.parse_custom(s.read(["pmset", "-g", "custom"])).get("b", {}):
+            raise CapabilityUnavailable(t("power.battery_unavailable"))
+    except ReadError as exc:
+        raise ObservationError(str(exc)) from exc
+    hit = value != "1"
+    return hit, [f"{key}={value}"], [dict(kind="low_power", key=key)] if hit else []
 
 
 def brightness(s):
@@ -372,6 +391,8 @@ def collect(config=None, *, clock=None):
                 raise ObservationError(t("health.deadline"))
             hit, row["evidence"], row["actions"] = probe(s)
             row["status"] = "hit" if hit else "clear"
+        except CapabilityUnavailable as exc:
+            row.update(status="unavailable", evidence=[str(exc)], actions=[])
         except ObservationError as exc:
             row.update(status="unknown", error=str(exc))
         row["elapsed_seconds"] = round(clock() - started, 4)

@@ -61,6 +61,11 @@
       "ps"
     ],
     [
+      "pmset",
+      "-g",
+      "custom"
+    ],
+    [
       "<PYTHON>",
       "-m",
       "travel_mode.system.health_native",

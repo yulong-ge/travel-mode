@@ -45,8 +45,7 @@ async def test_configured_scenario_skips_picker(scenario):
         await pilot.pause()
 
 
-def test_work_recommendations_ignore_sleep_hibernation_overrides(monkeypatch):
-    monkeypatch.setattr("travel_mode.system.platform.filter_power_keys", lambda values: values)
+def test_work_recommendations_ignore_sleep_hibernation_overrides():
     config = Config.defaults()
     config.power_overrides.update(sleep="1", displaysleep="1", hibernatemode="25")
     with profile_scope(config, "work"):

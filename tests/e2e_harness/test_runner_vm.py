@@ -11,16 +11,29 @@ from e2e_ui import InteractiveHarness, answers, select_answer
 
 from travel_mode import cli
 from travel_mode.i18n import set_language
+from travel_mode.system import pmset
+from travel_mode.system.shell import CmdResult
+
+RECORDINGS = Path(__file__).parents[1] / "fixtures/hosted-vm"
 
 
 class VirtualMachine(Machine):
     def __init__(self, root):
         super().__init__(root)
         self.battery = {}
+        self.ac = pmset.parse_custom((RECORDINGS / "pmset-custom-recorded.txt").read_text())["a"]
         self.tcc = "Not authorized to send Apple events (-1743)"
 
     def power_text(self):
-        return "AC Power:\n" + "".join(f" {key} {value}\n" for key, value in self.ac.items())
+        # Verbatim runner output includes multiword settings, not just known keys.
+        return (RECORDINGS / "pmset-custom-recorded.txt").read_text()
+
+    def __call__(self, cmd, timeout=None, interactive=False):
+        if cmd in (["/usr/bin/pmset", "-g"], ["ioreg", "-rn", "AppleSmartBattery"]):
+            self.calls.append(tuple(cmd))
+            filename = "pmset-g-synthetic.txt" if cmd[0] == "/usr/bin/pmset" else "ioreg-empty-recorded.txt"
+            return CmdResult((RECORDINGS / filename).read_text(), "", 0)
+        return super().__call__(cmd, timeout, interactive)
 
 
 class NoBacklight:
@@ -67,12 +80,18 @@ def test_vm_cli_round_trip_skips_power_and_tcc_but_tests_fixture_actions(vm, mon
     original = machine.power_text()
     harness.setup()
     assert harness.fixture_only_power and not harness.graceful_ready
+    assert harness.original_sleep is None
+    assert not any("disablesleep" in command for command in harness.rollback_commands)
     policy = answers(scenario, battery_measure=harness.fixture_only_power)
     for step, answer in policy.values():
         if step.startswith("battery-"):
             assert answer == "n"
     monkeypatch.setattr("builtins.input", lambda prompt: select_answer(prompt, policy)[1])
     assert cli.main(["--no-tui", "--lang", "en"]) == 0
+    from travel_mode.state import load_state
+
+    assert "sleepdisabled" not in load_state()["power_origin"]
+    assert "batt_prof" not in load_state()["power_origin"]
     harness.assert_on()
     assert cli.main(["off", "--lang", "en"]) == 0
     harness.assert_off()
@@ -85,6 +104,7 @@ async def test_vm_tui_fixture_only_round_trip_waits_for_actions(vm, scenario):
     from e2e_battery import QUICK_SELECTION
     from textual.widgets import Checkbox
 
+    from travel_mode.i18n import t
     from travel_mode.tui.app import TravelApp
     from tui_interaction import click_after_layout
 
@@ -96,8 +116,21 @@ async def test_vm_tui_fixture_only_round_trip_waits_for_actions(vm, scenario):
     app = TravelApp(scenario=scenario)
     async with app.run_test(size=(160, 55)) as pilot:
         await app.wait_for_idle()
+        assert app.origin_ready and app.refresh_complete
+        assert not app.query("#b-fixsleep")
+        assert not app.query("#b-health-sleep_disabled-0")
+        health_text = "\n".join(str(w.content) for w in app.query("#dash-health Static"))
+        assert t("power.sleep_switch_reason") in health_text
+        await pilot.press("2")
+        await app.wait_for_idle()
+        assert app.query_one("#cb-ac", Checkbox).disabled
+        assert not app.query("#cb-hib25") and not app.pw_boxes
+        await pilot.press("1")
+        await app.wait_for_idle()
         for name, value in {**QUICK_SELECTION, "q-measure": False}.items():
             app.query_one("#" + name, Checkbox).value = value
+        # Even an explicitly requested battery update must not send an empty pmset write.
+        app.query_one("#q-power", Checkbox).value = True
         await app.wait_for_idle()
         await click_after_layout(pilot, "#b-quick")
         await app.wait_for_idle()

@@ -99,7 +99,10 @@ class InteractiveHarness(Harness):
         self.runner.observe()
         self.before = self.foreign_snapshot()
         self.original_power = self.command(["pmset", "-g", "custom"])
-        self.original_sleep = pmset.sleep_disabled()
+        self.original_pmset_g = self.command(["pmset", "-g"])
+        self.original_sleep = pmset.parse_sleep_disabled(self.original_pmset_g)
+        if self.original_sleep is None:
+            self.skip("sleep-switch", "pmset did not report SleepDisabled; no change or restore attempted")
         profiles = pmset.pmset_custom()
         self.rollback_commands = []
         self.original_profiles = profiles
@@ -109,10 +112,15 @@ class InteractiveHarness(Harness):
             self.finish_setup(graceful_ready)
             return
         self.check_power(pmset.on_ac_power(), "AC required throughout UI tests")
-        self.fixture_only_power = not bool(profiles.get("b"))
+        self.fixture_only_power = not (
+            profiles.get("b")
+            and "hibernatemode" in profiles["b"]
+            and all(key in profiles.get("a", {}) for key in ("powernap", "womp"))
+        )
         if self.fixture_only_power:
             self.skip(
-                "power", "No Battery Power profile; UI tests fixture actions with all power controls off"
+                "power",
+                "Required power originals unavailable; UI tests fixture actions with all power controls off",
             )
             self.finish_setup(graceful_ready)
             return
@@ -130,9 +138,10 @@ class InteractiveHarness(Harness):
                     *[p for k in keys if k in selected for p in (k, profiles[profile][k])],
                 ]
             self.rollback_commands.append(command)
-        self.rollback_commands.append(
-            ["sudo", "-n", "/usr/bin/pmset", "-a", "disablesleep", self.original_sleep]
-        )
+        if self.original_sleep is not None:
+            self.rollback_commands.append(
+                ["sudo", "-n", "/usr/bin/pmset", "-a", "disablesleep", self.original_sleep]
+            )
         for command in self.rollback_commands:
             self.runner.validate(command)
             self.check_power(
@@ -160,12 +169,15 @@ class InteractiveHarness(Harness):
         profiles = pmset.pmset_custom()
         work = self.scenario == "work"
         self.check_power(
-            pmset.sleep_disabled() == (self.original_sleep if work or self.fixture_only_power else "0"),
+            pmset.sleep_disabled()
+            == (
+                self.original_sleep if work or self.fixture_only_power or self.original_sleep is None else "0"
+            ),
             "Scenario sleep policy",
         )
         self.check_profile(
-            self.original_profiles["a"],
-            profiles["a"],
+            self.original_profiles.get("a", {}),
+            profiles.get("a", {}),
             {} if work or self.fixture_only_power else {"powernap": "0", "womp": "0"},
             "UI AC",
         )
@@ -394,7 +406,13 @@ def child(args):
                 preflight(root, harness.state_file, harness.real_state)
                 set_language("en")
                 harness.setup()
-                write_json(evidence / "capabilities.json", {"fixture_only_power": harness.fixture_only_power})
+                write_json(
+                    evidence / "capabilities.json",
+                    {
+                        "fixture_only_power": harness.fixture_only_power,
+                        "sleep_switch": harness.original_sleep is not None,
+                    },
+                )
                 if args.child == "cli":
                     policy = answers(
                         args.scenario, battery_measure=args.battery_measure or harness.fixture_only_power
@@ -475,6 +493,7 @@ def child(args):
         report["commands"] = [list(c) for c in runner.commands]
         report["command_trace"] = runner.trace
         report["original_power"] = harness.original_power
+        report["original_pmset_g"] = harness.original_pmset_g
         report["original_sleepdisabled"] = harness.original_sleep
         report["emergency_rollback"] = harness.rollback_commands
         report["brightness"] = harness.brightness_report
@@ -626,14 +645,15 @@ def drive_tui(session):
         finish_tui(session)
         return
     capabilities = session.root / "capabilities.json"
-    if capabilities.exists() and json.loads(capabilities.read_text())["fixture_only_power"]:
+    power_capabilities = json.loads(capabilities.read_text()) if capabilities.exists() else {}
+    if power_capabilities.get("fixture_only_power"):
         select_battery_quick(session, measure=False)
         session.shot("02-vm-fixture-selection")
         mutate(session, "b-quick", "03-vm-fixture-applied")
         finish_tui(session)
         return
     # Fix SleepDisabled through its real button. No unsafe diagnostic buttons.
-    if session.scenario == "away":
+    if session.scenario == "away" and power_capabilities.get("sleep_switch", True):
         mutate(session, "b-fixsleep", "02-fixsleep")
     session.keys("2")
     session.wait_complete()

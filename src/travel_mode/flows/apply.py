@@ -123,7 +123,10 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
         fixsleep_applied = False
         if not work:
             c.rule(t("impl.sleep_blockers_highest_priority"))
-            if pmset.sleep_disabled() == "1":
+            sd = pmset.sleep_disabled()
+            if sd is None:
+                emit("dim", t("power.sleep_switch_unavailable"))
+            elif sd == "1":
                 emit("bad", t("impl.sleepdisabled_sleep_disabled_globally_closing_the_2"))
                 if ask(t("impl.fix_pmset_disablesleep"), yes=yes):
                     _, rc = execute(EnableSleep())
@@ -163,22 +166,28 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
 
         c.rule(t("impl.power_settings_battery_profile"))
         profs = pmset.pmset_custom()
+        if not profs.get("b"):
+            emit("dim", t("power.battery_unavailable"))
         chg = []
         power_applied = False
-        for key, desc, rec in pmset.power_recommendations():
+        for key, desc, rec in pmset.power_recommendations(profs):
             cur = pmset.pmget(key, "b", profs) or "(unset)"
             if cur == rec:
                 emit("ok", t("impl.is_already", v0=key, v1=cur, v2=desc))
                 continue
             if ask(t("impl.set_current_recommended", v0=key, v1=rec, v2=cur, v3=rec, v4=desc), yes=yes):
                 chg += [key, rec]
-        if not work and ask(
-            t("impl.use_hibernatemode_write_ram_to_disk"),
-            default="n",
-            yes=yes,
-            risk="aggressive",
-            aggressive=aggressive,
-            emit=emit,
+        if (
+            not work
+            and "hibernatemode" in profs.get("b", {})
+            and ask(
+                t("impl.use_hibernatemode_write_ram_to_disk"),
+                default="n",
+                yes=yes,
+                risk="aggressive",
+                aggressive=aggressive,
+                emit=emit,
+            )
         ):
             for i in range(0, len(chg), 2):
                 if chg[i] == "hibernatemode":
@@ -237,7 +246,14 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
         if not work:
             c.rule(t("impl.b_ac_profile_also_applies_while"))
         ac_applied = False
-        if not work and ask(t("impl.reduce_ac_activity_too_disable_powernap"), default="n", yes=yes):
+        ac_available = all(key in profs.get("a", {}) for key in ("powernap", "womp"))
+        if not work and not ac_available:
+            emit("dim", t("power.ac_unavailable"))
+        if (
+            not work
+            and ac_available
+            and ask(t("impl.reduce_ac_activity_too_disable_powernap"), default="n", yes=yes)
+        ):
             _, rc = execute(SetPowerProfile(["powernap", "0", "womp", "0"], "-c"))
             ac_applied = rc == 0
             emit(
@@ -410,8 +426,10 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
                     c.print(f"  {line.strip()}", highlight=False)
             sd = pmset.sleep_disabled()
             emit(
-                "ok" if sd != "1" else "bad",
-                t("impl.sleepdisabled_lid_close_sleep_available")
+                "dim" if sd is None else "ok" if sd != "1" else "bad",
+                t("power.sleep_switch_unavailable")
+                if sd is None
+                else t("impl.sleepdisabled_lid_close_sleep_available")
                 if sd != "1"
                 else t("impl.sleepdisabled_is_still_closing_the_lid"),
             )
