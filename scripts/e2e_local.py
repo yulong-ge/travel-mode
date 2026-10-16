@@ -8,6 +8,7 @@ Default tests inject the stateful fake backend and isolated paths.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import plistlib
 import pwd
@@ -17,6 +18,7 @@ import sys
 import tempfile
 import time
 from contextlib import ExitStack, contextmanager
+from datetime import datetime
 from difflib import unified_diff
 from pathlib import Path
 from unittest.mock import patch
@@ -196,6 +198,11 @@ class Harness:
         self.brightness_boundary = None
         self.brightness_dirty = False
         self.brightness_report = {"status": "NOT RUN"}
+        self.skips = []
+
+    def skip(self, stage, reason):
+        self.skips.append(dict(stage=stage, reason=reason))
+        print(f"SKIP {stage}: {reason}", flush=True)
 
     def command(self, cmd):
         result = self.runner(cmd, timeout=30)
@@ -436,11 +443,18 @@ class Harness:
         self.assert_foreign()
 
     def power(self):
+        # Capability observations are identical on a hosted VM and a maintainer Mac.
+        # AC remains mandatory; missing battery settings never authorize AC writes.
+        self.check(pmset.on_ac_power(), "AC connected; battery settings cannot affect current work")
+        profiles = pmset.pmset_custom()
+        if not profiles.get("b"):
+            self.skip("power", "No Battery Power profile; battery-setting round trip unavailable")
+            return
         permission = self.runner(
             ["sudo", "-n", "-l", "/usr/bin/pmset", "-a", "disablesleep", "0"], timeout=10
         )
         if permission.rc:
-            print(f"SKIP power: pmset-only sudo permission unavailable: {permission.stderr}")
+            self.skip("power", f"pmset-only sudo permission unavailable: {permission.stderr}")
             return
         self.original_power = self.command(["pmset", "-g", "custom"])
         self.original_sleep = pmset.sleep_disabled()
@@ -885,6 +899,9 @@ def print_plan():
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plan", action="store_true", help="Print guarded command branches; execute nothing")
+    parser.add_argument(
+        "--output", type=Path, help="Persistent JSON evidence directory (outside fixture root)"
+    )
     args = parser.parse_args(argv)
     if args.plan:
         print_plan()
@@ -897,16 +914,37 @@ def main(argv=None):
     paths = fixture_paths(root)
     executables = [str(app / "Contents/MacOS/loop") for app in paths]
     runner = GuardRunner(LocalBackend(executables), root, paths, root / "agent.plist")
+    evidence = args.output or Path("/tmp/travel-mode-e2e-evidence") / datetime.now().strftime(
+        "%Y%m%d-%H%M%S-%f"
+    )
+    evidence.mkdir(parents=True, exist_ok=False)
+    harness = Harness(root, runner, real_state, brightness_loader=brightness.NativeBrightness.load)
+    report = dict(status="FAIL")
     try:
-        Harness(root, runner, real_state, brightness_loader=brightness.NativeBrightness.load).run()
+        harness.run()
+        report["status"] = "PASS"
     except (OSError, RuntimeError, ValueError, AssertionError, KeyboardInterrupt) as error:
+        report["error"] = f"{type(error).__name__}: {error}"
         print(f"FAIL: {type(error).__name__}: {error}", file=sys.stderr)
         return 1
     except Exception as error:
+        report["error"] = f"{type(error).__name__}: {error}"
         print(f"FAIL: unexpected {type(error).__name__}: {error}", file=sys.stderr)
         raise RuntimeError(
             "Unexpected local e2e failure; see the original cause and cleanup output"
         ) from error
+    finally:
+        report.update(
+            skips=harness.skips,
+            brightness=harness.brightness_report,
+            guard_tripped=runner.tripped,
+            violations=runner.violations,
+            original_power=harness.original_power,
+            original_sleepdisabled=harness.original_sleep,
+        )
+        (evidence / "result.json").write_text(json.dumps(report, indent=2) + "\n")
+        (evidence / "command_trace.json").write_text(json.dumps(runner.trace, indent=2) + "\n")
+        print(f"Evidence: {evidence}")
     return 0
 
 

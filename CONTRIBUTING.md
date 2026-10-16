@@ -120,6 +120,24 @@ fixture apps/agents and selected power keys. GuardRunner verifies exact argv and
 PID identities and rejects interactive authentication. Power commands map to
 `sudo -n /usr/bin/pmset`; missing permission skips power with a reason.
 
+The separate [macOS e2e workflow](.github/workflows/e2e-macos.yml) runs on selected
+main pushes, weekly on Sunday at 08:17 UTC, or via Actions → **macOS guarded e2e** →
+**Run workflow**. It is not a required branch-protection check. After a run, open
+its summary and download `macos-e2e-<run-id>-<attempt>`; artifacts retain CLI/TUI
+screenshots, result JSON and command traces for 14 days, including failures.
+Local-harness JSON evidence is under `/tmp/travel-mode-e2e-evidence`; UI evidence
+is under `/tmp/tui-e2e`. Use `e2e_local.py --output <new-directory>` to select a
+persistent local evidence directory. The workflow ensures tmux is available.
+
+Hosted macOS runners are VMs with passwordless sudo; this does not widen the
+GuardRunner allowlist. With no observed Battery Power profile, the local power
+phase is SKIP and UI round trips disable every power/brightness/measurement
+control while still exercising fixture app/agent Actions and restore. AC remains
+mandatory. Native brightness Get failure and fixture AppleEvent authorization
+denial remain separate explicit SKIPs. Parse failures, unexpected command errors,
+identity checks and cleanup failures remain failures. No CI flag bypasses safety,
+changes TCC or installs a sudoers rule. See the [source review](docs/runner-e2e-research.md).
+
 An optional sudoers example uses a placeholder, not a real account:
 
 ```sudoers

@@ -23,6 +23,9 @@ All notable changes follow Keep a Changelog.
 
 ### Added
 
+- Explicit sudoers print/install/uninstall/status commands, a pmset-first scope and documented broader operational permissions, with syntax validation, confirmation and Action/Executor mutation routing.
+- Cheap bilingual status JSON and a five-minute SwiftBar plugin; scans and measurements run only after menu clicks.
+- A separate macOS e2e workflow for manual, weekly and selected main pushes, with observed VM capability SKIPs and 14-day failure evidence; no change to fixture guards or branch-protection checks.
 - A maintainer-only `measure_lowpower.py --plan` and guarded battery 0→1→0 experiment using fresh telemetry accumulator intervals, non-interactive passwordless pmset writes, contextual brightness/CPU observations and verified rollback on success, errors or Ctrl-C.
 - Optional power-source LaunchEvents automation with explicit install/uninstall/status, bounded local receipts, notification defaults and opt-in non-interactive safe work/restore actions. Consume XPC events before handling and exit; no resident monitor, periodic launch or lid/sleep trigger.
 

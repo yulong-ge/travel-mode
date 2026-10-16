@@ -72,6 +72,8 @@ Sudo is requested only for operations that require it, such as power writes, glo
 | `travel-mode power --seconds 20` / `--json` | Measure battery draw in a finite window |
 | `travel-mode check --reapply` | Pause recorded items detected running again |
 | `travel-mode check` / `travel-mode check --json` | Read-only audit, including the effective saved scenario in JSON |
+| `travel-mode status [--json]` | Cheap local snapshot and power-source status; no discovery or sampling |
+| `travel-mode sudoers print\|install\|uninstall\|status` | Preview, explicitly install/remove, or inspect optional permissions |
 | `travel-mode report` / `travel-mode report --json` | Read-only sleep / DarkWake report |
 | `travel-mode config path` | Show configuration and state paths |
 | `travel-mode config init` | Write the template; `--force` overwrites it |
@@ -130,7 +132,13 @@ Category actions supplement `services.unload` and explicit `apps.quit` / `apps.f
 
 Built-ins are `work`, `flight` and `overnight`. `cafe` was merged into `work` and removed, with no alias. A profile overrides ordinary settings for its supplied fields; custom `[profiles.NAME]` values override the matching built-in. A custom profile defaults to away unless it sets `scenario = "work"`. Conflicting explicit `--scenario` and profile scenarios are errors. Snapshots record the last applied scenario while keeping the first original values for recovery. `check --json` uses null when no saved scenario exists, including older snapshots.
 
-`TRAVEL_MODE_LANG` overrides configured language. `TRAVEL_MODE_APP_DIRS` adds colon-separated absolute app directories; empty/relative entries are errors. `suggest --write` requests confirmation, preserves comments and validates before replacing configuration. JSON schemas: [check](docs/json-schema/check.schema.json), [suggest](docs/json-schema/suggest.schema.json). Optional integrations: [Shortcuts](integrations/shortcuts.md), [menu plugin](integrations/swiftbar/travel-mode.10s.sh), [sudoers](docs/sudoers.md).
+`TRAVEL_MODE_LANG` overrides configured language. `TRAVEL_MODE_APP_DIRS` adds colon-separated absolute app directories; empty/relative entries are errors. `suggest --write` requests confirmation, preserves comments and validates before replacing configuration. JSON schemas: [check](docs/json-schema/check.schema.json), [suggest](docs/json-schema/suggest.schema.json), [status](docs/json-schema/status.schema.json).
+
+## Integrations and optional sudoers rules
+
+The [SwiftBar plugin](integrations/swiftbar/travel-mode.5m.sh) refreshes every five minutes. Each refresh runs only `travel-mode status --json`, which reads configured language, the local snapshot and one `pmset -g ps` query. It does not scan apps, services or health, or sample top/ioreg. The source query times out after 2 seconds; local file parsing and Python startup add time. One read-only observation on 2026-10-16, using a configuration copy and an isolated absent snapshot, took 0.0151 seconds internally, or 0.19 seconds including uv/Python startup; this is one observation, not a timing guarantee. SwiftBar's existing host launches the finite plugin; travel-mode adds no resident process. Full health checks, power measurement, history, work/away entry, restore and automation status open in a terminal only when clicked. Menu text follows configured language (and the usual language environment override). Set `TRAVEL_MODE_BIN` if the executable is not on PATH. Other integration: [Shortcuts](integrations/shortcuts.md).
+
+Start with **no sudoers configuration**, entering your password when needed. If desired, `travel-mode sudoers print` previews the optional **pmset** scope, and `travel-mode sudoers install` validates it with visudo, shows the complete policy and requires typing `yes` before invoking sudo install. `--dry-run` previews the commands. This scope grants every pmset operation, including factory resets. **all is not recommended**: `travel-mode sudoers print --scope all` also permits arbitrary system daemon load/unload, root TERM signals, indexing and Wi-Fi changes. In particular, daemon loading can execute arbitrary code as root. Argument globs are broader than the product's own safety checks. See the [complete risks and commands](docs/sudoers.md). Use `travel-mode sudoers status` to inspect the policy and noninteractive permission probes, and `travel-mode sudoers uninstall` to remove it after confirmation. These commands manage only `/etc/sudoers.d/travel-mode`; installation/removal requires a terminal, and replacing an existing file requires `--force` and a second `yes`. Policy-management commands do not receive passwordless permission from the generated rules.
 
 ## Health check
 
@@ -237,6 +245,7 @@ Without a snapshot, non-interactive `off` fails without resetting settings. Inte
 | 3 | Invalid, unreadable or unwritable recovery state |
 | 4 | Battery power measurement read or parse error |
 | 5 | Automation installation or event handling error |
+| 6 | Sudoers generation, validation or confirmed operation error |
 
 Configuration and state errors print one diagnostic line with a path, relevant key/reason and repair guidance, without a Python traceback. Set `TRAVEL_MODE_DEBUG=1` to retain the full traceback and exception chain. Battery measurement errors also print one diagnostic line; `power --json` returns an error object with `available=false`, `reason="failed"` and `error.type`/`error.message`. Debug mode retains their full traceback and exception chain. Unexpected exceptions retain their normal traceback. An external editor can return its own exit code.
 

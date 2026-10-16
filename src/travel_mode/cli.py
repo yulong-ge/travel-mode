@@ -47,6 +47,8 @@ def _main(argv=None):
             "history",
             "automation",
             "event",
+            "sudoers",
+            "status",
         ],
     )
     parser.add_argument(
@@ -63,6 +65,7 @@ def _main(argv=None):
             "uninstall",
             "status",
             "power-changed",
+            "print",
         ],
     )
     parser.add_argument("value", nargs="?")
@@ -79,6 +82,8 @@ def _main(argv=None):
     parser.add_argument("--scenario", choices=["work", "away"], help=t("scenario.help"))
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--write", action="store_true")
+    parser.add_argument("--scope", choices=["pmset", "all"])
+    parser.add_argument("--user", dest="sudoers_user")
     parser.add_argument("--samples", type=int, default=3)
     parser.add_argument("--limit", type=int, help=t("session.limit_help"))
     parser.add_argument("--seconds", type=float, help=t("measurement.seconds_help"))
@@ -97,8 +102,12 @@ def _main(argv=None):
     parser.add_argument("--all", action="store_true", help=t("cli.thaw_resume_all_stopped_app_processes"))
     parser.add_argument("--version", action="version", version="travel-mode 1.1.0")
     args = parser.parse_args(argv)
-    if args.config_cmd is not None and args.cmd not in {"config", "automation", "event"}:
+    if args.config_cmd is not None and args.cmd not in {"config", "automation", "event", "sudoers"}:
         parser.error(t("cli.unexpected_config_value"))
+    if args.scope is not None and (args.cmd != "sudoers" or args.config_cmd not in {"print", "install"}):
+        parser.error(t("sudoers.usage"))
+    if args.sudoers_user is not None and (args.cmd, args.config_cmd) != ("sudoers", "print"):
+        parser.error(t("sudoers.usage"))
     if args.cmd == "config" and args.config_cmd not in {
         None,
         "path",
@@ -138,21 +147,65 @@ def _main(argv=None):
         os.environ["TRAVEL_MODE_DEMO"] = "1"
         demo._configure_demo()
     exempt = args.cmd == "history" or (args.cmd == "config" and args.config_cmd in {"path", "validate"})
+    exempt = exempt or (args.cmd, args.config_cmd) == ("sudoers", "print")
     if not exempt:
         from .system.platform import detect_capabilities, ensure_macos
 
         try:
             ensure_macos()
-            if not args.demo and args.cmd != "automation":
+            if not args.demo and args.cmd not in {"automation", "sudoers", "status"}:
                 detect_capabilities()
         except SystemExit:
             raise
         except RuntimeError as exc:
             print(str(exc), file=sys.stderr)
             return 2
-    migration_messages = [] if args.cmd in {"suggest", "history", "automation"} else migrate_legacy()
+    migration_messages = (
+        [] if args.cmd in {"suggest", "history", "automation", "sudoers", "status"} else migrate_legacy()
+    )
     for message in migration_messages:
         print(message, file=sys.stderr)
+    if args.cmd == "status":
+        import json
+
+        from .status import StatusError, data
+        from .system.shell import ReadError
+
+        try:
+            result = data()
+        except ReadError as exc:
+            raise StatusError(str(exc)) from exc
+        print(
+            json.dumps(result, ensure_ascii=False)
+            if args.json
+            else result["swiftbar"].split("---")[1].strip()
+        )
+        return 0
+    if args.cmd == "sudoers":
+        import json
+
+        from . import sudoers
+        from .actions.base import Context
+        from .actions.executor import Executor
+        from .actions.sudoers import InstallSudoers, UninstallSudoers
+
+        if args.config_cmd == "print" and not args.json:
+            print(sudoers.snippet(args.scope or "pmset", args.sudoers_user), end="")
+            return 0
+        if args.config_cmd == "status":
+            result = sudoers.status()
+            print(json.dumps(result, ensure_ascii=False, indent=None if args.json else 2))
+            return 1 if result["content_error"] else 0
+        if args.config_cmd not in {"install", "uninstall"} or args.json:
+            parser.error(t("sudoers.usage"))
+        action = (
+            InstallSudoers(args.scope or "pmset", args.force)
+            if args.config_cmd == "install"
+            else UninstallSudoers()
+        )
+        Executor(Context(None)).execute(action)
+        print(t("sudoers.planned" if args.dry_run else "sudoers.completed"))
+        return 0
     from .tui import app as tui_app
 
     if args.demo:
@@ -356,12 +409,25 @@ def _handled_main(argv=None):
     from .automation import AutomationError, preview_scope
     from .paths import state_path
     from .state import StateError
+    from .status import StatusError
+    from .sudoers import SudoersError
     from .system.battery import BatteryError
 
     arguments = list(sys.argv[1:] if argv is None else argv)
     try:
         with preview_scope() if "automation" in arguments and "--dry-run" in arguments else nullcontext():
             return command_lifecycle(arguments, _main)
+    except (SudoersError, StatusError) as exc:
+        if os.environ.get("TRAVEL_MODE_DEBUG") == "1":
+            raise
+        detail = " ".join(str(exc).splitlines())
+        if "--json" in arguments:
+            import json
+
+            print(json.dumps({"error": {"type": type(exc).__name__, "message": detail}}, ensure_ascii=False))
+        else:
+            print(detail, file=sys.stderr)
+        return 6 if isinstance(exc, SudoersError) else 1
     except AutomationError as exc:
         if os.environ.get("TRAVEL_MODE_DEBUG") == "1":
             raise

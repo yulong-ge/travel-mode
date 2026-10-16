@@ -29,7 +29,7 @@ def test_release_and_integration_artifacts_exist():
     assert 'resource "tomlkit"' in formula
     assert Path("docs/releasing.md").exists()
     assert Path("docs/sudoers.md").exists()
-    swiftbar = Path("integrations/swiftbar/travel-mode.10s.sh").read_text("utf-8")
-    assert "check --json" in swiftbar
-    assert "--profile" in swiftbar and 'param1="off"' in swiftbar
+    swiftbar = Path("integrations/swiftbar/travel-mode.5m.sh").read_text("utf-8")
+    assert "status --json" in swiftbar
+    assert "check --json" not in swiftbar and "plutil -extract swiftbar raw" in swiftbar
     assert Path("integrations/shortcuts.md").exists()

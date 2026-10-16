@@ -72,6 +72,8 @@ away 动作可修改电池设置、AC 的 `powernap` / `womp`、全局 `disables
 | `travel-mode power --seconds 20` / `--json` | 在有限窗口内测量电池功耗 |
 | `travel-mode check --reapply` | 再次暂停检测到已复活的记录项 |
 | `travel-mode check` / `travel-mode check --json` | 只读检查；JSON 包含当前已保存的生效场景 |
+| `travel-mode status [--json]` | 低开销读取本地快照和电源来源；不扫描或采样 |
+| `travel-mode sudoers print\|install\|uninstall\|status` | 预览、明确安装/删除或检查可选权限 |
 | `travel-mode report` / `travel-mode report --json` | 只读睡眠 / DarkWake 报告 |
 | `travel-mode config path` | 显示配置和状态路径 |
 | `travel-mode config init` | 写入模板；`--force` 覆盖已有文件 |
@@ -130,7 +132,13 @@ skip = []
 
 内置 profile 为 `work`、`flight`、`overnight`。`cafe` 已合并到 `work` 并删除，不保留别名。profile 提供的字段覆盖普通配置；自定义 `[profiles.NAME]` 覆盖同名内置值。自定义 profile 默认属于 away，除非设置 `scenario = "work"`。显式 `--scenario` 与 profile 场景冲突会报错。快照记录最后应用的场景，同时保留首次原值用于恢复。没有已保存场景时，包括旧快照，`check --json` 输出 null。
 
-`TRAVEL_MODE_LANG` 覆盖配置语言。`TRAVEL_MODE_APP_DIRS` 添加以冒号分隔的绝对应用目录，空项或相对路径会报错。`suggest --write` 请求确认、保留注释，并在替换配置前校验。JSON schema：[check](docs/json-schema/check.schema.json)、[suggest](docs/json-schema/suggest.schema.json)。可选集成：[Shortcuts](integrations/shortcuts.md)、[菜单插件](integrations/swiftbar/travel-mode.10s.sh)、[sudoers](docs/sudoers.md)。
+`TRAVEL_MODE_LANG` 覆盖配置语言。`TRAVEL_MODE_APP_DIRS` 添加以冒号分隔的绝对应用目录，空项或相对路径会报错。`suggest --write` 请求确认、保留注释，并在替换配置前校验。JSON schema：[check](docs/json-schema/check.schema.json)、[suggest](docs/json-schema/suggest.schema.json)、[status](docs/json-schema/status.schema.json)。
+
+## 集成与可选 sudoers 规则
+
+[SwiftBar 插件](integrations/swiftbar/travel-mode.5m.sh)每五分钟刷新一次。刷新只运行 `travel-mode status --json`，读取配置语言、本地快照，以及一次 `pmset -g ps` 电源来源查询，不扫描 app、服务或体检，不采样 top/ioreg。来源查询超时为 2 秒；本地文件解析与 Python 启动另计。2026-10-16 使用配置副本与隔离空状态的一次只读观察中，内部耗时 0.0151 秒，包含 uv/Python 启动为 0.19 秒；这不是耗时保证。由已有的 SwiftBar 宿主按需启动有限运行的插件，travel-mode 不增加常驻进程。只有点击菜单项后，才在终端中打开完整体检、功耗测量、历史、work/away、恢复或自动触发状态。菜单跟随配置语言，也遵循通常的语言环境覆盖规则。可用 `TRAVEL_MODE_BIN` 指定不在 PATH 中的程序。其它集成：[Shortcuts](integrations/shortcuts.md)。
+
+建议先**不配置 sudoers**，在需要时输入密码。如有需要，可用 `travel-mode sudoers print` 预览可选的 **pmset** 范围；`travel-mode sudoers install` 先用 visudo 校验、展示完整内容，再要求输入 `yes`，然后调用 sudo install。`--dry-run` 可预览命令。此范围授权全部 pmset 操作，包括恢复出厂设置。**不推荐 all**：`travel-mode sudoers print --scope all` 还允许任意系统 daemon 的加载/卸载、root TERM 信号、索引与 Wi-Fi 修改。其中 daemon 加载可执行任意 root 代码。参数通配符的授权范围大于产品守卫。详见[完整风险与命令](docs/sudoers.md)。`travel-mode sudoers status` 显示策略与非交互权限探测；`travel-mode sudoers uninstall` 在确认后删除策略。这些命令只管理 `/etc/sudoers.d/travel-mode`；安装/卸载需要终端，覆盖已有文件还需要 `--force` 与第二次 `yes`。生成的规则不为策略管理命令授予免密权限。
 
 ## 体检
 
@@ -237,6 +245,7 @@ travel-mode history --json --limit 10
 | 3 | 恢复状态非法、不可读或不可写 |
 | 4 | 功耗测量读取或解析失败 |
 | 5 | 自动触发安装或事件处理错误 |
+| 6 | sudoers 生成、校验或已确认操作错误 |
 
 配置与状态错误只输出一行诊断，包含路径、相关键或原因及修复提示，不打印 Python traceback。设置 `TRAVEL_MODE_DEBUG=1` 后保留完整 traceback 和异常链。电池测量错误也只输出一行诊断；`power --json` 返回包含 `available=false`、`reason="failed"` 和 `error.type`/`error.message` 的错误对象。调试模式保留完整 traceback 和异常链。未预期异常保留正常 traceback。外部编辑器可以返回自己的退出码。
 

@@ -15,25 +15,26 @@ from pathlib import Path
 from typing import Protocol
 
 from ..i18n import t
+from ..privileges import PRIVILEGED_PATHS
 
 # Apple tools are selected independently of PATH, including sudo's target.
 # Keep logical argv upstream for Runner doubles, journaling and dry-run output.
 SYSTEM_TOOLS = {
-    "pmset": "/usr/bin/pmset",
+    **PRIVILEGED_PATHS,
     "ioreg": "/usr/sbin/ioreg",
-    "launchctl": "/bin/launchctl",
     "ps": "/bin/ps",
     "pgrep": "/usr/bin/pgrep",
     "pkill": "/usr/bin/pkill",
-    "kill": "/bin/kill",
     "top": "/usr/bin/top",
-    "mdutil": "/usr/bin/mdutil",
     "mdfind": "/usr/bin/mdfind",
-    "networksetup": "/usr/sbin/networksetup",
     "tmutil": "/usr/bin/tmutil",
     "osascript": "/usr/bin/osascript",
     "open": "/usr/bin/open",
     "sudo": "/usr/bin/sudo",
+    "visudo": "/usr/sbin/visudo",
+    "install": "/usr/bin/install",
+    "rm": "/bin/rm",
+    "cat": "/bin/cat",
     "system_profiler": "/usr/sbin/system_profiler",
     "plutil": "/usr/bin/plutil",
     "sw_vers": "/usr/bin/sw_vers",

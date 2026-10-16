@@ -1,0 +1,50 @@
+name: macOS guarded e2e
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 8 * * 0'
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'scripts/e2e_*.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/e2e-macos.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          version: '0.8.x'
+      - id: setup
+        run: |
+          if ! command -v tmux >/dev/null; then
+            brew install tmux
+          fi
+          uv sync --group dev --python 3.13
+      - name: Guarded local round trip (AC mode)
+        run: uv run python scripts/e2e_local.py
+      - name: Guarded CLI and TUI round trips (AC mode)
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: uv run python scripts/e2e_ui.py
+      - name: Upload evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            /tmp/tui-e2e/**/*.json
+            /tmp/tui-e2e/**/*.png
+            /tmp/tui-e2e/**/*.txt
+            /tmp/travel-mode-e2e-evidence/**

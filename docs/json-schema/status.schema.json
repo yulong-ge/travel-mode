@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "travel-mode cheap status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "active",
+    "scenario",
+    "started_at",
+    "power_source",
+    "language",
+    "source_timeout_seconds",
+    "elapsed_seconds",
+    "swiftbar"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "active": {
+      "type": "boolean"
+    },
+    "scenario": {
+      "enum": [
+        null,
+        "work",
+        "away"
+      ]
+    },
+    "started_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "power_source": {
+      "enum": [
+        "ac",
+        "battery",
+        "ups"
+      ]
+    },
+    "language": {
+      "enum": [
+        "en",
+        "zh"
+      ]
+    },
+    "source_timeout_seconds": {
+      "const": 2
+    },
+    "elapsed_seconds": {
+      "type": "number",
+      "minimum": 0
+    },
+    "swiftbar": {
+      "type": "string"
+    }
+  }
+}
