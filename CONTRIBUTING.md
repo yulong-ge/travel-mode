@@ -1,225 +1,116 @@
 # Contributing
 
-## Development
+Thanks for helping. This guide covers the development setup, the rules the test suite enforces,
+and which scripts change your system. Architecture notes for agents and humans are in
+[AGENTS.md](AGENTS.md); detailed product behavior is in [docs/reference.md](docs/reference.md).
 
-Use the repository-managed Python toolchain:
+## Setup and checks
 
 ```bash
 uv sync --group dev
-uv run ruff check
-uv run ruff format --check
-uv run pytest --cov=travel_mode --cov-report=term-missing
-uv build
-uv run python scripts/check_dist.py
+uv run ruff check && uv run ruff format --check
+uv run pytest                                        # default suite (excludes `macos` and `e2e`)
+uv run pytest tests/unit/test_config.py::test_name   # one test
+uv build && uv run python scripts/check_dist.py      # package contents
 ```
 
-Run `uv run pre-commit install` if you want local commit hooks. The default pytest
-selection excludes `macos` and `e2e`. `uv run pytest -m macos` selects the read-only
-macOS smoke test; it still isolates all user paths. Linux tests mock macOS commands
-and do not imply Linux runtime support.
-
-Tests use the strict `FakeRunner` in `tests/conftest.py`. Add explicit command
-responses and assert the recorded calls. Never execute a real state-changing
-command in an ordinary test. Config, state, HOME and XDG roots must be temporary;
-per-test and session guards check that real user config/state stay unchanged.
-
-User-visible messages belong in both `src/travel_mode/locales/en.toml` and
-`zh.toml`. Keep key sets and placeholders identical. After adding a message, run
-`uv run pytest tests/unit/test_i18n.py tests/unit/test_no_cjk_literals.py`.
-The privacy guard checks public files of every extension; review screenshot pixels
-separately before publishing. Use Conventional Commits for proposed changes and
-include validation and hardware limitations in the pull request.
-
-## Architecture and new actions
-
-`cli.py` parses arguments. `flows/` owns prompts, reports, config commands and
-checkpointed restore. `snapshots.py` captures originals; `state.py` validates and
-atomically saves the versioned recovery format.
-
-`actions/` is the shared CLI/TUI mutation boundary. Each Action describes an
-operation, declares its risk and implements `apply(ctx)`. Executor owns credential
-lifetimes, ordering and admission of one TUI mutation transaction at a time.
-The journal persists recovery intent before the Runner receives a mutation.
-
-`system/` owns macOS adapters. `process_control.py` validates PID birth time and
-executable identity and protects Terminal, ancestors and system apps.
-`daemon_apps.py` validates every configured plist before unloading any daemon.
-The check immediately before a signal reduces PID-reuse risk but is not atomic
-with the kernel signal operation.
-
-`tui/app.py` owns TravelApp and refresh lifecycle. `layout.py` composes pages,
-`dispatch.py` admits button messages, and `pages/` selects Actions and presents
-results. Widgets live in `widgets.py`; CSS stays in `style.tcss`.
-
-To add an Action:
-
-1. Define its recovery record and restore operation first. Extend state validation
-   and `actions.journal.prepare_command` for any new mutation command. Persist
-   intent before mutation; retain uncertain failures.
-2. Add the Action, an i18n description and `safe` or `aggressive` risk. Route all
-   mutations through the appropriate system adapter.
-3. Use `Executor(Context(snapshot, save)).execute(action)` in independent flows.
-   CLI apply supplies the journal scope. TUI presenters use `self.execute(action)`
-   inside the admitted transaction. Do not send mutation commands directly from a
-   presenter or duplicate PID/plist policy.
-4. Add strict FakeRunner tests for ordering, receipt persistence before mutation,
-   partial failure and recovery. Cover CLI and Pilot entrypoints where applicable.
-5. Run lint, format and the default test suite. Keep characterization contracts
-   unchanged for structural changes; review intentional behavior changes using
-   [the characterization guide](tests/characterization/README.md).
-
-## Isolated TUI checks
+CI runs the suite on Python 3.10–3.13 on Ubuntu and macOS. Before pushing, also run it once under
+the Linux simulation, which pins locale, terminal width, timezone, HOME and the platform the product
+sees:
 
 ```bash
-uv run python scripts/tui_debug.py --all
+mkdir -p /tmp/travel-mode-ci-home && env -i PATH="$PATH" HOME=/tmp/travel-mode-ci-home CI=true \
+  COLUMNS=57 LANG=C.UTF-8 TZ=Pacific/Honolulu PYTHONPATH=tests \
+  uv run --no-sync pytest -p ci_host </dev/null
 ```
 
-This defaults to demo mode. It writes PNG, text, ANSI, layout telemetry and
-`lint.json` under `/tmp/tui-debug/<run-id>/`. It covers five tabs, both languages
-and 120x36, 80x24 and 160x45 terminals. `--keys`, `--click X Y` and `--wait-text TEXT`
-select focused interactions. `--live-readonly` observes the host with isolated
-HOME/XDG/config/state; its Runner rejects mutations and every sudo command.
+`uv run --python 3.10 pytest` catches syntax or library features newer than 3.10.
+`uv run pre-commit install` adds local hooks. Use Conventional Commits, and describe how you
+validated the change (and what hardware it was not tested on) in the pull request.
+
+## Test rules
+
+- **No real system changes.** Tests run with a strict `FakeRunner` (`tests/conftest.py`) that
+  rejects any command you did not register and any host subprocess. Register responses and assert
+  the recorded calls.
+- **No real user files.** Config, state, HOME and XDG roots are temporary; guards fail a test that
+  touches the real `~/.config/travel-mode` or `~/.local/state/travel-mode`.
+- **Hermetic.** Do not depend on the host's sudoers, fonts, locale, terminal size, installed apps or
+  `sys.platform`. Tests that reach macOS-only entry points use the `darwin_platform` fixture.
+- **Behavior contracts.** `tests/characterization/` records the commands, final state, output and
+  exit code of each flow. A mismatch means behavior changed: investigate it. Update a contract only
+  for an intended change, through `tests/characterization/update_golden.py`
+  ([guide](tests/characterization/README.md)), and explain it in the pull request.
+- **Both languages.** Every user-visible string goes into `src/travel_mode/locales/en.toml` and
+  `zh.toml` with the same keys and placeholders (`tests/unit/test_i18n.py`).
+- **No personal data.** `tests/unit/test_no_personal_terms.py` scans public files for private
+  identifiers. Screenshots are checked by eye; regenerate them in demo mode.
+- **Stable async tests.** New or changed TUI/async tests must pass repeatedly under load before
+  they are committed:
+  `uv run python scripts/stress_tui.py --jobs 10 --runs 30 <test ids>`.
+
+## Adding an Action
+
+Every change to the system goes through an Action, so the CLI and TUI share the same safety
+checks and recovery records.
+
+1. Define the recovery record and the restore step first. Extend state validation and
+   `actions.journal.prepare_command` for the new command; recovery intent is saved before the
+   command runs.
+2. Add the Action with an i18n description and a `safe` or `aggressive` risk, and run its commands
+   through the matching `system/` adapter (never directly from a flow or page).
+3. Run it with `Executor(Context(snapshot, save)).execute(action)`; TUI pages call
+   `self.execute(action)` inside the admitted transaction.
+4. Test ordering, that the record is saved before the command, partial failure and restore, from
+   both the CLI and the TUI where it applies.
+
+## TUI screenshots and debugging
 
 ```bash
-uv run python scripts/tmux_capture.py --demo
+uv run python scripts/tui_debug.py --all            # every tab, both languages, three sizes
+uv run python scripts/tui_debug.py --live-readonly  # real machine data, mutations refused
+uv run python scripts/tmux_capture.py --demo        # regenerate docs/assets screenshots
 ```
 
-This regenerates checked-in bilingual demo assets through the shared cell-grid
-renderer. Never use real user config/state as output paths. Screenshot/debug
-commands require tmux and the macOS fonts used by `scripts/terminal_render.py`.
+Output goes to `/tmp/tui-debug/<run-id>/` (PNG, text, layout telemetry and `lint.json`). These
+need tmux and the macOS fonts used by `scripts/terminal_render.py`. `--live-readonly` uses a copy of
+your configuration and an isolated HOME; its runner rejects every write and every sudo call.
 
-## End-to-end harness
+## End-to-end tests
 
-Automated development runs use FakeRunner, isolated demo or command-free plans:
+The e2e scripts drive the real CLI and TUI. A guard runner allows only exact, pre-approved
+commands against temporary fixture apps and agents, verifies process identity before any signal,
+and restores and compares the original state on success, failure or Ctrl-C.
 
-```bash
-uv run python scripts/e2e_local.py --plan
-uv run python scripts/e2e_ui.py --plan
-uv run python scripts/e2e_ui.py --demo
-uv run python scripts/e2e_ui.py --battery-measure --plan
-uv run python scripts/e2e_ui.py --battery-measure --demo
-```
+| Command | Changes the system | Who runs it |
+| --- | --- | --- |
+| `e2e_local.py --plan`, `e2e_ui.py --plan`, `--battery-measure --plan` | no (prints commands) | anyone |
+| `e2e_ui.py --demo`, `--demo --demo-vm`, `--battery-measure --demo` | no (fake machine) | anyone, CI |
+| `e2e_local.py` | yes: fixtures, battery and AC power keys, sleep repair, brightness; needs AC power | maintainer, after reading the plan |
+| `e2e_ui.py` | yes: same scope through the CLI and TUI; needs AC power | maintainer |
+| `e2e_ui.py --battery-measure` | fixtures only, no power settings; needs battery; runs a busy test app for a few minutes | maintainer |
+| `e2e_automation.py` | installs and removes a separate test LaunchAgent; you switch the power source once | maintainer |
+| `measure_lowpower.py` | battery `lowpowermode` only, restored afterwards; needs battery | maintainer |
 
-The demo runs real CLI questions, CLI off and TravelApp against the stateful
-`e2e_fake.Machine`. HOME, XDG, config/state and tmux socket are isolated. Prompts
-must match complete i18n output before answering. TUI navigation uses keys and
-mouse and waits for completed action generations. Evidence and explicit failure
-reports remain under `/tmp/tui-e2e/<run-id>/`. Select `--interface cli|tui` for a
-focused demo, or `--output PATH` for a new evidence directory.
+All scripts live in `scripts/`. Before changing anything, the real modes refuse to start when they
+find an active travel-mode session or a leftover test agent from an earlier run. Power
+steps use `sudo -n /usr/bin/pmset` and are skipped, with the reason, when passwordless permission is
+missing; they never prompt. Wi-Fi, Bluetooth, Spotlight, display sleep, terminating a user's
+`caffeinate` and AC sleep timers are deliberately not exercised.
 
-**Only a maintainer who has reviewed the scripts should opt into real mode:**
+`--demo-vm` rehearses a machine without a battery profile, adjustable brightness or AppleEvent
+permission. Evidence is written to `/tmp/tui-e2e/<run-id>/` and `/tmp/travel-mode-e2e-evidence/`.
 
-```bash
-uv run python scripts/e2e_local.py
-uv run python scripts/e2e_ui.py
-```
+### CI on a macOS runner
 
-These commands change the system. They require AC power, refuse existing real
-state or conflicting fixture agent labels, and restrict mutations to temporary
-fixture apps/agents and selected power keys. GuardRunner verifies exact argv and
-PID identities and rejects interactive authentication. Power commands map to
-`sudo -n /usr/bin/pmset`; missing permission skips power with a reason.
+[`.github/workflows/e2e-macos.yml`](.github/workflows/e2e-macos.yml) runs `e2e_local.py` and
+`e2e_ui.py` on a hosted macOS VM: weekly, on pushes to `main` that touch the product or harness,
+and on demand (Actions → **macOS guarded e2e** → **Run workflow**). It is not a required check.
+The VM has no battery or adjustable display, so those steps are reported as SKIP; its passwordless
+sudo does not widen the guard. Screenshots, results and command traces are uploaded as the
+`macos-e2e-<run-id>-<attempt>` artifact for 14 days. Background: [runner notes](docs/runner-e2e-research.md).
 
-The separate [macOS e2e workflow](.github/workflows/e2e-macos.yml) runs on selected
-main pushes, weekly on Sunday at 08:17 UTC, or via Actions → **macOS guarded e2e** →
-**Run workflow**. It is not a required branch-protection check. After a run, open
-its summary and download `macos-e2e-<run-id>-<attempt>`; artifacts retain CLI/TUI
-screenshots, result JSON and command traces for 14 days, including failures.
-Local-harness JSON evidence is under `/tmp/travel-mode-e2e-evidence`; UI evidence
-is under `/tmp/tui-e2e`. Use `e2e_local.py --output <new-directory>` to select a
-persistent local evidence directory. The workflow ensures tmux is available.
+## Documentation
 
-Hosted macOS runners are VMs with passwordless sudo; this does not widen the
-GuardRunner allowlist. With no observed Battery Power profile, the local power
-phase is SKIP and UI round trips disable every power/brightness/measurement
-control while still exercising fixture app/agent Actions and restore. AC remains
-mandatory. Native brightness Get failure and fixture AppleEvent authorization
-denial remain separate explicit SKIPs. Parse failures, unexpected command errors,
-identity checks and cleanup failures remain failures. No CI flag bypasses safety,
-changes TCC or installs a sudoers rule. See the [source review](docs/runner-e2e-research.md).
-
-An optional sudoers example uses a placeholder, not a real account:
-
-```sudoers
-<your-username> ALL=(root) NOPASSWD: /usr/bin/pmset
-```
-
-This grants all pmset operations, including disruptive ones. Prefer exact argv
-rules covering both selected writes and their captured rollback commands; see
-[the sudoers guide](docs/sudoers.md). Product authentication first checks the exact
-command with `sudo -n -l <command>`; no blanket `sudo -v` exception is needed.
-
-The harness covers fixture quit/freeze/reopen, user LaunchAgent unload/reload,
-AppleEvent graceful quit, battery keys including hibernatemode 25, global
-`disablesleep`, AC `powernap`/`womp`, CLI thaw and a separate brightness round trip.
-The UI selects hibernatemode 25 independently even when current/recommended=3.
-
-Brightness samples the original through native DisplayServices Get. Initial Get
-failure is an explicit SKIP. Normal stages reject native writes. The isolated
-brightness stage permits only 0.15 and the sampled original; it verifies target
-error ≤0.02 and off-restored error ≤0.01, without screenshots or deliberate waits
-while dimmed. Exceptions and Ctrl-C restore and verify brightness first. Native
-calls bypass subprocess, so this restriction is enforced separately from
-GuardRunner. Demo injects a simulated backend and never loads system frameworks.
-
-Real applets use an isolated bundle ID, hidden background reopen, exact AppleEvent
-argv, and final unregister/cleanup. First-run Automation denial or timeout is a
-SKIP, not a pass. Cleanup verifies identity before signals. Power originals and
-rollback permissions are captured before mutation; cleanup restores and compares
-complete power output and `SleepDisabled`. `thaw --all` skips if any foreign app is
-already stopped. Before/after process snapshots only cover sampling instants.
-
-The real harness deliberately excludes Wi-Fi, Bluetooth, Spotlight, immediate
-screen-off, terminating user `caffeinate` processes and AC sleep/displaysleep.
-They must not be inferred from demo results or default pytest success. The current
-hardware verification scope is listed in both READMEs.
-
-### Battery measurement with fixture load
-
-For a reviewed, maintainer-run test while unplugged, use
-`uv run python scripts/e2e_ui.py --battery-measure` (`--interface cli|tui`
-selects one interface). This mode requires a measurable, discharging battery and
-refuses AC before starting fixtures. Ordinary real e2e still requires AC.
-It changes only the isolated fixture apps and user LaunchAgent. It does not
-change power settings, brightness, networking or the display. Its guard rejects
-all sudo commands, including permission probes, independently of the UI policy.
-CLI power, AC, disablesleep, hibernatemode, brightness and display-off answers are
-no; the TUI runs the measured work quick action with only apps and services
-selected. Native brightness setters remain inaccessible. No power or brightness
-round trip or emergency power rollback is scheduled.
-
-An additional Burn app uses private copies of `sh` for its main and helper,
-each executing `while :; do :; done`. The two processes can occupy about two CPU
-cores. They warm up for 5 seconds; the product waits for three fresh telemetry
-updates covering two accumulator intervals (5-second polls, 240-second timeout),
-freezes them through its existing Action, settles for 10 seconds, then measures
-again with the same policy. The cached first read is not an accepted baseline.
-Allow up to 490 seconds for both windows and settling per interface, plus fixture setup
-and checks. Both default
-interfaces run sequentially. Off must resume the same PID/birth identities before
-the existing identity-checked cleanup terminates the fixtures.
-
-The run requires valid before/after measurements with a recorded capacity source,
-at least 1.0 W measured saving, real mAh session endpoints, average power and a
-successful restore. Two busy interpreters provide controlled load; the 1 W
-threshold is a conservative harness acceptance criterion, not a hardware power
-guarantee. Background work and thermal changes can invalidate that criterion.
-On failure, `result.json` and terminal diagnostics retain both window averages
-and numerical ioreg samples, without raw battery identifiers. Each accepted interval
-prints its average power; duplicate generations never inflate sample counts.
-Insufficient updates, counter resets/wraps or a changed source invalidate the run. Observed external
-power or incomplete battery-source log coverage invalidates the run; no discharge
-values are synthesized. The log check covers preflight through off, including
-warmup and the first measurement before the first Action starts a session.
-This is one finite test, with no resident monitor.
-
-电池测量模式只操作临时 fixture，不修改电源、亮度、网络或显示器设置。
-它要求拔电且正在放电；接电时拒绝启动。双进程 CPU fixture 会额外耗电，
-每个界面的两个窗口与稳定期最多共需 490 秒，另需准备 fixture 与检查；两个窗口各等待至少 3 次真实遥测更新。样本不足时判为无效。普通真机 e2e 仍要求接电。运行前先查看
-`--battery-measure --plan`；自动化开发只运行 `--demo`，真机模式由维护者运行。
-
-### Event automation validation
-
-`uv run python scripts/e2e_automation.py --plan` lists the complete sequence. Only a maintainer runs the command without `--plan`: it installs the independent `io.github.yulong-ge.travel-mode.events-e2e` label with a temporary guarded Python helper and isolated config/state. Both policies are `off`, so a real event only records the observed source. The helper rejects notifications, authentication and mutations; the parent guard only permits print/bootstrap/bootout for that exact test label and plist, and validates the complete plist before bootstrap. It also reads the current power source before and after the manual transition.
-
-Change AC/battery source manually, allow the handler to finish, then press Enter in the harness. It checks the local receipt and `launchctl print` for a non-running state, then always boots out that label and removes its plist. It refuses an existing test plist. Evidence remains in the printed temporary directory. It does not post synthetic power notifications and does not modify the production automation agent. This delivery check does not validate the opt-in power/app mutations; those use existing Action tests and the separate fixture e2e harness.
+User documentation is `README.md`, `README.zh-CN.md` and `docs/`. Keep both READMEs in step, describe
+what the tool does in plain language, and name the machine for any measured number.
