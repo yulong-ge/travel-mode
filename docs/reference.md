@@ -123,6 +123,10 @@ Each finding has a status, evidence, an impact line and either an action or manu
 - External displays are read through a short-lived CoreGraphics reader; a display ID does not prove
   a dock is attached. Time Machine and displays get manual instructions only.
 - Keyboard backlight and Bluetooth wake are not checked: no reliable unprivileged reader was found.
+- Some Macs and virtual machines do not report every power field (for example `SleepDisabled` in
+  `pmset -g`, or a battery profile). A missing field makes that item **unavailable**
+  (`"status": "unavailable"` in JSON) and removes its action; no original value is recorded or
+  restored. A field that is present but malformed is still an error.
 - JSON keeps the raw `health.checks` and adds `health.display_checks`, where repeated evidence is
   shown once with references.
 
