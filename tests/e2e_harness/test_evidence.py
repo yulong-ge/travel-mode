@@ -1,7 +1,7 @@
 """Evidence readers must never observe a published partial layout schema."""
 
 import json
-import os
+from pathlib import Path
 
 import pytest
 from harness_evidence import LAYOUT_FIELDS, EvidenceError, read_layout, write_json, write_layout, write_text
@@ -12,17 +12,19 @@ from tui_debug import DebugApp, Session
 async def test_every_layout_publication_has_action_fields_even_before_ready(tmp_path, monkeypatch, scenario):
     path = tmp_path / "layout.json"
     publications = []
-    replace = os.replace
+    replace = Path.replace
 
     def observe_commit(source, target, *args, **kwargs):
         result = replace(source, target, *args, **kwargs)
-        if os.fspath(target) == str(path):
+        if Path(target) == path:
             # Deterministic reader at the exact publication boundary, before a
             # subclass can perform another write. No sleeps or timing retries.
             publications.append(json.loads(path.read_text()))
         return result
 
-    monkeypatch.setattr(os, "replace", observe_commit)
+    # Python 3.10's pathlib accessor caches os.replace at import time. Observe
+    # the public method used by our writer, on every supported Python version.
+    monkeypatch.setattr(Path, "replace", observe_commit)
     app = DebugApp(path, scenario=scenario)
     async with app.run_test(size=(120, 36)):
         await app.wait_for_idle()
