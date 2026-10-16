@@ -6,6 +6,10 @@ All notable changes follow Keep a Changelog.
 
 ### Fixed
 
+- Share one structural AppleSmartBattery parser across session endpoints, measurements and the TUI; nested ChargerData keys and other registry nodes cannot overwrite top-level battery status.
+
+- Measure fresh PowerTelemetryData accumulator intervals instead of averaging repeated cached voltage/current reads. Default windows require two fresh updates, label a single interval as lower precision, poll every 5 seconds and time out after 180 seconds without fabricating a result; session averages use endpoint accumulator deltas. Label the voltage/current fallback and update e2e diagnostics and wait guidance.
+- Read discharge capacities from either top-level AppleRaw fields or BatteryData, record the selected source, and share capacity parsing with session endpoints. Power command read/parse failures return exit code 4 with a single diagnostic or a JSON error object; debug mode retains the traceback.
 - Wait for admitted TUI button transactions and Action threads before removing controls on exit; serialize language recomposition with mutations and use explicit completion signals in TUI tests.
 - Pin Apple system tools and sudo targets to fixed macOS paths at execution time; report optional PATH-selected tool locations in check. E2e traces use the same resolver without expanding the guard allowlist.
 - Restrict e2e app, agent, assertion and category discovery to fixtures; keep full process observations for safety checks and disable health remediation controls in the UI harness.
@@ -18,6 +22,7 @@ All notable changes follow Keep a Changelog.
 
 ### Added
 
+- Add an opt-in battery-only CLI/TUI e2e mode with a two-process fixture load, measured freeze/restore checks, numerical diagnostics and a stricter guard that rejects all sudo commands. Ordinary real e2e retains its AC requirement.
 - Session reports after restore, local retained JSONL history and same-scenario power comparisons, with explicit incomplete charging/log intervals.
 - Scrollable bilingual session/history views and a history JSON schema.
 - Bounded on-demand health checks shared by check/JSON and the bilingual overview, with evidence, manual steps and existing Action remediation buttons.

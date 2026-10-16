@@ -450,7 +450,15 @@
     ],
     [
       "dim",
+      "Battery telemetry usually updates every 20–60 s; allow about 1–3 min per window (timeout 180 s; 2 fresh updates). Use --no-measure to skip."
+    ],
+    [
+      "dim",
       "Measuring battery draw before applying actions"
+    ],
+    [
+      "dim",
+      "Fresh telemetry updates: 0/2"
     ],
     [
       "dim",

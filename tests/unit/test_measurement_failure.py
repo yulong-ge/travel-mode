@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
-from test_battery import FakeClock
+from test_battery import FakeClock, fresh_readings
 
 from travel_mode import cli, measurement, sessions, state
 from travel_mode.i18n import t
@@ -27,7 +27,7 @@ def test_ac_preflight_skips_ioreg_and_window(fake_runner, monkeypatch):
 def test_measurement_failure_continues_cli_and_is_retained_in_session_report(
     phase, error_type, tmp_paths, darwin_platform, fake_runner, monkeypatch, capsys
 ):
-    (tmp_paths / "config.toml").write_text("[measurement]\nseconds=2\ninterval=2\nsettle_seconds=0\n")
+    (tmp_paths / "config.toml").write_text("[measurement]\nseconds=20\ninterval=5\nsettle_seconds=0\n")
     fake_runner.responses[("sudo", "pmset")] = CmdResult("", "", 0)
     reading = battery.parse((Path(__file__).parents[1] / "fixtures/battery/discharging.txt").read_text())
 
@@ -37,7 +37,7 @@ def test_measurement_failure_continues_cli_and_is_retained_in_session_report(
             raise error_type("fixture ioreg timeout")
         return reading
 
-    monkeypatch.setattr(battery, "read", read)
+    fresh_readings(monkeypatch, read)
     if phase == "source":
         original = measurement._read
 
@@ -66,7 +66,7 @@ def test_measurement_failure_continues_cli_and_is_retained_in_session_report(
 
 
 def test_unexpected_measurement_exception_still_propagates(monkeypatch):
-    def fail():
+    def fail(**kwargs):
         raise RuntimeError("programming error")
 
     monkeypatch.setattr(battery, "read", fail)
@@ -74,11 +74,12 @@ def test_unexpected_measurement_exception_still_propagates(monkeypatch):
         measurement.begin("work", True, measurement.Settings(), lambda text: None)
 
 
-def test_after_window_skips_settling_and_ioreg_if_ac_is_connected(fake_runner):
+def test_after_window_skips_settling_and_ioreg_if_ac_is_connected(fake_runner, monkeypatch):
     from test_battery import FIXTURES
 
+    fresh_readings(monkeypatch, battery.parse((FIXTURES / "discharging.txt").read_text()))
     before = measurement.measure(
-        measurement.Settings(seconds=2),
+        measurement.Settings(seconds=20),
         clock=FakeClock(),
         first=battery.parse((FIXTURES / "discharging.txt").read_text()),
     )

@@ -1,0 +1,13 @@
++-o AppleSmartBattery
+{
+  "TimeRemaining" = 199
+  "ExternalConnected" = No
+  "Voltage" = 12339
+  "PowerTelemetryData" = {"SystemLoad"=15576,"AccumulatedSystemLoad"=1290870778,"SystemLoadAccumulatorCount"=122874,"AccumulatedBatteryPower"=86888531,"BatteryPowerAccumulatorCount"=6376,"AccumulatedBatteryDischarge"=18446744073629429644,"BatteryDischargeAccumulatorCount"=7883}
+  "UpdateTime" = 1792118851
+  "ChargerData" = {"IsCharging"=0}
+  "BatteryData" = {"FullChargeCapacity"=4820,"NominalChargeCapacity"=4970,"RemainingCapacity"=4781,"DesignCapacity"=6075}
+  "InstantAmperage" = 18446744073709550135
+  "Amperage" = 18446744073709550135
+  "IsCharging" = No
+}

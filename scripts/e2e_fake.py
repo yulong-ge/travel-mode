@@ -167,6 +167,67 @@ class Machine:
         return CmdResult(out, "", 0)
 
 
+class InstantClock:
+    """Finite-window demo clock; advances without sleeping or a sampler thread."""
+
+    def __init__(self):
+        self.now = 0
+
+    def monotonic(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.now += seconds
+
+
+class BatteryMachine(Machine):
+    """Numerical battery observations respond to only the owned Burn fixture."""
+
+    def __init__(self, root):
+        super().__init__(root)
+        self.external = False
+        self.battery_reads = 0
+        self.telemetry_count = 100
+        self.telemetry_sum = 1_000_000
+        self.cached_battery = None
+
+    def __call__(self, cmd, timeout=None, interactive=False):
+        if cmd == ["ioreg", "-rn", "AppleSmartBattery"]:
+            self.calls.append(tuple(cmd))
+            self.battery_reads += 1
+            frozen = any("/TravelModeE2E-Burn.app/" in r[2] and r[0] == "T" for r in self.rows.values())
+            current = -700 if frozen else -2000
+            if self.cached_battery is None or self.battery_reads % 4 == 0:
+                self.telemetry_count += 20
+                self.telemetry_sum += (-current * 12) * 20
+                self.cached_battery = (
+                    '"ChargerData" = {"IsCharging"=0}\n'
+                    '"IsCharging" = No\n"Voltage" = 12000\n'
+                    f'"InstantAmperage" = {2**64 + current}\n"TimeRemaining" = 200\n'
+                    f'"UpdateTime" = {1000 + self.telemetry_count}\n'
+                    f'"BatteryData" = {{"RemainingCapacity"={4800 - self.battery_reads},'
+                    '"FullChargeCapacity"=5000}\n'
+                    f'"PowerTelemetryData" = {{"AccumulatedSystemLoad"={self.telemetry_sum},'
+                    f'"SystemLoadAccumulatorCount"={self.telemetry_count},"SystemLoad"={-current * 12},'
+                    f'"AccumulatedBatteryDischarge"={2**64 - self.telemetry_sum},'
+                    f'"BatteryDischargeAccumulatorCount"={self.telemetry_count}' + "}\n"
+                )
+            return CmdResult(
+                f'"ExternalConnected" = {"Yes" if self.external else "No"}\n' + self.cached_battery,
+                "",
+                0,
+            )
+        if cmd in [["/usr/bin/pmset", "-g", kind] for kind in ("ps", "batt", "log")]:
+            self.calls.append(tuple(cmd))
+            if cmd[-1] == "log":
+                return CmdResult("2020-01-01 00:00:00 Using Batt\n", "", 0)
+            source = "AC Power" if self.external else "Battery Power"
+            return CmdResult(
+                f"Now drawing from '{source}'\n -InternalBattery-0 96%; discharging; 3:20 remaining\n", "", 0
+            )
+        return super().__call__(cmd, timeout, interactive)
+
+
 class SimulatedBrightness:
     """Native API-shaped demo double. Never loads system frameworks."""
 

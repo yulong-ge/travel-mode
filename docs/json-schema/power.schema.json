@@ -1,120 +1,238 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "required": [
-    "available",
-    "reason",
-    "samples",
-    "macos"
-  ],
-  "properties": {
-    "available": {
-      "type": "boolean"
-    },
-    "reason": {
-      "enum": [
-        null,
-        "external_power",
-        "no_battery",
-        "charging",
-        "not_discharging"
-      ]
-    },
-    "samples": {
-      "type": "integer",
-      "minimum": 0
-    },
-    "macos": {
+  "oneOf": [
+    {
       "type": "object",
       "required": [
-        "raw",
-        "minutes"
+        "available",
+        "reason",
+        "samples",
+        "macos"
       ],
       "properties": {
-        "raw": {
-          "type": "string"
+        "available": {
+          "type": "boolean"
         },
-        "minutes": {
-          "type": [
-            "integer",
-            "null"
+        "reason": {
+          "enum": [
+            null,
+            "external_power",
+            "no_battery",
+            "charging",
+            "not_discharging",
+            "insufficient_samples",
+            "counter_reset",
+            "missing_update_marker",
+            "source_changed"
+          ]
+        },
+        "samples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "macos": {
+          "type": "object",
+          "required": [
+            "raw",
+            "minutes"
           ],
+          "properties": {
+            "raw": {
+              "type": "string"
+            },
+            "minutes": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        },
+        "capacity_source": {
+          "enum": [
+            "AppleRaw",
+            "BatteryData"
+          ]
+        },
+        "power_source": {
+          "enum": [
+            "PowerTelemetryData.SystemLoad",
+            "voltage_current",
+            null
+          ]
+        },
+        "polls": {
+          "type": "integer",
           "minimum": 0
         }
-      }
-    }
-  },
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "available": {
-            "const": true
-          }
-        }
       },
-      "then": {
-        "required": [
-          "seconds",
-          "average_watts",
-          "remaining_wh",
-          "remaining_hours"
-        ],
-        "properties": {
-          "reason": {
-            "type": "null"
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "available": {
+                "const": true
+              }
+            }
           },
-          "seconds": {
-            "type": "number",
-            "exclusiveMinimum": 0
+          "then": {
+            "required": [
+              "seconds",
+              "average_watts",
+              "remaining_wh",
+              "remaining_hours",
+              "covered_seconds",
+              "interval_count",
+              "intervals",
+              "power_source",
+              "polls"
+            ],
+            "properties": {
+              "reason": {
+                "type": "null"
+              },
+              "seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "average_watts": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "remaining_wh": {
+                "type": "number",
+                "minimum": 0
+              },
+              "remaining_hours": {
+                "type": "number",
+                "minimum": 0
+              },
+              "samples": {
+                "type": "integer",
+                "minimum": 2
+              },
+              "covered_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "interval_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "power_source": {
+                "enum": [
+                  "PowerTelemetryData.SystemLoad",
+                  "voltage_current"
+                ]
+              },
+              "intervals": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "seconds",
+                    "power_source",
+                    "average_watts"
+                  ],
+                  "properties": {
+                    "seconds": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "average_watts": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "power_source": {
+                      "enum": [
+                        "PowerTelemetryData.SystemLoad",
+                        "voltage_current"
+                      ]
+                    },
+                    "accumulator_samples": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
+                }
+              },
+              "battery_average_watts": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            }
           },
-          "average_watts": {
-            "type": "number",
-            "exclusiveMinimum": 0
-          },
-          "remaining_wh": {
-            "type": "number",
-            "minimum": 0
-          },
-          "remaining_hours": {
-            "type": "number",
-            "minimum": 0
-          },
-          "samples": {
-            "type": "integer",
-            "minimum": 1
-          }
-        }
-      },
-      "else": {
-        "properties": {
-          "reason": {
-            "enum": [
-              "external_power",
-              "no_battery",
-              "charging",
-              "not_discharging"
-            ]
-          }
-        },
-        "not": {
-          "anyOf": [
-            {
-              "required": [
-                "average_watts"
-              ]
+          "else": {
+            "properties": {
+              "reason": {
+                "enum": [
+                  "external_power",
+                  "no_battery",
+                  "charging",
+                  "not_discharging",
+                  "insufficient_samples",
+                  "counter_reset",
+                  "missing_update_marker",
+                  "source_changed"
+                ]
+              }
             },
-            {
-              "required": [
-                "remaining_wh"
-              ]
-            },
-            {
-              "required": [
-                "remaining_hours"
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "average_watts"
+                  ]
+                },
+                {
+                  "required": [
+                    "remaining_wh"
+                  ]
+                },
+                {
+                  "required": [
+                    "remaining_hours"
+                  ]
+                }
               ]
             }
-          ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "object",
+      "required": [
+        "available",
+        "reason",
+        "error"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "available": {
+          "const": false
+        },
+        "reason": {
+          "const": "failed"
+        },
+        "error": {
+          "type": "object",
+          "required": [
+            "type",
+            "message"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "BatteryError"
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
         }
       }
     }

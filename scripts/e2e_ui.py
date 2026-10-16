@@ -14,18 +14,21 @@ import shutil
 import sys
 import tempfile
 import time
-from datetime import datetime
+from contextlib import ExitStack
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from e2e_fake import Machine, SimulatedBrightness
+import e2e_battery
+from e2e_fake import BatteryMachine, InstantClock, Machine, SimulatedBrightness
 from e2e_guard import GuardRunner, LocalBackend
 from e2e_isolation import write_fixture_config
 from e2e_local import Harness, create_fixtures, fixture_paths, preflight, print_plan, product_environment
 from terminal_render import render
 from tui_debug import ROOT, DebugApp, Session, isolated_env
 
-from travel_mode import state
+from travel_mode import measurement, sessions, state
 from travel_mode.cli import main as product_main
 from travel_mode.i18n import set_language, t
 from travel_mode.system import apps, brightness, pmset, processes
@@ -60,15 +63,24 @@ class FixtureDebugApp(DebugApp):
 
 class InteractiveHarness(Harness):
     scenario = "away"
+    battery_measure = False
 
     def setup(self):
+        if self.battery_measure:
+            e2e_battery.require_battery()
+            self.battery_started = sessions.timestamp(sessions.utc_now())
+            self.apps = fixture_paths(self.root, battery_measure=True)
         if self.agent_loaded():
             raise RuntimeError("Fixture agent already loaded")
         self.fixture_attempted = True
-        create_fixtures(self.root)
+        create_fixtures(self.root, battery_measure=self.battery_measure)
         for executable in self.runner.executables:
             self.command([executable])
-        self.wait(lambda: len(self.runner.observe()) >= 4, "Shell fixtures started")
+        expected = 6 if self.battery_measure else 4
+        self.wait(
+            lambda: sum(r[2] in self.runner.shells for r in self.runner.observe().values()) == expected,
+            "Shell fixtures started",
+        )
         self.agent_attempted = True
         self.command(["launchctl", "load", str(self.plist)])
         self.wait(self.agent_loaded, "Agent loaded")
@@ -77,7 +89,7 @@ class InteractiveHarness(Harness):
         graceful_ready = self.graceful()
         if self.state_file.exists():
             raise AssertionError("Preflight graceful stage left a state file")
-        write_fixture_config(self.root, graceful=graceful_ready)
+        write_fixture_config(self.root, graceful=graceful_ready, battery_measure=self.battery_measure)
         print(
             "SKIP shell Quit fixture in UI; covered by local ForceQuitApp: "
             "its AppleEvent is outside the exact guard allowlist.",
@@ -87,9 +99,15 @@ class InteractiveHarness(Harness):
         self.before = self.foreign_snapshot()
         self.original_power = self.command(["pmset", "-g", "custom"])
         self.original_sleep = pmset.sleep_disabled()
-        self.check_power(pmset.on_ac_power(), "AC required throughout UI tests")
         profiles = pmset.pmset_custom()
         self.rollback_commands = []
+        self.original_profiles = profiles
+        if self.battery_measure:
+            e2e_battery.require_battery()
+            self.pause(e2e_battery.WARMUP_SECONDS)
+            self.finish_setup(graceful_ready)
+            return
+        self.check_power(pmset.on_ac_power(), "AC required throughout UI tests")
         for domain, profile, keys in [("-b", "b", list(profiles["b"])), ("-c", "a", ["powernap", "womp"])]:
             values = [p for k in keys for p in (k, profiles[profile][k])]
             command = ["sudo", "-n", "/usr/bin/pmset", domain, *values]
@@ -114,9 +132,13 @@ class InteractiveHarness(Harness):
             )
         self.record_power_originals()
         self.power_dirty = True
-        self.original_profiles = profiles
+        self.finish_setup(graceful_ready)
+
+    def finish_setup(self, graceful_ready):
         self.freeze_pids = {
-            p: r[1:] for p, r in self.runner.observe().items() if r[2].startswith(str(self.apps[1]) + "/")
+            p: r[1:]
+            for p, r in self.runner.observe().items()
+            if any(r[2].startswith(str(app) + "/") for app in self.apps[1:])
         }
         self.action_start = len(self.runner.commands)
         self.graceful_ready = graceful_ready
@@ -124,6 +146,8 @@ class InteractiveHarness(Harness):
     def assert_on(self):
         self.runner.observe()
         self.check(apps.frozen_count(str(self.apps[1])) == 2, "UI froze fixture main/helper")
+        if self.battery_measure:
+            self.check(apps.frozen_count(str(self.apps[2])) == 2, "UI froze both Burn fixture processes")
         self.check(not self.agent_loaded(), "UI unloaded fixture agent")
         profiles = pmset.pmset_custom()
         work = self.scenario == "work"
@@ -141,7 +165,9 @@ class InteractiveHarness(Harness):
             targets = {key: value for key, value in targets.items() if key in {"lowpowermode", "powermode"}}
         else:
             targets["hibernatemode"] = "25"
-        self.check_profile(self.original_profiles["b"], profiles["b"], targets, "UI battery")
+        self.check_profile(
+            self.original_profiles["b"], profiles["b"], {} if self.battery_measure else targets, "UI battery"
+        )
         applet_pids = {
             pid
             for pid, (_, command) in self.runner.owned.items()
@@ -160,8 +186,17 @@ class InteractiveHarness(Harness):
         saved = state.load_state()
         self.check(saved["scenario"] == self.scenario, "Snapshot scenario matches selected scenario")
         self.check(
-            len(saved["frozen_pids"]) == 2 and len(saved["unloaded_svcs"]) == 1, "UI exact fixture receipts"
+            len(saved["frozen_pids"]) == (4 if self.battery_measure else 2)
+            and len(saved["unloaded_svcs"]) == 1,
+            "UI exact fixture receipts",
         )
+        if self.battery_measure:
+            self.check(
+                not any(saved.get(k) for k in ("batt_prof", "ac_prof", "sleepdisabled", "brightness")),
+                "Battery mode recorded no power or brightness mutations",
+            )
+            self.comparison = saved.get("measurement")
+            e2e_battery.assert_comparison(self.runner, self.comparison)
         self.assert_foreign()
         self.check(not self.runner.tripped, "UI no guard violations")
 
@@ -172,7 +207,7 @@ class InteractiveHarness(Harness):
         rows = self.runner.observe()
         self.check(
             all(
-                pid in rows and rows[pid][1:] == identity and not rows[pid][0].startswith("T")
+                pid in rows and rows[pid][1:] == identity and not rows[pid][0].startswith(("T", "Z"))
                 for pid, identity in self.freeze_pids.items()
             ),
             "UI off resumed the same fixture identities",
@@ -180,12 +215,23 @@ class InteractiveHarness(Harness):
         if self.graceful_ready:
             self.wait(lambda: apps.app_running(str(self.runner.graceful)), "UI off reopened applet")
         self.verify_power()
+        if self.battery_measure:
+            e2e_battery.require_battery()
+            self.session_report = sessions.read_history()[-1]
+            e2e_battery.assert_comparison(self.runner, self.session_report["measurement"])
+            e2e_battery.assert_report(self.session_report)
+            self.battery_coverage = e2e_battery.assert_battery_interval(
+                self.battery_started, sessions.timestamp(sessions.utc_now())
+            )
+            self.check(
+                True, "Battery-only report includes mAh endpoints, average watts and completed restore"
+            )
         self.power_dirty = False
         self.assert_foreign()
         self.check(not self.runner.tripped, "UI round trip no guard violation")
 
 
-def answers(scenario="away"):
+def answers(scenario="away", *, battery_measure=False):
     """Exact i18n-rendered prompt allowlist, derived from the observed snapshot."""
     yes = [
         "impl.fix_pmset_disablesleep",
@@ -200,7 +246,7 @@ def answers(scenario="away"):
         "impl.quit_the_configured_daemon_app",
     ]
     result = {t("scenario.input"): ("scenario", scenario)}
-    for key, answer in [(k, "y") for k in yes] + [(k, "n") for k in no]:
+    for key, answer in [(k, "n" if battery_measure else "y") for k in yes] + [(k, "n") for k in no]:
         result[t(key)] = (key, answer)
     for target in processes.caffeinate_procs():
         result[t("caffeinate.confirm", pid=target.process.pid)] = (
@@ -221,7 +267,7 @@ def answers(scenario="away"):
         prompt = t(
             "impl.set_current_recommended", v0=k, v1=rec, v2=profiles["b"].get(k, "(unset)"), v3=rec, v4=desc
         )
-        result[prompt] = ("battery-" + k, "y")
+        result[prompt] = ("battery-" + k, "n" if battery_measure else "y")
     for row in apps.scan_apps()["running"]:
         default = row["defact"] if row["defact"] != "ask" else "quit"
         prompt = t(
@@ -274,34 +320,60 @@ def select_answer(prompt, policy):
 def child(args):
     root = args.root.resolve()
     backend = (
-        Machine(root)
+        (BatteryMachine(root) if args.battery_measure else Machine(root))
         if args.demo
-        else LocalBackend([str(a / "Contents/MacOS/loop") for a in fixture_paths(root)])
+        else LocalBackend(
+            [
+                str(a / "Contents/MacOS/loop")
+                for a in fixture_paths(root, battery_measure=args.battery_measure)
+            ]
+        )
     )
-    runner = GuardRunner(backend, root, fixture_paths(root), root / "agent.plist")
+    runner = GuardRunner(
+        backend,
+        root,
+        fixture_paths(root, battery_measure=args.battery_measure),
+        root / "agent.plist",
+        battery_measure=args.battery_measure,
+    )
     harness = InteractiveHarness(
         root,
         runner,
         Path(args.real_state),
-        brightness_loader=SimulatedBrightness if args.demo else brightness.NativeBrightness.load,
+        brightness_loader=None
+        if args.battery_measure
+        else (SimulatedBrightness if args.demo else brightness.NativeBrightness.load),
+        **({"pause": lambda _: None} if args.demo else {}),
     )
     harness.scenario = args.scenario
+    harness.battery_measure = args.battery_measure
     report = {
         "mode": "demo" if args.demo else "real",
         "interface": args.child,
         "scenario": args.scenario,
+        "battery_measure": args.battery_measure,
         "status": "FAIL",
     }
     # Evidence survives temporary fixture cleanup.
     evidence = args.evidence
     try:
-        with product_environment(root, runner), harness.brightness_capability():
+        with product_environment(root, runner), harness.brightness_capability(), ExitStack() as demo_clock:
+            if args.demo and args.battery_measure:
+                clock = InstantClock()
+                demo_clock.enter_context(patch.object(measurement, "Clock", lambda: clock))
+                demo_clock.enter_context(patch.object(measurement, "CancellableClock", lambda _: clock))
+                baseline = datetime(2026, 10, 15, 12, tzinfo=timezone.utc)
+                demo_clock.enter_context(
+                    patch.object(
+                        sessions, "utc_now", lambda: (baseline + timedelta(seconds=clock.now)).isoformat()
+                    )
+                )
             try:
                 preflight(root, harness.state_file, harness.real_state)
                 set_language("en")
                 harness.setup()
                 if args.child == "cli":
-                    policy = answers(args.scenario)
+                    policy = answers(args.scenario, battery_measure=args.battery_measure)
                     original_input = builtins.input
                     count = 0
 
@@ -357,8 +429,16 @@ def child(args):
 
                     ObservedApp(evidence / "layout.json").run()
                 harness.assert_off()
-                harness.brightness()
+                if not args.battery_measure:
+                    harness.brightness()
             finally:
+                if args.battery_measure:
+                    report["battery_measurement"] = e2e_battery.evidence(
+                        runner, getattr(harness, "comparison", None)
+                    )
+                    report["session"] = getattr(harness, "session_report", None)
+                    report["full_run_power_coverage"] = getattr(harness, "battery_coverage", None)
+                    print("BATTERY DIAGNOSTICS: " + json.dumps(report["battery_measurement"]), flush=True)
                 harness.cleanup()
         report["status"] = "PASS"
     except BaseException as error:
@@ -378,13 +458,14 @@ def child(args):
 
 
 class UISession(Session):
-    def __init__(self, evidence, fixture, interface, demo, scenario):
+    def __init__(self, evidence, fixture, interface, demo, scenario, *, battery_measure=False):
         self.scenario = scenario
+        self.battery_measure = battery_measure
         self.root = evidence
         self.cols = 160
         self.rows = 55
         self.language = "en"
-        self.timeout = 40
+        self.timeout = 600 if battery_measure else 40
         self.config_source = {"kind": "isolated-fixtures"}
         self.env = isolated_env(evidence)
         self.socket = str(evidence / "tmux.socket")
@@ -413,6 +494,8 @@ class UISession(Session):
         ]
         if demo:
             command.append("--demo")
+        if battery_measure:
+            command.append("--battery-measure")
         self.tmux(
             "new-session", "-d", "-x", str(self.cols), "-y", str(self.rows), "-s", "e2e", shlex.join(command)
         )
@@ -480,7 +563,7 @@ def drive_cli(session):
 def mutate(session, widget, step):
     path = session.root / "layout.json"
     generation = json.loads(path.read_text())["action_generation"]
-    if widget == "b-power":
+    if widget in {"b-power", "b-quick"}:
         # Keyboard focus scrolls the bottom button into view on long detail pages.
         for _ in range(80):
             if json.loads(path.read_text()).get("focused_id") == widget:
@@ -510,6 +593,12 @@ def drive_tui(session):
     session.widget_click("scenario-" + session.scenario)
     session.wait_complete()
     session.shot("01-dashboard")
+    if getattr(session, "battery_measure", False):
+        select_battery_quick(session)
+        session.shot("02-battery-selection")
+        mutate(session, "b-quick", "03-battery-measured")
+        finish_tui(session)
+        return
     # Fix SleepDisabled through its real button. No unsafe diagnostic buttons.
     if session.scenario == "away":
         mutate(session, "b-fixsleep", "02-fixsleep")
@@ -528,6 +617,29 @@ def drive_tui(session):
     session.wait_complete()
     session.shot("07-services")
     mutate(session, "b-svc-all", "08-services-applied")
+    finish_tui(session)
+
+
+def select_battery_quick(session):
+    path = session.root / "layout.json"
+
+    def selected(widget, value):
+        layout = json.loads(path.read_text())
+        return layout["ready"] and any(
+            row["id"] == widget and row["value"] is value for row in layout["widgets"]
+        )
+
+    for widget, value in e2e_battery.QUICK_SELECTION.items():
+        if not selected(widget, value):
+            session.widget_click(widget)
+            wait_for(
+                lambda widget=widget, value=value: selected(widget, value),
+                f"{widget} selection did not commit",
+                session.timeout,
+            )
+
+
+def finish_tui(session):
     (session.root / "assert-on.request").touch()
     # A harmless refresh provides a rendered completion point for the assertion.
     session.keys("r")
@@ -553,6 +665,11 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plan", action="store_true")
     parser.add_argument("--demo", action="store_true")
+    parser.add_argument(
+        "--battery-measure",
+        action="store_true",
+        help="Battery-only work measurement with fixture freeze; no power or brightness writes",
+    )
     parser.add_argument("--output", type=Path)
     parser.add_argument("--interface", choices=("both", "cli", "tui"), default="both")
     parser.add_argument("--scenario", choices=("work", "away"), default="away", help=argparse.SUPPRESS)
@@ -561,7 +678,12 @@ def main(argv=None):
     parser.add_argument("--evidence", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--real-state", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+    if args.battery_measure:
+        args.scenario = "work"
     if args.plan:
+        if args.battery_measure:
+            e2e_battery.print_plan()
+            return 0
         print_plan()
         print(
             "UI: four isolated tmux children (work/away x CLI/TUI) install GuardRunner "
@@ -600,7 +722,7 @@ def main(argv=None):
     rows = []
     for scenario, interface, driver in [
         (scenario, interface, driver)
-        for scenario in ("work", "away")
+        for scenario in (("work",) if args.battery_measure else ("work", "away"))
         for interface, driver in [("cli", drive_cli), ("tui", drive_tui)]
     ]:
         if args.interface not in ("both", interface):
@@ -608,7 +730,9 @@ def main(argv=None):
         evidence = output / f"{scenario}-{interface}"
         evidence.mkdir()
         fixture = Path(tempfile.mkdtemp(prefix="travel-mode-e2e-ui-"))
-        session = UISession(evidence, fixture, interface, args.demo, scenario)
+        session = UISession(
+            evidence, fixture, interface, args.demo, scenario, battery_measure=args.battery_measure
+        )
         try:
             driver(session)
         except (RuntimeError, TimeoutError, AssertionError, OSError):

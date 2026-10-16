@@ -122,12 +122,14 @@ def product_environment(root, runner):
                 os.environ[key] = value
 
 
-def fixture_paths(root):
-    return (root / "TravelModeE2E-Quit.app", root / "TravelModeE2E-Freeze.app")
+def fixture_paths(root, *, battery_measure=False):
+    names = ("Quit", "Freeze", "Burn") if battery_measure else ("Quit", "Freeze")
+    return tuple(root / f"TravelModeE2E-{name}.app" for name in names)
 
 
-def create_fixtures(root):
-    for app, kind in zip(fixture_paths(root), ("quit", "freeze"), strict=True):
+def create_fixtures(root, *, battery_measure=False):
+    for app in fixture_paths(root, battery_measure=battery_measure):
+        kind = app.stem.removeprefix("TravelModeE2E-").lower()
         main = app / "Contents/MacOS"
         helper = app / "Contents/Helpers"
         main.mkdir(parents=True)
@@ -147,9 +149,10 @@ def create_fixtures(root):
                 }
             )
         )
-        (helper / "loop").write_text(f"#!{helper}/sh\nwhile :; do /bin/sleep 0.2; done\n")
+        loop = "while :; do :; done" if kind == "burn" else "while :; do /bin/sleep 0.2; done"
+        (helper / "loop").write_text(f"#!{helper}/sh\n{loop}\n")
         (helper / "loop").chmod(0o700)
-        (main / "loop").write_text(f'#!{main}/sh\n"{helper}/loop" &\nwhile :; do /bin/sleep 0.2; done\n')
+        (main / "loop").write_text(f'#!{main}/sh\n"{helper}/loop" &\n{loop}\n')
         (main / "loop").chmod(0o700)
     agent = root / "agent.sh"
     agent.write_text("#!/bin/sh\nwhile :; do /bin/sleep 0.2; done\n")
@@ -160,7 +163,7 @@ def create_fixtures(root):
     agents = root / "home/Library/LaunchAgents"
     agents.mkdir(parents=True, exist_ok=True)
     (agents / f"{LABEL}.plist").symlink_to(root / "agent.plist")
-    write_fixture_config(root)
+    write_fixture_config(root, battery_measure=battery_measure)
 
 
 class Harness:

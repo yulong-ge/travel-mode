@@ -96,6 +96,8 @@ Automated development runs use FakeRunner, isolated demo or command-free plans:
 uv run python scripts/e2e_local.py --plan
 uv run python scripts/e2e_ui.py --plan
 uv run python scripts/e2e_ui.py --demo
+uv run python scripts/e2e_ui.py --battery-measure --plan
+uv run python scripts/e2e_ui.py --battery-measure --demo
 ```
 
 The demo runs real CLI questions, CLI off and TravelApp against the stateful
@@ -153,3 +155,47 @@ The real harness deliberately excludes Wi-Fi, Bluetooth, Spotlight, immediate
 screen-off, terminating user `caffeinate` processes and AC sleep/displaysleep.
 They must not be inferred from demo results or default pytest success. The current
 hardware verification scope is listed in both READMEs.
+
+### Battery measurement with fixture load
+
+For a reviewed, maintainer-run test while unplugged, use
+`uv run python scripts/e2e_ui.py --battery-measure` (`--interface cli|tui`
+selects one interface). This mode requires a measurable, discharging battery and
+refuses AC before starting fixtures. Ordinary real e2e still requires AC.
+It changes only the isolated fixture apps and user LaunchAgent. It does not
+change power settings, brightness, networking or the display. Its guard rejects
+all sudo commands, including permission probes, independently of the UI policy.
+CLI power, AC, disablesleep, hibernatemode, brightness and display-off answers are
+no; the TUI runs the measured work quick action with only apps and services
+selected. Native brightness setters remain inaccessible. No power or brightness
+round trip or emergency power rollback is scheduled.
+
+An additional Burn app uses private copies of `sh` for its main and helper,
+each executing `while :; do :; done`. The two processes can occupy about two CPU
+cores. They warm up for 5 seconds; the product waits for three fresh telemetry
+updates covering two accumulator intervals (5-second polls, 240-second timeout),
+freezes them through its existing Action, settles for 10 seconds, then measures
+again with the same policy. The cached first read is not an accepted baseline.
+Allow up to 490 seconds for both windows and settling per interface, plus fixture setup
+and checks. Both default
+interfaces run sequentially. Off must resume the same PID/birth identities before
+the existing identity-checked cleanup terminates the fixtures.
+
+The run requires valid before/after measurements with a recorded capacity source,
+at least 1.0 W measured saving, real mAh session endpoints, average power and a
+successful restore. Two busy interpreters provide controlled load; the 1 W
+threshold is a conservative harness acceptance criterion, not a hardware power
+guarantee. Background work and thermal changes can invalidate that criterion.
+On failure, `result.json` and terminal diagnostics retain both window averages
+and numerical ioreg samples, without raw battery identifiers. Each accepted interval
+prints its average power; duplicate generations never inflate sample counts.
+Insufficient updates, counter resets/wraps or a changed source invalidate the run. Observed external
+power or incomplete battery-source log coverage invalidates the run; no discharge
+values are synthesized. The log check covers preflight through off, including
+warmup and the first measurement before the first Action starts a session.
+This is one finite test, with no resident monitor.
+
+电池测量模式只操作临时 fixture，不修改电源、亮度、网络或显示器设置。
+它要求拔电且正在放电；接电时拒绝启动。双进程 CPU fixture 会额外耗电，
+每个界面的两个窗口与稳定期最多共需 490 秒，另需准备 fixture 与检查；两个窗口各等待至少 3 次真实遥测更新。样本不足时判为无效。普通真机 e2e 仍要求接电。运行前先查看
+`--battery-measure --plan`；自动化开发只运行 `--demo`，真机模式由维护者运行。

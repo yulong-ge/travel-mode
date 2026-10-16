@@ -67,6 +67,7 @@ def _main(argv=None):
     parser.add_argument("--samples", type=int, default=3)
     parser.add_argument("--limit", type=int, help=t("session.limit_help"))
     parser.add_argument("--seconds", type=float, help=t("measurement.seconds_help"))
+    parser.add_argument("--updates", type=int, help=t("measurement.updates_help"))
     measure_flags = parser.add_mutually_exclusive_group()
     measure_flags.add_argument(
         "--measure", dest="measure", action="store_true", default=None, help=t("measurement.enable_help")
@@ -84,6 +85,8 @@ def _main(argv=None):
         parser.error(t("session.limit_error"))
     if args.seconds is not None and args.cmd != "power":
         parser.error(t("measurement.seconds_only_power"))
+    if args.updates is not None and args.cmd != "power":
+        parser.error(t("measurement.updates_only_power"))
     if args.reapply and args.cmd != "check" and not args.check:
         parser.error(t("resurrection.check_only"))
     if args.value is not None and args.config_cmd not in {"set-language", "set-interface"}:
@@ -162,17 +165,29 @@ def _main(argv=None):
         from dataclasses import replace
 
         from .measurement import describe, measure, validate_settings
+        from .system.battery import BatteryError
+        from .system.shell import ReadError
 
         settings = load_config().measurement
         if args.seconds is not None:
             settings = replace(settings, seconds=args.seconds)
+        if args.updates is not None:
+            settings = replace(settings, updates=args.updates)
         try:
             validate_settings(settings)
         except ValueError as exc:
             parser.error(str(exc))
-        result = measure(settings)
+        try:
+            result = measure(settings)
+        except ReadError as exc:
+            raise BatteryError(str(exc)) from exc
         print(json.dumps(result, ensure_ascii=False) if args.json else describe(result))
-        return 0
+        return (
+            4
+            if result.get("reason")
+            in {"insufficient_samples", "counter_reset", "missing_update_marker", "source_changed"}
+            else 0
+        )
     if args.cmd == "suggest":
         from .flows.suggest import confirm_write, print_suggestions, print_warnings, suggest_data
 
@@ -265,9 +280,31 @@ __all__ = ["main"]
 def main(argv=None):
     from .paths import state_path
     from .state import StateError
+    from .system.battery import BatteryError
 
+    arguments = list(sys.argv[1:] if argv is None else argv)
     try:
-        return command_lifecycle(list(sys.argv[1:] if argv is None else argv), _main)
+        return command_lifecycle(arguments, _main)
+    except BatteryError as exc:
+        if os.environ.get("TRAVEL_MODE_DEBUG") == "1":
+            raise
+        detail = " ".join(str(exc).splitlines())
+        if "--json" in arguments:
+            import json
+
+            print(
+                json.dumps(
+                    {
+                        "available": False,
+                        "reason": "failed",
+                        "error": {"type": "BatteryError", "message": detail},
+                    },
+                    ensure_ascii=False,
+                )
+            )
+        else:
+            print(t("measurement.failed", reason=detail), file=sys.stderr)
+        return 4
     except (ConfigError, StateError) as exc:
         if os.environ.get("TRAVEL_MODE_DEBUG") == "1":
             raise

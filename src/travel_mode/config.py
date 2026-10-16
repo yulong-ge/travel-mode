@@ -344,7 +344,7 @@ def load_config(path: str | Path | None = None) -> Config:
         raise _error(target, "profiles", t("config.expected_a_table"))
     profiles = parse_profiles(raw_profiles, target)
     measurement = _table(data, "measurement", target)
-    _check_keys(measurement, {"seconds", "interval", "settle_seconds"}, target, "measurement")
+    _check_keys(measurement, {"seconds", "interval", "settle_seconds", "updates"}, target, "measurement")
     settings = Settings(**measurement)
     try:
         validate_settings(settings)

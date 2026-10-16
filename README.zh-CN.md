@@ -98,8 +98,9 @@ interface = "tui" # tui | cli
 language = "auto" # auto | en | zh
 
 [measurement]
-seconds = 20
-interval = 2
+seconds = 180
+interval = 5
+updates = 2
 settle_seconds = 10
 
 [categories]
@@ -154,19 +155,21 @@ spotlight_cpu_threshold = 20
 
 ## 功耗测量
 
-`travel-mode power` 在 20 秒窗口内每 2 秒采样一次 `ioreg -rn AppleSmartBattery`，并读取一次 `pmset -g batt` 显示 macOS 的估计。`travel-mode power --seconds 30 --json` 输出结构化结果；[power schema](docs/json-schema/power.schema.json) 定义可测量与不可测量结果。此命令无需 sudo。接电、充电或没有电池时，明确返回不可测量，不合成功率数值。放电字段缺失或格式异常时明确报错。
+`travel-mode power` 等待 2 次真实遥测更新，覆盖至少 1 个区间。它每 5 秒只读一次 `ioreg -rn AppleSmartBattery`，默认最多等待 180 秒。已录制的本机 macOS 每 20–60 秒更新一次这些注册表值；重复读取可能得到同一份缓存。因此每个窗口通常需要约 1–3 分钟。第一次读取只作为新鲜度参照；观察到第一次变化后才建立基线，避免区间包含执行 Action 前的负载。更新较慢时，超时前可能不足 2 次更新；此时明确返回“样本不足”，不给出平均瓦数或剩余时长。`travel-mode power --seconds 240 --updates 3 --json` 可延长等待上限并输出结构化结果，见 [power schema](docs/json-schema/power.schema.json)。此命令无需 sudo；接电、充电或没有电池时明确返回不可测量。
 
-功率为电压 mV × 有符号放电电流 mA / 1,000,000。无符号 64 位负电流会先转换为有符号值。剩余能量使用 `AppleRawCurrentCapacity` 的 mAh 值和当前电压；预计小时数为剩余 Wh / 平均 W。`TimeRemaining=65535` 或 macOS 未提供时长时显示未知。放电估算需要原始 mAh 字段，不以百分比容量替代。瞬时电流会随屏幕亮度、网络、温度和前台任务波动。结果描述采样窗口，不保证实际续航，也不能证明变化由某个动作导致。
+优先数据源是 `PowerTelemetryData.AccumulatedSystemLoad` 与 `SystemLoadAccumulatorCount`：区间平均 W = 累加 mW 差值 / 累加样本数差值 / 1000。整个窗口按累加样本数加权各区间。电池放电或功率累加器存在且增长时，另外报告电池平均功率。结果注明功率和容量来源、实际等待时长、观察到的覆盖时长与区间数。只有一个区间时注明“仅 1 个区间，精度较低”。覆盖时长是两次硬件变化被观察到的时间跨度；边界有最多一个轮询间隔的不确定性，不表示注册表连续更新。
 
-使用电池时，work 应用动作前先测量，动作后等待 10 秒，再次测量。默认增加约 50 秒。`--no-measure` 关闭对比；`--measure` 在 away 中也开启。TUI 提供相同选择，测量时显示进度，界面继续响应。dry-run 没有执行动作，因此跳过对比。电源来源变化会终止当前窗口。完整对比保存在活动快照中，由 `report` 展示；功耗增加时保留负节省值。额外时长按动作后同一份剩余电量比较两次平均功率。
+仅当系统负载累加器整对缺失时，才在不同的 `UpdateTime` 之间用电压 × 有符号电流作区间积分，并明确标为 `voltage_current`。无符号 64 位负电流会先解码。录制中的电流可能被量化，其可靠性低于负载累加器。选中来源的字段不完整或无效时明确报错；缺少新鲜度标记、计数重置或回绕、窗口内数据源变化时不计算有效均值。工具不猜测计数器周期，也不混合不同来源。重复的计数或时间戳不计为新样本。
 
-可配置 `[measurement] seconds`、`interval` 和 `settle_seconds`。数值必须有限且不超过 3600 秒；窗口大于 0，间隔至少 0.5 秒，稳定期不小于 0。`power --seconds` 仅覆盖本次命令的窗口。总览仅在 TUI 打开期间每 30 秒读取一次 ioreg，退出时停止定时器。耗电排行仅在点击按钮时运行一次 `top -stats power`。工具不安装监控进程、守护进程或后台服务。
+容量优先读取顶层 `AppleRawCurrentCapacity`/`AppleRawMaxCapacity`；两者均不存在时读取 `BatteryData.RemainingCapacity`/`FullChargeCapacity`。选定布局必须有效，不以标称容量、设计容量或百分比替代。剩余 Wh 使用剩余 mAh 和最近一次电压；预计小时数为剩余 Wh / 区间平均 W。`pmset -g batt` 另行显示 macOS 的估计。负载波动、遥测量化、缓存边界及未来的屏幕、网络和前台活动都会影响精度。短时前后对比不能证明因果关系，也不保证实际续航。
 
-打开工具或运行 `check` 时，还会对照暂停记录检查 LaunchAgent label、应用可执行文件和 PID 出生身份，列出重新加载的 agent、重新运行的应用和恢复运行的冻结 PID。点击“再次处理”或运行 `travel-mode check --reapply` 可复用现有 Action 再次暂停。命令或 TUI 退出后不再检测；复用的 PID 不会被视为原进程。
+使用电池时，work 在动作前测量，动作后稳定 10 秒，再按相同策略测量。CLI 与 TUI 开始前会提示预计等待时长；两个窗口通常共需约 2–6 分钟，按默认超时和稳定期最多约 370 秒。`--no-measure` 跳过对比；`--measure` 在 away 中也开启。TUI 显示真实更新进度并保持响应。辅助读取失败或样本不足会保留在会话报告中，动作继续执行；第一个窗口无效时不再做第二个窗口对比。接电会中止当前窗口。dry-run 跳过对比。
 
-2026-10-15 在 macOS 接电状态下实测：20.159 秒采样窗口使用工具进程 CPU 0.020392 秒、子进程 CPU 0.155477 秒，合计 0.175869 秒；调用 ioreg 10 次、pmset 1 次。TUI 空闲窗口为 300.001 秒，使用工具进程 CPU 0.931522 秒、子进程 CPU 0.189740 秒，合计 1.121262 秒。该窗口内仅调用 ioreg 10 次，没有运行 top。这些是 CPU 时间，不是耗电量。TUI 没有交互；本机同时运行其他验证进程。
+配置项为 `[measurement] seconds = 180`（等待上限）、`interval = 5`、`updates = 2`、`settle_seconds = 10`。秒数必须有限且不超过 3600；超时大于 0，轮询间隔至少 5 秒，稳定期不小于 0，更新次数为 2–720 的整数。`power --seconds` 与 `--updates` 仅覆盖本次命令。总览仍只在 TUI 打开期间每 30 秒读取一次 ioreg，并将单次注册表读数标为缓存值，不当作区间均值。耗电排行仅由按钮触发。命令或 TUI 关闭后没有采样进程。
 
-复现方法：`uv run python scripts/measure_overhead.py probes --output /tmp/travel-mode-probes.json` 与 `uv run python scripts/measure_overhead.py tui --output /tmp/travel-mode-tui.json`。脚本隔离 HOME、配置和状态，强制使用只读 Runner，并计算 `resource.getrusage(RUSAGE_SELF)` 与 `RUSAGE_CHILDREN` 的用户态加内核态 CPU 时间差。TUI 在初始渲染完成后计时，保持五分钟无输入。20 秒探针模式在接电时也执行读数与解析路径，并查询一次 macOS 估计；正常 power 和 apply 在接电时跳过窗口。本轮没有真机验证有效放电测量或续航改善。
+打开工具或运行 `check` 时还会检查已暂停项目是否复活。现有“再次处理”按钮或 `travel-mode check --reapply` 可再次暂停；这不是持续监控。
+
+2026-10-15 的早期开销测试使用**原始探针基准**，不是现在的真实更新窗口：20.159 秒内调用 ioreg 10 次、pmset 1 次，工具 CPU 为 0.020392 秒，子进程 CPU 为 0.155477 秒，合计 0.175869 秒。TUI 空闲 300.001 秒的 CPU 为 0.931522 + 0.189740 = 1.121262 秒，调用 ioreg 10 次，没有 top。这些是历史 CPU 时间，不是耗电量，也不代表新 180 秒策略的开销。复现原始探针/TUI 计时可用 `uv run python scripts/measure_overhead.py probes --output /tmp/travel-mode-probes.json` 或 `uv run python scripts/measure_overhead.py tui --output /tmp/travel-mode-tui.json`；脚本隔离路径、使用只读 Runner，并通过 `resource.getrusage` 统计工具及子进程 CPU 时间。
 
 ## 会话报告与历史
 
@@ -176,7 +179,7 @@ spotlight_cpu_threshold = 20
 
 会话从第一个 Action 开始，不从打开 TUI 开始。开始和结束各调用一次 ioreg 与 pmset 电池查询。工具关闭后不采样。`check` 与打开的 TUI 记录实际发现的复活项目，不持续监控。现有 TUI 电池定时器会同时记录接电读数，不增加探测。动作数统计顶层 Action，不统计子进程或 PID 数；失败尝试也保留。恢复项单独计数，并跨重试累计。
 
-整段平均功耗按端点平均电压 × 原始容量减少量 ÷ 时长估算。仅在端点字段有效、电量与容量没有增加、保留的 pmset 日志在开始时刻或之前有电池供电记录且没有记录接电区间时提供。电源分类依赖保留的日志，不能证明事件从未遗漏。观察到接电时显示「期间曾接电，掉电统计不完整」，不提供整段掉电或功耗。日志覆盖不足或读数缺失时同样明确标为不可用。接电时仍显示端点读数，但不把差值称为掉电。已有的 before/after 测量窗口单独列出；应用后窗口均值只与其他应用后窗口比较，不与整段估计混算。JSON 的 `difference_watts` 为正表示功耗更低，为负表示更高；文本显示方向与差值的绝对值。
+整段平均功耗优先使用会话开始与结束两次读取的系统负载累加器差值，来源标为 `PowerTelemetryData.SystemLoad`，不需要持续采样。硬件缺少该累加器时，既有端点容量/电压估算标为 `capacity_delta`。仅在端点字段有效、电量与容量没有增加、保留的 pmset 日志在开始时刻或之前有电池供电记录且没有记录接电区间时提供。电源分类依赖保留的日志，不能证明事件从未遗漏。观察到接电时显示「期间曾接电，掉电统计不完整」，不提供整段掉电或功耗。日志覆盖不足或读数缺失时同样明确标为不可用。接电时仍显示端点读数，但不把差值称为掉电。已有的 before/after 测量窗口单独列出；应用后窗口均值只与相同功率来源的其他应用后窗口比较，不与整段估计混算。JSON 的 `difference_watts` 为正表示功耗更低，为负表示更高；文本显示方向与差值的绝对值。
 
 away 报告复用睡眠段与 DarkWake 解析器，并限定在会话时间区间内。只累计日志中完整的睡眠段，不外推跨越边界的片段；没有完整匹配段时掉电为未知，不填零。记录到接电或电源覆盖未知时，不提供睡眠掉电总数。DarkWake 次数与原因仅来自区间内记录的电池事件。
 
@@ -186,7 +189,7 @@ travel-mode history --limit 10
 travel-mode history --json --limit 10
 ```
 
-报告只保存在本机状态文件旁的 `history.jsonl`；设置 `TRAVEL_MODE_STATE` 会同时隔离历史路径。`[history] retain = 50` 默认保留最新 50 条，有效范围 1–10000。`history` 默认显示最新 50 条，`--limit N` 修改显示条数。JSON 遵循[历史 schema](docs/json-schema/history.schema.json)。比较只使用保留历史中同场景、同统计口径的其他会话，排除当前报告与缺少均值的记录。读取历史不探测 macOS，也不迁移配置。
+报告只保存在本机状态文件旁的 `history.jsonl`；设置 `TRAVEL_MODE_STATE` 会同时隔离历史路径。`[history] retain = 50` 默认保留最新 50 条，有效范围 1–10000。`history` 默认显示最新 50 条，`--limit N` 修改显示条数。JSON 遵循[历史 schema](docs/json-schema/history.schema.json)。比较只使用保留历史中同场景、同统计口径、同功率来源的其他会话，排除当前报告与缺少均值的记录。读取历史不探测 macOS，也不迁移配置。
 
 工具先保存报告检查点，再原子写入历史，最后删除状态。归档失败时保留状态并阻止新 Action；再次运行 `off` 会重试同一报告，不重新采集结束读数，也不重复写历史。部分恢复保留会话与恢复记录。dry-run 不采样、不归档会话。旧快照的开始读数和动作数为未知，报告会明确说明。报告包含本机应用/服务名称，分享前请检查。没有跨进程写锁，请一次只运行一个修改实例。
 
@@ -208,8 +211,9 @@ travel-mode history --json --limit 10
 | 1 | 操作失败、恢复尚未完成，或出现未预期异常 |
 | 2 | 配置或参数错误；也用于不支持的平台或缺少平台能力 |
 | 3 | 恢复状态非法、不可读或不可写 |
+| 4 | 功耗测量读取或解析失败 |
 
-配置与状态错误只输出一行诊断，包含路径、相关键或原因及修复提示，不打印 Python traceback。设置 `TRAVEL_MODE_DEBUG=1` 后保留完整 traceback 和异常链。未预期异常保留正常 traceback。外部编辑器可以返回自己的退出码。
+配置与状态错误只输出一行诊断，包含路径、相关键或原因及修复提示，不打印 Python traceback。设置 `TRAVEL_MODE_DEBUG=1` 后保留完整 traceback 和异常链。电池测量错误也只输出一行诊断；`power --json` 返回包含 `available=false`、`reason="failed"` 和 `error.type`/`error.message` 的错误对象。调试模式保留完整 traceback 和异常链。未预期异常保留正常 traceback。外部编辑器可以返回自己的退出码。
 
 ## 兼容性与验证边界
 

@@ -147,6 +147,45 @@
                     "items": {
                       "type": "string"
                     }
+                  },
+                  "telemetry": {
+                    "type": "object",
+                    "required": [
+                      "system_sum_mw",
+                      "system_count"
+                    ],
+                    "properties": {
+                      "system_sum_mw": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "system_count": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "system_load_mw": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "battery_count": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "battery_sum_mw": {
+                        "type": "integer"
+                      },
+                      "battery_source": {
+                        "enum": [
+                          "AccumulatedBatteryDischarge",
+                          "AccumulatedBatteryPower"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "update_time": {
+                    "type": "integer",
+                    "minimum": 0
                   }
                 },
                 "additionalProperties": false
@@ -210,6 +249,45 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "telemetry": {
+                "type": "object",
+                "required": [
+                  "system_sum_mw",
+                  "system_count"
+                ],
+                "properties": {
+                  "system_sum_mw": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "system_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "system_load_mw": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "battery_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "battery_sum_mw": {
+                    "type": "integer"
+                  },
+                  "battery_source": {
+                    "enum": [
+                      "AccumulatedBatteryDischarge",
+                      "AccumulatedBatteryPower"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "update_time": {
+                "type": "integer",
+                "minimum": 0
               }
             },
             "additionalProperties": false
@@ -270,6 +348,14 @@
             "type": [
               "object",
               "null"
+            ]
+          },
+          "average_source": {
+            "enum": [
+              null,
+              "PowerTelemetryData.SystemLoad",
+              "voltage_current",
+              "capacity_delta"
             ]
           }
         },

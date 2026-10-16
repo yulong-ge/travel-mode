@@ -21,7 +21,7 @@ APP_QUERY = ["ps", "-axo", "pid=,%cpu=,command="]
 INDEX_QUERY = ["mdfind", 'kMDItemContentType == "com.apple.application-bundle"']
 
 
-def write_fixture_config(root, *, graceful=None):
+def write_fixture_config(root, *, graceful=None, battery_measure=False):
     quit_apps = (
         ["TravelModeE2E-Quit"] if graceful is None else (["TravelModeE2E-Graceful"] if graceful else [])
     )
@@ -30,7 +30,11 @@ def write_fixture_config(root, *, graceful=None):
         '[apps]\ndefault="skip"\nwatch=[]\nask=[]\nwith_daemon=[]\n'
         + "quit="
         + json.dumps(quit_apps)
-        + '\nfreeze=["TravelModeE2E-Freeze"]\nskip='
+        + "\nfreeze="
+        + json.dumps(
+            ["TravelModeE2E-Freeze", "TravelModeE2E-Burn"] if battery_measure else ["TravelModeE2E-Freeze"]
+        )
+        + "\nskip="
         + json.dumps(skip)
         + "\nignore="
         + json.dumps(DEFAULT_APPS)
@@ -39,7 +43,8 @@ def write_fixture_config(root, *, graceful=None):
         + "\n[services]\nunload="
         + json.dumps([LABEL])
         + "\nkeep=[]\n[network]\napps=[]\n"
-        + '[options]\nlanguage="en"\nscenario="ask"\naggressive=false\n',
+        + '[options]\nlanguage="en"\nscenario="ask"\naggressive=false\n'
+        + ("[measurement]\nseconds=240\nupdates=3\n" if battery_measure else ""),
         encoding="utf-8",
     )
 
@@ -50,7 +55,7 @@ class FixtureDiscoveryRunner:
     def __init__(self, runner, root):
         self.runner = runner
         self.bundles = tuple(
-            (root / f"TravelModeE2E-{name}.app").resolve() for name in ("Quit", "Freeze", "Graceful")
+            (root / f"TravelModeE2E-{name}.app").resolve() for name in ("Quit", "Freeze", "Graceful", "Burn")
         )
 
     def fixture_path(self, value):

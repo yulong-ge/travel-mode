@@ -88,7 +88,7 @@ def identities(output):
 class GuardRunner:
     """Exact argv allowlist; signal permissions include process birth identity."""
 
-    def __init__(self, backend, root: Path, apps, plist: Path, *, plan=False):
+    def __init__(self, backend, root: Path, apps, plist: Path, *, plan=False, battery_measure=False):
         self.backend = backend
         self.root = root.resolve()
         self.apps = tuple(Path(app).resolve() for app in apps)
@@ -105,6 +105,7 @@ class GuardRunner:
         self.shells += (str(self.graceful / "Contents/MacOS/applet"),)
         self.owned = {}
         self.plan = plan
+        self.battery_measure = battery_measure
         self.commands = []
         self.tripped = False
         self.results = []
@@ -128,6 +129,10 @@ class GuardRunner:
 
     def validate(self, command):
         cmd = list(command)
+        # The battery harness needs no privileged command, including permission
+        # probes. Refuse before normalization, independently of driver choices.
+        if self.battery_measure and cmd and cmd[0] in {"sudo", "/usr/bin/sudo"}:
+            self.refuse(cmd)
         if cmd[:3] == ["sudo", "-n", "-l"]:
             target = self.validate(["sudo", *cmd[3:]])
             if target[:3] != ["sudo", "-n", "/usr/bin/pmset"]:

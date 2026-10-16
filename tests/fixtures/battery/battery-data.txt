@@ -1,0 +1,10 @@
++-o AppleSmartBattery
+{
+  "Voltage" = 12339
+  "InstantAmperage" = 18446744073709550135
+  "Amperage" = 18446744073709550135
+  "TimeRemaining" = 199
+  "ExternalConnected" = No
+  "IsCharging" = No
+  "BatteryData" = {"RemainingCapacity"=4781,"FullChargeCapacity"=4820,"NominalChargeCapacity"=4970,"DesignCapacity"=6075}
+}

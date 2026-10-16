@@ -32,7 +32,7 @@ def timestamp(value):
 
 
 def observe():
-    from .system.battery import COMMAND
+    from .system import battery
 
     result = dict(
         at=utc_now(),
@@ -43,39 +43,31 @@ def observe():
         voltage_mv=None,
         errors=[],
     )
-    for command in [COMMAND, ["pmset", "-g", "batt"]]:
-        try:
-            output = _read(command, timeout=2)
-        except ReadError as exc:
-            result["errors"].append(str(exc))
-            continue
-        if command == COMMAND:
-            if not output.strip():
-                result["errors"].append(t("session.no_battery"))
-                continue
-            for field, name, boolean in [
-                ("ExternalConnected", "external", True),
-                ("IsCharging", "charging", True),
-                ("AppleRawCurrentCapacity", "remaining_mah", False),
-                ("Voltage", "voltage_mv", False),
-            ]:
-                match = re.search(r'"' + field + r'"\s*=\s*([^\n]+)', output)
-                value = match[1].strip() if match else None
-                if boolean and value in ("Yes", "No"):
-                    result[name] = value == "Yes"
-                elif not boolean and value is not None and re.fullmatch(r"\d+", value):
-                    if name == "voltage_mv" and int(value) == 0:
-                        result["errors"].append(f"ioreg.{field}: zero voltage")
-                    else:
-                        result[name] = int(value)
-                else:
-                    result["errors"].append(f"ioreg.{field}: {value!r}")
+    try:
+        reading = battery.read(timeout=2, endpoint=True)
+        if not reading["available"]:
+            result["errors"].append(t("session.no_battery"))
         else:
-            match = re.search(r"\b(\d+)%;", output)
-            if match and 0 <= int(match[1]) <= 100:
-                result["percent"] = int(match[1])
-            else:
-                result["errors"].append(f"pmset -g batt: {output.strip()!r}")
+            result.update(
+                external=reading["external_connected"],
+                charging=reading["is_charging"],
+                remaining_mah=reading["remaining_mah"],
+                voltage_mv=reading["voltage_mv"],
+            )
+            for key in ("telemetry", "update_time"):
+                if reading.get(key) is not None:
+                    result[key] = reading[key]
+    except (ReadError, battery.BatteryError) as exc:
+        result["errors"].append(str(exc))
+    try:
+        output = _read(["pmset", "-g", "batt"], timeout=2)
+        match = re.search(r"\b(\d+)%;", output)
+        if match and 0 <= int(match[1]) <= 100:
+            result["percent"] = int(match[1])
+        else:
+            result["errors"].append(f"pmset -g batt: {output.strip()!r}")
+    except ReadError as exc:
+        result["errors"].append(str(exc))
     return result
 
 
@@ -165,6 +157,7 @@ def build_report(state, restored, failed):
         mah_drop=None,
         average_watts=None,
         average_scope=None,
+        average_source=None,
         power_status="unknown",
         measurement=state.get("measurement"),
         actions=active["actions"] if active else None,
@@ -209,13 +202,33 @@ def build_report(state, restored, failed):
         mah = start["remaining_mah"] - end["remaining_mah"]
         if min(percent, mah) >= 0:
             report.update(percent_drop=percent, mah_drop=mah)
-            if seconds > 0:
+            if seconds > 0 and "telemetry" not in start and "telemetry" not in end:
                 report["average_watts"] = (
                     mah * (start["voltage_mv"] + end["voltage_mv"]) / 2 / 1_000_000 / (seconds / 3600)
                 )
                 report["average_scope"] = "session"
+                report["average_source"] = "capacity_delta"
         else:
             report["power_status"] = "unknown"
+    if report["power_status"] == "battery_only" and "telemetry" in start and "telemetry" in end:
+        from .system.battery import IntervalError, interval
+
+        try:
+            aggregate = interval(
+                {"telemetry": start["telemetry"], "power_source": "PowerTelemetryData.SystemLoad"},
+                {"telemetry": end["telemetry"], "power_source": "PowerTelemetryData.SystemLoad"},
+                seconds=seconds,
+            )
+            if aggregate is not None:
+                report.update(
+                    average_watts=aggregate["average_watts"],
+                    average_scope="session",
+                    average_source=aggregate["power_source"],
+                )
+            else:
+                report["errors"].append(t("measurement.reason.insufficient_samples"))
+        except IntervalError as exc:
+            report["errors"].append(str(exc))
     if (
         report["average_watts"] is None
         and report["measurement"]
@@ -224,6 +237,7 @@ def build_report(state, restored, failed):
     ):
         report["average_watts"] = report["measurement"]["after"]["average_watts"]
         report["average_scope"] = "after_window"
+        report["average_source"] = report["measurement"]["after"].get("power_source")
     if report["scenario"] == "away" and window is not None:
         segments = parse_sleep_segments(window)
         reasons = parse_darkwake_reasons(window)
@@ -270,7 +284,7 @@ def validate_active(active):
 
 
 def validate_observation(row):
-    if not isinstance(row, dict) or set(row) != {
+    required = {
         "at",
         "external",
         "charging",
@@ -278,8 +292,21 @@ def validate_observation(row):
         "remaining_mah",
         "voltage_mv",
         "errors",
-    }:
+    }
+    if (
+        not isinstance(row, dict)
+        or not required <= row.keys()
+        or row.keys() - required - {"telemetry", "capacity_source", "update_time"}
+    ):
         raise ValueError("observation: invalid fields")
+    if "telemetry" in row:
+        from .system.battery import validate_telemetry
+
+        validate_telemetry(row["telemetry"])
+    if "capacity_source" in row and row["capacity_source"] not in ("AppleRaw", "BatteryData"):
+        raise ValueError("observation.capacity_source: invalid source")
+    if "update_time" in row and (type(row["update_time"]) is not int or row["update_time"] < 0):
+        raise ValueError("observation.update_time: invalid timestamp")
     timestamp(row["at"])
     for key in ("external", "charging"):
         if row[key] is not None and type(row[key]) is not bool:
@@ -315,8 +342,20 @@ def validate_report(row):
         "away",
         "errors",
     }
-    if not isinstance(row, dict) or set(row) != required or row["version"] != 1:
+    if (
+        not isinstance(row, dict)
+        or not required <= row.keys()
+        or row.keys() - required - {"average_source"}
+        or row["version"] != 1
+    ):
         raise ValueError("report: invalid fields/version")
+    if row.get("average_source") not in (
+        None,
+        "PowerTelemetryData.SystemLoad",
+        "voltage_current",
+        "capacity_delta",
+    ):
+        raise ValueError("report.average_source: invalid source")
     if not isinstance(row["id"], str) or not row["id"] or row["scenario"] not in ("work", "away", None):
         raise ValueError("report: invalid identity/scenario")
     timestamp(row["ended_at"])
@@ -456,6 +495,7 @@ def comparison(report, rows):
         if r["id"] != report["id"]
         and r["scenario"] == report["scenario"]
         and r["average_scope"] == report["average_scope"]
+        and r.get("average_source") == report.get("average_source")
         and r["average_watts"] is not None
     ]
     if report["average_watts"] is None or not peers:
@@ -505,16 +545,30 @@ def describe(report, peers=()):
         yield t(
             "session.average",
             watts=report["average_watts"],
-            scope=t("session.scope." + report["average_scope"]),
+            scope=t("session.scope.telemetry")
+            if report.get("average_source") == "PowerTelemetryData.SystemLoad"
+            and report["average_scope"] == "session"
+            else t("session.scope." + report["average_scope"]),
         )
+        if report.get("average_source") is not None:
+            yield t("measurement.power_source", source=report["average_source"])
     else:
         yield t("session.no_average")
     if report["measurement"]:
         from .measurement import comparison_description
         from .measurement import describe as measurement_description
 
-        if report["measurement"]["before"]["available"] and not report["measurement"]["after"]["available"]:
+        if report["measurement"]["before"]["available"] and (
+            "power_source" in report["measurement"]["before"]
+            or not report["measurement"]["after"]["available"]
+        ):
             yield t("session.before_window") + ": " + measurement_description(report["measurement"]["before"])
+        if (
+            report["measurement"]["after"] is not None
+            and report["measurement"]["after"]["available"]
+            and "power_source" in report["measurement"]["after"]
+        ):
+            yield t("session.after_window") + ": " + measurement_description(report["measurement"]["after"])
         yield comparison_description(report["measurement"])
     counts = report["actions"]
     yield t(

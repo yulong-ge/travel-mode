@@ -7,4 +7,5 @@
   "ExternalConnected" = No
   "IsCharging" = No
   "TimeRemaining" = 240
+  "UpdateTime" = 1000
 }
