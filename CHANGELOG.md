@@ -22,6 +22,8 @@ All notable changes follow Keep a Changelog.
 
 ### Added
 
+- Optional power-source LaunchEvents automation with explicit install/uninstall/status, bounded local receipts, notification defaults and opt-in non-interactive safe work/restore actions. Consume XPC events before handling and exit; no resident monitor, periodic launch or lid/sleep trigger.
+
 - Add an opt-in battery-only CLI/TUI e2e mode with a two-process fixture load, measured freeze/restore checks, numerical diagnostics and a stricter guard that rejects all sudo commands. Ordinary real e2e retains its AC requirement.
 - Session reports after restore, local retained JSONL history and same-scenario power comparisons, with explicit incomplete charging/log intervals.
 - Scrollable bilingual session/history views and a history JSON schema.

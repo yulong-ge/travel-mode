@@ -199,3 +199,9 @@ This is one finite test, with no resident monitor.
 它要求拔电且正在放电；接电时拒绝启动。双进程 CPU fixture 会额外耗电，
 每个界面的两个窗口与稳定期最多共需 490 秒，另需准备 fixture 与检查；两个窗口各等待至少 3 次真实遥测更新。样本不足时判为无效。普通真机 e2e 仍要求接电。运行前先查看
 `--battery-measure --plan`；自动化开发只运行 `--demo`，真机模式由维护者运行。
+
+### Event automation validation
+
+`uv run python scripts/e2e_automation.py --plan` lists the complete sequence. Only a maintainer runs the command without `--plan`: it installs the independent `io.github.yulong-ge.travel-mode.events-e2e` label with a temporary guarded Python helper and isolated config/state. Both policies are `off`, so a real event only records the observed source. The helper rejects notifications, authentication and mutations; the parent guard only permits print/bootstrap/bootout for that exact test label and plist, and validates the complete plist before bootstrap. It also reads the current power source before and after the manual transition.
+
+Change AC/battery source manually, allow the handler to finish, then press Enter in the harness. It checks the local receipt and `launchctl print` for a non-running state, then always boots out that label and removes its plist. It refuses an existing test plist. Evidence remains in the printed temporary directory. It does not post synthetic power notifications and does not modify the production automation agent. This delivery check does not validate the opt-in power/app mutations; those use existing Action tests and the separate fixture e2e harness.

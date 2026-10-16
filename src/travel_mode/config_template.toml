@@ -40,3 +40,9 @@ scenario = "ask"
 
 [profiles.flight]
 # Add profile-specific values in a future release.
+
+# Optional event agent is installed only by automation install.
+[automation]
+on_battery = "notify"
+on_ac = "notify"
+retain = 50

@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://travel-mode.example/schemas/automation-status.json",
+  "title": "Automation status",
+  "type": "object",
+  "required": [
+    "version",
+    "installed",
+    "loaded",
+    "running",
+    "path",
+    "plist",
+    "last_event"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "installed": {
+      "type": "boolean"
+    },
+    "loaded": {
+      "type": "boolean"
+    },
+    "running": {
+      "type": "boolean"
+    },
+    "path": {
+      "type": "string"
+    },
+    "plist": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "last_event": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "at",
+            "source",
+            "result",
+            "details"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "at": {
+              "type": "number",
+              "minimum": 0
+            },
+            "source": {
+              "enum": [
+                null,
+                "ac",
+                "battery",
+                "ups"
+              ]
+            },
+            "result": {
+              "enum": [
+                "handled",
+                "ignored",
+                "failed"
+              ]
+            },
+            "details": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

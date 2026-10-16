@@ -68,6 +68,7 @@ Sudo is requested only for operations that require it, such as power writes, glo
 | --- | --- |
 | `travel-mode` / `travel-mode on` | Select a scenario, then use the chosen interface |
 | `travel-mode off` / `travel-mode restore` | Restore outstanding recovery records |
+| `travel-mode automation install` / `uninstall` / `status [--json]` | Manage optional power-source events |
 | `travel-mode power --seconds 20` / `--json` | Measure battery draw in a finite window |
 | `travel-mode check --reapply` | Pause recorded items detected running again |
 | `travel-mode check` / `travel-mode check --json` | Read-only audit, including the effective saved scenario in JSON |
@@ -153,6 +154,25 @@ spotlight_cpu_threshold = 20
 
 Brightness thresholds and targets are fractions greater than zero and at most one; CPU thresholds are percentages greater than zero and at most 10000. A selected profile's brightness target takes precedence over `health.brightness_target`. Automatic buttons are optional; checks themselves do not change settings. `off` restores recorded changes, with the existing exception for terminated caffeinate processes.
 
+## Optional event automation
+
+Automation is off until you explicitly run `travel-mode automation install`. Installation writes one user LaunchAgent and bootstraps it in your GUI domain. `travel-mode automation install --dry-run` previews the plist and command without installing it. `travel-mode automation status` (or `--json`) shows the descriptor, loaded/running state and latest local event receipt. `travel-mode automation uninstall` boots out only this agent and removes its plist; event receipts remain local.
+
+The agent subscribes only to Apple's power-source change notification. launchd starts it when a source event arrives; it consumes the XPC event, reads the current source, processes it once and exits. There is no resident travel-mode process, polling service, login launch, periodic wake or KeepAlive. A 30-second launch throttle limits event storms; repeated observations are ignored. Notifications can be coalesced or lost, so this reconciles current state and does not promise a record of every rapid transition. No lid-close, sleep or wake trigger is installed: the public APIs established by our research require a running observer. See the [research and verification boundaries](docs/automation-research.md).
+
+```toml
+[automation]
+on_battery = "notify"  # notify | apply-work-safe | off
+on_ac = "notify"       # notify | off-restore | off
+retain = 50            # bounded local event receipts (1–10000)
+```
+
+By default an unplug event only suggests entering work mode; an AC event with an active snapshot suggests `travel-mode off`. System settings change only after explicit `apply-work-safe` or `off-restore` configuration. `apply-work-safe` uses the existing work Actions for low power mode and selected user LaunchAgents. It quits/freezes an app only when the app is explicitly listed in `[apps].quit` or `[apps].freeze`; built-in app category matches alone are insufficient. Configured daemon-app shutdown, indexing, brightness, display sleep and network changes are excluded. Non-interactive sudo authorization is required for low power mode; otherwise it is skipped and the notification explains why. No password prompt, credential refresh thread or power measurement runs in an event handler. `off-restore` reuses the existing snapshot restore flow with `sudo -n`; failed restorations retain the snapshot for manual `travel-mode off`.
+
+Each handler permits at most 45 seconds of external command time, after a native event wait of at most 10 seconds. Errors are recorded in `automation.json` beside the state file and return a nonzero status. Notification failures are recorded after the other work; no result is fabricated. The event entry is `travel-mode event power-changed`; the installed agent additionally uses a private XPC-consumption flag. Event and installation commands do not migrate or rewrite your configuration. Automation operation errors return exit code 5; notification delivery failure returns 1. Configuration/state errors retain exit codes 2/3.
+
+A read-only **simulation** on 2026-10-15 measured one handler at 0.006204 seconds wall time and 0.005247 seconds process CPU, with 0 child CPU seconds. It used temporary paths and two logical commands (`pmset -g ps` and notification); neither command ran on the host. Imports were already loaded; Python startup, XPC delivery and real notification cost are excluded. Reproduce with `uv run python scripts/measure_event_overhead.py`. No agent was installed during development; installed-agent delivery and idle zero-process state still require the maintainer's [guarded validation plan](CONTRIBUTING.md#event-automation-validation).
+
 ## Power measurement
 
 `travel-mode power` waits for two fresh telemetry updates, covering at least one interval. It reads `ioreg -rn AppleSmartBattery` every 5 seconds and stops after 180 seconds by default. On the recorded hardware, macOS refreshed these registry values every 20–60 seconds; repeated reads returned the same cached data. Allow about 1–3 minutes per window. The first snapshot is only a freshness reference: the first observed change establishes the baseline, so an interval predating an Action is excluded. At a slow update cadence the timeout can expire before two updates; this returns **insufficient samples**, without average watts or a runtime estimate. `travel-mode power --seconds 240 --updates 3 --json` extends the maximum wait and returns structured results, as defined by the [power schema](docs/json-schema/power.schema.json). No sudo is needed. AC, charging or no battery produces an explicit unavailable result.
@@ -212,6 +232,7 @@ Without a snapshot, non-interactive `off` fails without resetting settings. Inte
 | 2 | Configuration / argument error; also unsupported platform or missing platform capabilities |
 | 3 | Invalid, unreadable or unwritable recovery state |
 | 4 | Battery power measurement read or parse error |
+| 5 | Automation installation or event handling error |
 
 Configuration and state errors print one diagnostic line with a path, relevant key/reason and repair guidance, without a Python traceback. Set `TRAVEL_MODE_DEBUG=1` to retain the full traceback and exception chain. Battery measurement errors also print one diagnostic line; `power --json` returns an error object with `available=false`, `reason="failed"` and `error.type`/`error.message`. Debug mode retains their full traceback and exception chain. Unexpected exceptions retain their normal traceback. An external editor can return its own exit code.
 

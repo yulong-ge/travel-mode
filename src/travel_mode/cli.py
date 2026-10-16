@@ -45,10 +45,25 @@ def _main(argv=None):
             "suggest",
             "power",
             "history",
+            "automation",
+            "event",
         ],
     )
     parser.add_argument(
-        "config_cmd", nargs="?", choices=["path", "init", "validate", "edit", "set-language", "set-interface"]
+        "config_cmd",
+        nargs="?",
+        choices=[
+            "path",
+            "init",
+            "validate",
+            "edit",
+            "set-language",
+            "set-interface",
+            "install",
+            "uninstall",
+            "status",
+            "power-changed",
+        ],
     )
     parser.add_argument("value", nargs="?")
     parser.add_argument("--check", action="store_true")
@@ -78,9 +93,32 @@ def _main(argv=None):
     parser.add_argument("--reapply", action="store_true", help=t("resurrection.reapply_help"))
     parser.add_argument("--lang", choices=["en", "zh"], help=t("cli.output_language"))
     parser.add_argument("--demo", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--launch-event", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--all", action="store_true", help=t("cli.thaw_resume_all_stopped_app_processes"))
     parser.add_argument("--version", action="version", version="travel-mode 1.1.0")
     args = parser.parse_args(argv)
+    if args.config_cmd is not None and args.cmd not in {"config", "automation", "event"}:
+        parser.error(t("cli.unexpected_config_value"))
+    if args.cmd == "config" and args.config_cmd not in {
+        None,
+        "path",
+        "init",
+        "validate",
+        "edit",
+        "set-language",
+        "set-interface",
+    }:
+        parser.error(t("cli.config_requires_path_init_validate_or"))
+    if args.launch_event and (args.cmd, args.config_cmd) != ("event", "power-changed"):
+        parser.error(t("automation.event_usage"))
+    if args.cmd == "event":
+        if args.config_cmd != "power-changed" or args.value is not None or args.dry_run or args.demo:
+            parser.error(t("automation.event_usage"))
+        from .flows.automation import event
+        from .system.platform import ensure_macos
+
+        ensure_macos()
+        return event(launch_event=args.launch_event)
     if args.limit is not None and (args.cmd != "history" or args.limit < 1):
         parser.error(t("session.limit_error"))
     if args.seconds is not None and args.cmd != "power":
@@ -105,14 +143,14 @@ def _main(argv=None):
 
         try:
             ensure_macos()
-            if not args.demo:
+            if not args.demo and args.cmd != "automation":
                 detect_capabilities()
         except SystemExit:
             raise
         except RuntimeError as exc:
             print(str(exc), file=sys.stderr)
             return 2
-    migration_messages = [] if args.cmd in {"suggest", "history"} else migrate_legacy()
+    migration_messages = [] if args.cmd in {"suggest", "history", "automation"} else migrate_legacy()
     for message in migration_messages:
         print(message, file=sys.stderr)
     from .tui import app as tui_app
@@ -121,6 +159,41 @@ def _main(argv=None):
         demo._configure_demo_views()
     mode_apply, mode_check, mode_off = flow_apply.mode_apply, flow_check.mode_check, flow_restore.mode_off
     mode_report, thaw_processes, tui = flow_report.mode_report, flow_thaw.thaw_processes, tui_app.tui
+
+    if args.cmd == "automation":
+        import json
+
+        from . import automation
+        from .actions.automation import InstallAutomation, UninstallAutomation
+        from .actions.base import Context
+        from .actions.executor import Executor
+
+        if args.config_cmd == "status":
+            result = automation.status()
+            print(
+                json.dumps(result, ensure_ascii=False)
+                if args.json
+                else t(
+                    "automation.status",
+                    installed=result["installed"],
+                    loaded=result["loaded"],
+                    running=result["running"],
+                    path=result["path"],
+                )
+                + "\n"
+                + json.dumps(
+                    {"plist": result["plist"], "last_event": result["last_event"]},
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            return 0
+        if args.config_cmd not in {"install", "uninstall"} or args.json:
+            parser.error(t("automation.usage"))
+        action = InstallAutomation() if args.config_cmd == "install" else UninstallAutomation()
+        Executor(Context(None)).execute(action)
+        print(t("automation.planned" if args.dry_run else "automation.completed", action=action.describe()))
+        return 0
 
     if args.cmd == "config":
         if not args.config_cmd:
@@ -277,14 +350,23 @@ def _main(argv=None):
 __all__ = ["main"]
 
 
-def main(argv=None):
+def _handled_main(argv=None):
+    from contextlib import nullcontext
+
+    from .automation import AutomationError, preview_scope
     from .paths import state_path
     from .state import StateError
     from .system.battery import BatteryError
 
     arguments = list(sys.argv[1:] if argv is None else argv)
     try:
-        return command_lifecycle(arguments, _main)
+        with preview_scope() if "automation" in arguments and "--dry-run" in arguments else nullcontext():
+            return command_lifecycle(arguments, _main)
+    except AutomationError as exc:
+        if os.environ.get("TRAVEL_MODE_DEBUG") == "1":
+            raise
+        print(t("automation.failed", detail=" ".join(str(exc).splitlines())), file=sys.stderr)
+        return 5
     except BatteryError as exc:
         if os.environ.get("TRAVEL_MODE_DEBUG") == "1":
             raise
@@ -328,3 +410,22 @@ def ask_scenario():
     if answer not in ("work", "away"):
         raise ConfigError("<cli>", "--scenario", t("scenario.invalid"))
     return answer
+
+
+def main(argv=None):
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if not {"event", "power-changed", "--launch-event"} <= set(arguments):
+        return _handled_main(arguments)
+    # libxpc has no unregister API. Native callbacks must not race CPython's
+    # interpreter teardown. Complete all scoped cleanup, flush, then exit the
+    # one-shot launchd child without running interpreter finalizers.
+    try:
+        result = _handled_main(arguments)
+    except BaseException:  # noqa: BLE001 - native child reports then exits without interpreter teardown.
+        import traceback
+
+        traceback.print_exc()
+        result = 1
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(result)

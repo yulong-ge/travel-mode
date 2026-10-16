@@ -155,6 +155,13 @@ class HealthConfig:
 
 
 @dataclass(frozen=True)
+class AutomationConfig:
+    on_battery: str = "notify"
+    on_ac: str = "notify"
+    retain: int = 50
+
+
+@dataclass(frozen=True)
 class Profile:
     values: dict[str, Any] = field(default_factory=dict)
 
@@ -171,6 +178,7 @@ class Config:
     measurement: Settings = field(default_factory=Settings)
     health: HealthConfig = field(default_factory=HealthConfig)
     history_retain: int = 50
+    automation: AutomationConfig = field(default_factory=AutomationConfig)
 
     @classmethod
     def defaults(cls) -> Config:
@@ -183,6 +191,7 @@ class Config:
 
 
 _TOP_KEYS = {
+    "automation",
     "history",
     "apps",
     "network",
@@ -363,7 +372,20 @@ def load_config(path: str | Path | None = None) -> Config:
     retain = history.get("retain", 50)
     if type(retain) is not int or not 1 <= retain <= 10000:
         raise _error(target, "history.retain", t("session.invalid_retain"))
+    automation = _table(data, "automation", target)
+    _check_keys(automation, {"on_battery", "on_ac", "retain"}, target, "automation")
+    for key, values in (
+        ("on_battery", ("notify", "apply-work-safe", "off")),
+        ("on_ac", ("notify", "off-restore", "off")),
+    ):
+        if automation.get(key, "notify") not in values:
+            raise _error(
+                target, "automation." + key, t("automation.invalid_policy", values=", ".join(values))
+            )
+    if type(automation.get("retain", 50)) is not int or not 1 <= automation.get("retain", 50) <= 10000:
+        raise _error(target, "automation.retain", t("session.invalid_retain"))
     return Config(
+        automation=AutomationConfig(**automation),
         history_retain=retain,
         apps=app_config,
         network=network_config,

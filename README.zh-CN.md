@@ -68,6 +68,7 @@ away 动作可修改电池设置、AC 的 `powernap` / `womp`、全局 `disables
 | --- | --- |
 | `travel-mode` / `travel-mode on` | 选择场景后进入选定界面 |
 | `travel-mode off` / `travel-mode restore` | 恢复尚未完成的恢复记录 |
+| `travel-mode automation install` / `uninstall` / `status [--json]` | 管理可选电源来源事件 |
 | `travel-mode power --seconds 20` / `--json` | 在有限窗口内测量电池功耗 |
 | `travel-mode check --reapply` | 再次暂停检测到已复活的记录项 |
 | `travel-mode check` / `travel-mode check --json` | 只读检查；JSON 包含当前已保存的生效场景 |
@@ -153,6 +154,25 @@ spotlight_cpu_threshold = 20
 
 亮度阈值与目标值为大于 0 且不超过 1 的比例；CPU 阈值为大于 0 且不超过 10000 的百分数。所选 profile 的亮度目标优先于 `health.brightness_target`。用户可自行选择是否使用处理按钮；检查本身不改设置。`off` 恢复已记录的改动，但按现有规则不重建已终止的 caffeinate 进程。
 
+## 自动触发（可选）
+
+自动触发默认关闭，只有显式运行 `travel-mode automation install` 才会安装。安装命令写入一个用户 LaunchAgent，并在当前 GUI 域加载。`travel-mode automation install --dry-run` 预览 plist 和命令，不安装。`travel-mode automation status`（或 `--json`）显示配置摘要、加载与运行状态和最近的本地触发记录。`travel-mode automation uninstall` 只卸载这个 agent 并删除它的 plist；本地触发记录保留。
+
+agent 只订阅 Apple 的电源来源变化通知。事件到达时由 launchd 拉起，消费 XPC 事件、读取当前来源、处理一次后退出。没有常驻 travel-mode 进程、轮询服务、登录启动、定时唤醒或 KeepAlive。30 秒启动节流限制事件风暴，重复来源会被忽略。通知可能合并或丢失，因此工具核对当前状态，不保证记录每次快速切换。本轮不安装合盖、睡眠或唤醒触发：调研确认的公开 API 需要运行中的观察者。详见[调研与验证范围](docs/automation-research.md)。
+
+```toml
+[automation]
+on_battery = "notify"  # notify | apply-work-safe | off
+on_ac = "notify"       # notify | off-restore | off
+retain = 50            # 本地触发记录上限，范围 1–10000
+```
+
+默认在拔电时仅提示进入 work 模式；接电且有活动快照时提示运行 `travel-mode off`。只有显式配置 `apply-work-safe` 或 `off-restore` 才会修改系统设置。`apply-work-safe` 复用现有 work Action，处理低电量模式和选中的用户 LaunchAgent。只有在 `[apps].quit` 或 `[apps].freeze` 中明确列出的应用才会退出或冻结；仅命中内置应用类别不会触发处理。带 daemon 的应用退出、索引、亮度、关屏和网络变更不在自动处理范围。低电量模式需要无需交互的 sudo 授权，否则跳过并在通知中说明。事件处理不请求密码、不启动凭据刷新线程、不测量功耗。`off-restore` 复用现有快照恢复流程并使用 `sudo -n`；恢复失败的项目保留在快照中，供手动运行 `travel-mode off`。
+
+每次处理的外部命令总时限为 45 秒，此前原生事件等待上限为 10 秒。错误记录在状态文件旁的 `automation.json` 中，并以非零状态退出。通知失败在其它工作完成后记录，不合成结果。事件入口为 `travel-mode event power-changed`；安装的 agent 还使用一个内部 XPC 消费参数。事件和安装命令不会迁移或重写用户配置。自动触发操作错误的退出码为 5；通知投递失败返回 1。配置和状态错误仍分别返回 2/3。
+
+2026-10-15 的一次只读**模拟**测得处理耗时 0.006204 秒、进程 CPU 时间 0.005247 秒、子进程 CPU 时间 0 秒。测试使用隔离路径，仅记录电源查询与通知两个逻辑命令，均未在本机执行。导入已完成；数据不包含 Python 启动、XPC 投递和真实通知开销。可用 `uv run python scripts/measure_event_overhead.py` 复现。开发期间未安装 agent；已安装 agent 的真实事件交付与空闲零进程状态仍需维护者按[带 guard 的验证步骤](CONTRIBUTING.md#event-automation-validation)验收。
+
 ## 功耗测量
 
 `travel-mode power` 等待 2 次真实遥测更新，覆盖至少 1 个区间。它每 5 秒只读一次 `ioreg -rn AppleSmartBattery`，默认最多等待 180 秒。已录制的本机 macOS 每 20–60 秒更新一次这些注册表值；重复读取可能得到同一份缓存。因此每个窗口通常需要约 1–3 分钟。第一次读取只作为新鲜度参照；观察到第一次变化后才建立基线，避免区间包含执行 Action 前的负载。更新较慢时，超时前可能不足 2 次更新；此时明确返回“样本不足”，不给出平均瓦数或剩余时长。`travel-mode power --seconds 240 --updates 3 --json` 可延长等待上限并输出结构化结果，见 [power schema](docs/json-schema/power.schema.json)。此命令无需 sudo；接电、充电或没有电池时明确返回不可测量。
@@ -212,6 +232,7 @@ travel-mode history --json --limit 10
 | 2 | 配置或参数错误；也用于不支持的平台或缺少平台能力 |
 | 3 | 恢复状态非法、不可读或不可写 |
 | 4 | 功耗测量读取或解析失败 |
+| 5 | 自动触发安装或事件处理错误 |
 
 配置与状态错误只输出一行诊断，包含路径、相关键或原因及修复提示，不打印 Python traceback。设置 `TRAVEL_MODE_DEBUG=1` 后保留完整 traceback 和异常链。电池测量错误也只输出一行诊断；`power --json` 返回包含 `available=false`、`reason="failed"` 和 `error.type`/`error.message` 的错误对象。调试模式保留完整 traceback 和异常链。未预期异常保留正常 traceback。外部编辑器可以返回自己的退出码。
 

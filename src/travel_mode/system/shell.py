@@ -185,7 +185,7 @@ def _dry_run_readonly(cmd: list[str]) -> bool:
     if base == "pmset":
         return len(args) >= 1 and args[0] == "-g"
     if base == "launchctl":
-        return args == ["list"]
+        return args == ["list"] or (len(args) == 2 and args[0] == "print")
     if base == "ioreg":
         return args == ["-rn", "AppleSmartBattery"]
     if base == "mdutil":
