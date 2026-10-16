@@ -6,6 +6,7 @@ All notable changes follow Keep a Changelog.
 
 ### Fixed
 
+- Describe Low Power Mode as reducing energy use with effects that vary by Mac model, rather than promising CPU/GPU frequency or brightness changes; cite Apple's wording and dated third-party observations in both READMEs.
 - Share one structural AppleSmartBattery parser across session endpoints, measurements and the TUI; nested ChargerData keys and other registry nodes cannot overwrite top-level battery status.
 
 - Measure fresh PowerTelemetryData accumulator intervals instead of averaging repeated cached voltage/current reads. Default windows require two fresh updates, label a single interval as lower precision, poll every 5 seconds and time out after 180 seconds without fabricating a result; session averages use endpoint accumulator deltas. Label the voltage/current fallback and update e2e diagnostics and wait guidance.
@@ -22,6 +23,7 @@ All notable changes follow Keep a Changelog.
 
 ### Added
 
+- A maintainer-only `measure_lowpower.py --plan` and guarded battery 0→1→0 experiment using fresh telemetry accumulator intervals, non-interactive passwordless pmset writes, contextual brightness/CPU observations and verified rollback on success, errors or Ctrl-C.
 - Optional power-source LaunchEvents automation with explicit install/uninstall/status, bounded local receipts, notification defaults and opt-in non-interactive safe work/restore actions. Consume XPC events before handling and exit; no resident monitor, periodic launch or lid/sleep trigger.
 
 - Add an opt-in battery-only CLI/TUI e2e mode with a two-process fixture load, measured freeze/restore checks, numerical diagnostics and a stricter guard that rejects all sudo commands. Ordinary real e2e retains its AC requirement.

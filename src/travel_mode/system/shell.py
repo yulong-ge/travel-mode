@@ -90,7 +90,7 @@ def resolve_command(cmd: list[str]) -> list[str]:
             index += 1
             if option == "--":
                 break
-            if option not in {"-n", "-l", "-v"}:
+            if option not in {"-n", "-l", "-v", "-k"}:
                 raise ValueError(t("shell.sudo_option", option=option))
         if index < len(cmd):
             resolved[index:] = resolve_command(cmd[index:])

@@ -10,7 +10,7 @@ from ..i18n import t
 from .shell import ReadError, _read
 
 POWER_KEYS = [
-    ("lowpowermode", t("impl.low_power_mode_reduce_cpu_gpu"), "1"),
+    ("lowpowermode", t("impl.low_power_mode_reduce_energy"), "1"),
     ("sleep", t("impl.sleep_after_n_idle_minutes_disables"), "5"),
     ("displaysleep", t("impl.turn_off_the_display_after_n"), "3"),
     ("powernap", t("impl.power_nap_wake_periodically_for_mail"), "0"),

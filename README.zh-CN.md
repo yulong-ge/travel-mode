@@ -175,6 +175,10 @@ retain = 50            # 本地触发记录上限，范围 1–10000
 
 ## 功耗测量
 
+Apple 的[电池设置说明](https://support.apple.com/guide/mac-help/change-battery-settings-mchlfc3b7879/mac)与[电源模式说明](https://support.apple.com/en-us/101613)将低电量模式描述为降低能耗、延长电池续航。具体效果因机型和 macOS 版本而异，本工具不预设 CPU/GPU 频率或亮度变化。[Eclectic Light 在 2025 年 1 月的测试](https://eclecticlight.co/2025/01/06/power-modes-and-apple-silicon-gpus/)中，M3 Pro 的旧式模式调暗屏幕，但未测得 GPU 性能变化；M4 Pro 的新式模式降低了 GPU 频率与功耗。这些结果仅代表所测系统，不能推广到所有 Mac。[9to5Mac 在 2024 年 9 月的报道](https://9to5mac.com/2024/09/23/apple-is-making-it-easier-for-mac-users-to-enable-low-power-mode-with-macos-15-1/)还描述了可能暂停部分后台任务，以及将 ProMotion 显示器刷新率限制为 60 Hz 的行为。
+
+维护者可先运行 `uv run python scripts/measure_lowpower.py --plan` 查看计划，再手动运行实验。前提是电池供电、无活动 travel-mode 快照，并且已有 pmset 免密授权。唯一写入项是电池 `lowpowermode`，顺序为 0→1→0；每段稳定 30 秒，等待三次真实遥测更新（两个累加器区间），超时 300 秒。总计最多约 16.5 分钟，另加命令耗时。请保持负载稳定。中间段与前后两段关闭状态的均值比较，并报告关闭窗口的漂移。这能减少顺序偏差，但不能证明因果关系。脚本用带目标命令的 `-k` 与 `-n` 忽略 sudo 缓存凭据，不提示密码、不刷新凭据。成功、异常或 Ctrl-C 后均恢复录制原值，逐字比对整个电池段落，并确认 AC 未改变；比对失败会明确报错。`/tmp/travel-mode-lowpower-*/report.json` 保存区间、样本数、亮度读数（或明确的不可读原因）、CPU 快照与恢复结果。脚本不改变亮度，也不生成负载。
+
 `travel-mode power` 等待 2 次真实遥测更新，覆盖至少 1 个区间。它每 5 秒只读一次 `ioreg -rn AppleSmartBattery`，默认最多等待 180 秒。已录制的本机 macOS 每 20–60 秒更新一次这些注册表值；重复读取可能得到同一份缓存。因此每个窗口通常需要约 1–3 分钟。第一次读取只作为新鲜度参照；观察到第一次变化后才建立基线，避免区间包含执行 Action 前的负载。更新较慢时，超时前可能不足 2 次更新；此时明确返回“样本不足”，不给出平均瓦数或剩余时长。`travel-mode power --seconds 240 --updates 3 --json` 可延长等待上限并输出结构化结果，见 [power schema](docs/json-schema/power.schema.json)。此命令无需 sudo；接电、充电或没有电池时明确返回不可测量。
 
 优先数据源是 `PowerTelemetryData.AccumulatedSystemLoad` 与 `SystemLoadAccumulatorCount`：区间平均 W = 累加 mW 差值 / 累加样本数差值 / 1000。整个窗口按累加样本数加权各区间。电池放电或功率累加器存在且增长时，另外报告电池平均功率。结果注明功率和容量来源、实际等待时长、观察到的覆盖时长与区间数。只有一个区间时注明“仅 1 个区间，精度较低”。覆盖时长是两次硬件变化被观察到的时间跨度；边界有最多一个轮询间隔的不确定性，不表示注册表连续更新。
