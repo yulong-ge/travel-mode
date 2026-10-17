@@ -21,6 +21,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import e2e_battery
+import e2e_refusal
 from e2e_fake import BatteryMachine, InstantClock, Machine, SimulatedBrightness, VirtualMachine
 from e2e_guard import GuardRunner, LocalBackend
 from e2e_isolation import write_fixture_config
@@ -85,7 +86,34 @@ class InteractiveHarness(Harness):
         graceful_ready = self.graceful()
         if self.state_file.exists():
             raise AssertionError("Preflight graceful stage left a state file")
-        write_fixture_config(self.root, graceful=graceful_ready, battery_measure=self.battery_measure)
+        self.refusing_ready = False
+        if graceful_ready and not self.battery_measure:
+            from travel_mode.system.shell import command_path
+
+            if command_path("swiftc") is None:
+                self.skip("refusing-quit", "swiftc is unavailable; refusing fixture cannot be built")
+            else:
+                e2e_refusal.create(self.root, self.runner)
+                self.command(["open", "-g", "-j", str(self.runner.refusing)])
+                self.wait(lambda: apps.app_running(str(self.runner.refusing)), "Refusing fixture started")
+                self.runner.observe()
+                result = self.runner(e2e_refusal.QUIT_EVENT, timeout=10)
+                if result.rc and "-128" in result.stdout + result.stderr:
+                    self.refusing_ready = True
+                elif result.rc and any(
+                    code in result.stdout + result.stderr for code in ("-1743", "-1712", "timeout")
+                ):
+                    self.skip(
+                        "refusing-quit", "Refusing fixture AppleEvent denied or timed out; guard unchanged"
+                    )
+                else:
+                    raise AssertionError(f"Refusing fixture did not cancel Quit: {result}")
+        write_fixture_config(
+            self.root,
+            graceful=graceful_ready,
+            battery_measure=self.battery_measure,
+            refusing=self.refusing_ready,
+        )
         print(
             "SKIP shell Quit fixture in UI; covered by local ForceQuitApp: "
             "its AppleEvent is outside the exact guard allowlist.",
@@ -208,6 +236,18 @@ class InteractiveHarness(Harness):
             self.check(not apps.app_running(str(self.runner.graceful)), "UI gracefully quit fixture")
         self.check(self.state_file.exists(), "UI persisted isolated state")
         saved = state.load_state()
+        if self.refusing_ready:
+            alive = apps.app_running(str(self.runner.refusing))
+            self.check(alive == work, "Refusing fixture: work keeps it running; away forces it to exit")
+            if work:
+                self.check(
+                    any("-128" in row["stderr"] for row in saved.get("action_failures", [])),
+                    "Unresolved work refusal is persisted",
+                )
+                self.check(saved["session"]["actions"]["failed"] >= 1, "Work refusal counted")
+            else:
+                self.check(not saved.get("action_failures"), "Away fallback has no failed actions")
+                self.check(saved["session"]["actions"]["failed"] == 0, "Away fallback counted as success")
         self.check(saved["scenario"] == self.scenario, "Snapshot scenario matches selected scenario")
         self.check(
             len(saved["frozen_pids"]) == (4 if self.battery_measure else 2)
@@ -238,6 +278,8 @@ class InteractiveHarness(Harness):
         )
         if self.graceful_ready:
             self.wait(lambda: apps.app_running(str(self.runner.graceful)), "UI off reopened applet")
+        if self.refusing_ready:
+            self.wait(lambda: apps.app_running(str(self.runner.refusing)), "UI off restored refusing fixture")
         self.verify_power()
         if self.battery_measure:
             e2e_battery.require_battery()
@@ -306,6 +348,11 @@ def answers(scenario="away", *, battery_measure=False):
             v2="F" if default == "freeze" else "f",
         )
         result[cpu_pattern(prompt)] = (row["name"], "f" if default == "freeze" else "y")
+        if row["name"] == "TravelModeE2E-Refusing" and scenario == "away":
+            result[t("impl.has_not_quit_possible_unsaved_dialog", v0=row["name"])] = (
+                "force-refusing-fixture",
+                "y",
+            )
     # Render the service prompt through the same catalogue as the product.
     from travel_mode.system import launchd
 
@@ -431,7 +478,9 @@ def child(args):
                     builtins.input = guarded_input
                     try:
                         harness.check_power(
-                            product_main(["--no-tui", "--lang", "en"]) == 0, "CLI apply succeeded"
+                            product_main(["--no-tui", "--lang", "en"])
+                            == (1 if harness.refusing_ready and args.scenario == "work" else 0),
+                            "CLI completed with the expected refusing-fixture partial-failure status",
                         )
                     finally:
                         builtins.input = original_input
@@ -463,6 +512,14 @@ def child(args):
                 if not args.battery_measure:
                     harness.brightness()
             finally:
+                # Keep private failure/session evidence before fixture cleanup
+                # removes its isolated state directory. Never read host state.
+                for name in ("travel-mode.log", "travel-mode.log.1", "history.jsonl"):
+                    source = root / name
+                    if source.is_file():
+                        target = evidence / name
+                        shutil.copyfile(source, target)
+                        target.chmod(0o600)
                 if args.battery_measure:
                     report["battery_measurement"] = e2e_battery.evidence(
                         runner, getattr(harness, "comparison", None)
@@ -757,7 +814,18 @@ def main(argv=None):
         )
         print(
             "SKIP shell Quit in UI by product decision: quit target is graceful applet; "
-            "local ForceQuitApp covers shell fixture. Exact osascript allowlist unchanged."
+            "local ForceQuitApp covers shell fixture."
+        )
+        print("Refusing fixture: compile fixed AppKit .terminateCancel source in the temporary root using:")
+        plan_root = Path("/tmp/travel-mode-e2e-PLAN")
+        print(shlex.join(e2e_refusal.compile_command(plan_root)))
+        print(shlex.join(e2e_refusal.QUIT_EVENT))
+        print(
+            "Only this exact source, compile argv, bundle and owned PID identities are admitted by the guard."
+        )
+        print(
+            "Assert away Force Quit; work partial failure without Force Quit; "
+            "freeze/agent actions continue; off restores."
         )
         print(
             "Select standalone hib25 checkbox with original=recommendation=3; "

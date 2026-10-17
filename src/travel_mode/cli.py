@@ -368,10 +368,11 @@ def _main(argv=None):
     if args.cmd == "thaw":
         return thaw_processes(all_processes=args.all)
     if args.cmd == "check" or args.check:
+        reapply_failed = 0
         if args.reapply:
             from .flows.check import reapply_paused
 
-            reapply_paused()
+            reapply_failed = reapply_paused()
         if args.dry_run:
             from .actions.runtime import _prepare_dry_run
 
@@ -382,8 +383,8 @@ def _main(argv=None):
             from .structured import check_data
 
             print(json.dumps(check_data(), ensure_ascii=False))
-            return 0
-        return mode_check()
+            return int(bool(reapply_failed))
+        return mode_check() or int(bool(reapply_failed))
     if args.cmd == "report" or args.report:
         if args.dry_run:
             from .actions.runtime import _prepare_dry_run
@@ -442,6 +443,7 @@ def _handled_main(argv=None):
     from contextlib import nullcontext
 
     from .automation import AutomationError, preview_scope
+    from .failures import CommandError
     from .menubar import MenubarError
     from .menubar import preview_scope as menubar_preview_scope
     from .paths import state_path
@@ -449,6 +451,7 @@ def _handled_main(argv=None):
     from .status import StatusError
     from .sudoers import SudoersError
     from .system.battery import BatteryError
+    from .system.shell import ReadError, SudoReadError
 
     arguments = list(sys.argv[1:] if argv is None else argv)
     try:
@@ -501,6 +504,19 @@ def _handled_main(argv=None):
         else:
             print(t("measurement.failed", reason=detail), file=sys.stderr)
         return 4
+    except (CommandError, ReadError, SudoReadError) as exc:
+        if os.environ.get("TRAVEL_MODE_DEBUG") == "1":
+            raise
+        from . import failures
+
+        commands = (
+            [dict(command=exc.command, rc=exc.rc, stdout="", stderr=exc.detail)]
+            if isinstance(exc, CommandError)
+            else []
+        )
+        row = failures.record(None, " ".join(arguments[:2]), str(exc), commands)
+        print(failures.message(row), file=sys.stderr)
+        return 1
     except (ConfigError, StateError) as exc:
         if os.environ.get("TRAVEL_MODE_DEBUG") == "1":
             raise
@@ -509,7 +525,17 @@ def _handled_main(argv=None):
             print(f"{detail}. {t('errors.config_hint')}", file=sys.stderr)
             return 2
         location = "" if str(state_path()) in detail else f"{state_path()}: "
-        print(f"{location}{detail}. {t('errors.state_hint')}", file=sys.stderr)
+        from . import failures
+
+        if not getattr(exc, "travel_failure", None):
+            try:
+                failures.record(None, " ".join(arguments[:2]), detail, error=exc, kind="state")
+            except StateError as log_error:
+                detail += f". {log_error}"
+        print(
+            f"{location}{detail}. {t('errors.state_hint')} {t('failure.log_path', path=failures.log_path())}",
+            file=sys.stderr,
+        )
         return 3
 
 

@@ -70,8 +70,9 @@ def remediate(descriptor, execute, state, save):
     else:
         success = bool(result)
     if not success:
-        raise RuntimeError(t("health.action_failed", action=action_label(descriptor)))
+        return False
     save()
+    return True
 
 
 __all__ = ["collect", "lines", "make_action", "remediate"]

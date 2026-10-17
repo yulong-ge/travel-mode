@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from textual.worker import WorkerCancelled
+from textual.worker import WorkerCancelled, WorkerFailed
 
 
 class Lifecycle:
@@ -14,6 +14,10 @@ class Lifecycle:
         self._action_threads = set()
         self.language_posted = asyncio.Event()
         self.last_language_dispatch = None
+        self._worker_error_events = {}
+
+    def worker_error_reported(self, worker):
+        return self._worker_error_events.setdefault(worker, asyncio.Event())
 
     def track_input(self):
         completion = asyncio.get_running_loop().create_future()
@@ -51,6 +55,10 @@ class Lifecycle:
                         # WorkerFailed and task cancellation still propagate.
                         if not worker.is_cancelled:
                             raise
+                    except WorkerFailed:
+                        # A failed operation stays failed; wait for its explicit
+                        # receipt/UI notification instead of letting Textual exit.
+                        await asyncio.wait_for(self.worker_error_reported(worker).wait(), 30)
 
                 await asyncio.gather(*(finish(worker) for worker in workers))
             if not self._pending_inputs and not any(

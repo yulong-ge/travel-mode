@@ -5,7 +5,8 @@ from __future__ import annotations
 import sys
 
 from travel_mode.actions.apps import ResumeProcess
-from travel_mode.actions.executor import execute
+from travel_mode.actions.base import Context
+from travel_mode.actions.executor import Executor
 from travel_mode.presentation import action_message as t
 from travel_mode.system.shell import run_out
 
@@ -40,8 +41,11 @@ def thaw_processes(all_processes=False):
         if answer not in {"y", "yes"}:
             return 1
     fails = 0
+    from travel_mode.state import load_state, save_state
+
+    executor = Executor(Context(load_state(), save_state))
     for pid, _ in selected:
-        _, result = execute(ResumeProcess(pid))
+        _, result = executor.execute(ResumeProcess(pid))
         if result == 0:
             print(t("impl.thawed_2", v0=pid))
         else:

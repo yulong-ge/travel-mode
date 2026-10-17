@@ -97,9 +97,8 @@ async def test_work_profile_brightness_is_opt_in_and_uses_configured_target(mach
 
 
 def test_work_quit_failure_does_not_force_quit_or_report_success(machine, monkeypatch):
-    import pytest
-
     monkeypatch.setattr("travel_mode.system.apps.grace_quit", lambda path, name: False)
-    with profile_scope(load_config(), "work"), pytest.raises(RuntimeError, match="Quit Demo"):
-        mode_apply(yes=True)
+    with profile_scope(load_config(), "work"):
+        assert mode_apply(yes=True) == 1
+    assert state.load_state()["action_failures"]
     assert not any(call[:2] == ("kill", "-TERM") for call in machine["fake"].calls)

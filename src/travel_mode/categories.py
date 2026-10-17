@@ -6,8 +6,6 @@ from fnmatch import fnmatchcase
 from functools import lru_cache
 from importlib.resources import files
 
-from .i18n import t
-
 try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover
@@ -132,7 +130,7 @@ def pause_categories(categories, app_rows, service_rows, execute, save, state):
         seen.add(row["plist_path"])
         _, rc = execute(UnloadAgent(row["plist_path"]))
         if rc:
-            raise RuntimeError(t("categories.agent_failed", label=row["label"], rc=rc))
+            continue
         save()
     for row in app_rows:
         rule = identify(name=row["name"], bundle_id=row.get("bundle_id", ""))
@@ -151,5 +149,5 @@ def pause_categories(categories, app_rows, service_rows, execute, save, state):
         action = config.apps.actions.get(row["name"], rule["action"])
         operation = FreezeApp(row["path"]) if action == "freeze" else QuitApp(row["path"], row["name"])
         if not execute(operation):
-            raise RuntimeError(t("categories.app_failed", name=row["name"]))
+            continue
         save()

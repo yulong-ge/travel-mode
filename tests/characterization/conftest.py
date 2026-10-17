@@ -206,7 +206,14 @@ def machine(contract_root, tmp_paths, darwin_platform, monkeypatch):
     previous = get_language()
     set_language("en")
     yield dict(
-        root=root, paths=paths, fake=fake, processes=processes, config=config, daemon=daemon, plist=plist
+        root=root,
+        paths=paths,
+        fake=fake,
+        processes=processes,
+        config=config,
+        daemon=daemon,
+        plist=plist,
+        loaded=loaded,
     )
     set_language(previous)
 

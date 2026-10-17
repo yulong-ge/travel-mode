@@ -160,7 +160,7 @@ def build_report(state, restored, failed):
         average_source=None,
         power_status="unknown",
         measurement=state.get("measurement"),
-        actions=active["actions"] if active else None,
+        actions=dict(active["actions"]) if active else None,
         restore=dict(
             restored=(active["restored"] if active else 0) + restored,
             failed=failed,
@@ -170,6 +170,23 @@ def build_report(state, restored, failed):
         away=None,
         errors=list(end["errors"]),
     )
+    from .failures import session_receipts
+
+    receipts = session_receipts(state)
+    if receipts or "action_failures" in state:
+        report["failures"] = receipts
+    if report["actions"] is not None:
+        for receipt in receipts:
+            counts = receipt.get("counts")
+            if counts and (
+                counts["attempted"] > report["actions"]["attempted"]
+                or (
+                    counts["attempted"] == report["actions"]["attempted"]
+                    and counts["succeeded"] + counts["failed"]
+                    > report["actions"]["succeeded"] + report["actions"]["failed"]
+                )
+            ):
+                report["actions"] = dict(counts)
     if not active:
         report["errors"].append(t("session.missing_start"))
         return report
@@ -345,10 +362,14 @@ def validate_report(row):
     if (
         not isinstance(row, dict)
         or not required <= row.keys()
-        or row.keys() - required - {"average_source"}
+        or row.keys() - required - {"average_source", "failures"}
         or row["version"] != 1
     ):
         raise ValueError("report: invalid fields/version")
+    if "failures" in row:
+        from .failures import validate
+
+        validate(row["failures"])
     if row.get("average_source") not in (
         None,
         "PowerTelemetryData.SystemLoad",
@@ -578,6 +599,17 @@ def describe(report, peers=()):
         failed=counts["failed"] if counts else unknown,
     )
     yield t("session.restore", **report["restore"])
+    for failure in report.get("failures", []):
+        yield t(
+            "failure.history_recovered" if failure.get("recovered") else "failure.history",
+            action=failure["action"],
+            reason=failure["reason"],
+            rc=failure["rc"] if failure["rc"] is not None else unknown,
+        )
+        if failure["command"]:
+            import shlex
+
+            yield t("failure.history_command", command=shlex.join(failure["command"]))
     for row in report["resurrected"]:
         from .resurrection import describe as resurrection_description
 

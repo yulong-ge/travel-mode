@@ -10,7 +10,6 @@ from textual.widgets import Checkbox, Label, Static
 
 from travel_mode import network_apps as network_api
 from travel_mode.actions.apps import (
-    ForceQuitApp,
     FreezeApp,
     QuitApp,
     QuitDaemonApp,
@@ -162,8 +161,8 @@ class DashboardPage:
     async def act_health(self, button):
         from travel_mode.flows.doctor import remediate
 
-        await self.busy(button, remediate, button.health_descriptor, self.execute, self.st, self.save)
-        button._mutation_done = True
+        if await self.busy(button, remediate, button.health_descriptor, self.execute, self.st, self.save):
+            button._mutation_done = True
         self.action_refresh()
 
     async def build_dash(self, blocks, ac, batt, spot):
@@ -300,16 +299,11 @@ class DashboardPage:
                     self.save()  # 电源变更落盘 (否则 off 无法回滚且污染下次锚点)
                 target = self.profile_values.get("brightness")
                 if target is not None:
-                    from travel_mode.system.brightness import available
-
-                    if not available():
-                        raise RuntimeError(
-                            t("impl.brightness_is_not_installed_restore_brightness", v0=target)
-                        )
                     _, rc = self.execute(SetBrightness(target))
                     if rc:
-                        raise RuntimeError(t("impl.changing_brightness_failed"))
-                    self.save()
+                        self.tlog("bad", t("impl.changing_brightness_failed"))
+                    else:
+                        self.save()
             if scope["apps"]:
                 nq = nf = 0
                 ask_pending = []
@@ -331,21 +325,32 @@ class DashboardPage:
                         spec = configured_daemon(name)
                         if spec is not None:
                             _, okq, msg = self.execute(QuitDaemonApp(spec, self.st, self.save))
-                            self.tlog("ok" if okq else "warn", msg)
+                            if msg:
+                                self.tlog("ok" if okq else "warn", msg)
                             nq += int(okq)
                             continue
-                        if self.execute(QuitApp(path, name)) or (
-                            self.scenario != "work" and self.execute(ForceQuitApp(path))
-                        ):
+                        result = self.execute(QuitApp(path, name, fallback=self.scenario != "work"))
+                        if result:
                             self.save()
                             nq += 1
-                            self.tlog("ok", t("impl.quit", v0=name))
+                            if not getattr(result, "forced", False):
+                                self.tlog("ok", t("impl.quit", v0=name))
                         else:
                             self.tlog("warn", t("impl.did_not_quit", v0=name))
-                            if self.scenario == "work":
-                                raise RuntimeError(t("impl.did_not_quit", v0=name))
                     elif dfl == "freeze":
-                        for _line in system_apps.app_sleep_assertions(name)[:1]:
+                        from travel_mode.failures import probe
+
+                        assertions = probe(
+                            self.st,
+                            name,
+                            system_apps.app_sleep_assertions,
+                            name,
+                            save=self.save,
+                            emit=self.tlog,
+                        )
+                        if assertions is None:
+                            continue
+                        for _line in assertions[:1]:
                             self.tlog("warn", t("impl.holds_a_sleep_assertion_freezing_will_2", v0=name))
                         if self.execute(FreezeApp(path)):
                             self.save()
@@ -391,17 +396,18 @@ class DashboardPage:
                         p_uu = system_apps.app_path(name)
                         if (p_uu and system_apps.app_running(p_uu)) or pmset.sleep_blocking_assertion():
                             _, okq, msg = self.execute(QuitDaemonApp(spec, self.st, self.save))
-                            self.tlog("ok" if okq else "warn", f"{name}: {msg}")
+                            if msg:
+                                self.tlog("ok" if okq else "warn", f"{name}: {msg}")
                         continue
                     p = system_apps.app_path(name)
                     if p and system_apps.app_running(p):
-                        if self.execute(QuitApp(p, name)) or self.execute(ForceQuitApp(p)):
+                        result = self.execute(QuitApp(p, name, fallback=self.scenario != "work"))
+                        if result:
                             self.save()
-                            self.tlog("ok", t("impl.quit", v0=name))
+                            if not getattr(result, "forced", False):
+                                self.tlog("ok", t("impl.quit", v0=name))
                         else:
                             self.tlog("warn", t("impl.did_not_quit", v0=name))
-                            if self.scenario == "work":
-                                raise RuntimeError(t("impl.did_not_quit", v0=name))
                 dev = system_network.wifi_dev()
                 if dev:
                     if not system_network.wifi_powered(dev):

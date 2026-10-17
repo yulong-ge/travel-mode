@@ -416,6 +416,10 @@ class Harness:
             print(TCC_SKIP)
             self.state_file.unlink(missing_ok=True)
             return False
+        if not ok and tcc_denied(self.runner):
+            print(TCC_SKIP)
+            self.state_file.unlink(missing_ok=True)
+            return False
         self.check(ok and not apps.app_running(str(self.runner.graceful)), "AppleEvent quit exited applet")
         self.check(
             not any(c[0] == "kill" for c in self.runner.commands[start:]),
@@ -703,6 +707,8 @@ class Harness:
         def unregister():
             if self.graceful_attempted and self.runner.graceful.exists():
                 self.command([LSREGISTER, "-u", str(self.runner.graceful)])
+            if self.runner.refusing.exists():
+                self.command([LSREGISTER, "-u", str(self.runner.refusing)])
 
         # LIFO callbacks guarantee independent cleanup even for unexpected exception
         # types. Expected failures are collected and re-raised with their causes.
@@ -747,16 +753,11 @@ TCC_SKIP = (
 
 
 def tcc_denied(runner):
-    return bool(
-        runner.results
-        and runner.results[-1][0] == tuple(QUIT_EVENT)
-        and (
-            runner.results[-1][1].rc == 124
-            or any(
-                code in runner.results[-1][1].stderr + runner.results[-1][1].stdout
-                for code in ("-1743", "-1712")
-            )
-        )
+    result = next(
+        (result for command, result in reversed(runner.results) if command == tuple(QUIT_EVENT)), None
+    )
+    return result is not None and (
+        result.rc == 124 or any(code in result.stderr + result.stdout for code in ("-1743", "-1712"))
     )
 
 

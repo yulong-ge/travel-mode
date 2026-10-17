@@ -239,7 +239,7 @@ def test_budget_exhaustion_is_explicit_and_no_more_commands(health_machine):
         ({"kind": "freeze", "path": "/Applications/Worker.app"}, FreezeApp),
     ],
 )
-def test_remediation_reuses_actions_and_propagates_failure(descriptor, expected):
+def test_remediation_reuses_actions_and_returns_failure(descriptor, expected):
     calls, saves = [], []
 
     def execute(action):
@@ -248,8 +248,7 @@ def test_remediation_reuses_actions_and_propagates_failure(descriptor, expected)
 
     remediate(descriptor, execute, {}, lambda: saves.append(True))
     assert isinstance(calls[0], expected) and saves == [True]
-    with pytest.raises(RuntimeError):
-        remediate(descriptor, lambda _: False, {}, lambda: saves.append(True))
+    assert remediate(descriptor, lambda _: False, {}, lambda: saves.append(True)) is False
     assert saves == [True]
 
 

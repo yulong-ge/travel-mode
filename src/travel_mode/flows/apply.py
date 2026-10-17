@@ -11,7 +11,6 @@ from travel_mode import snapshots
 from travel_mode import state as state_api
 from travel_mode.actions import runtime
 from travel_mode.actions.apps import (
-    ForceQuitApp,
     FreezeApp,
     QuitApp,
     QuitConfiguredDaemons,
@@ -109,8 +108,9 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
     if config.options.scenario != "ask":
         st["scenario"] = config.options.scenario
     from ..actions.journal import mutation_scope
+    from ..failures import batch, reporter
 
-    with mutation_scope(st):
+    with mutation_scope(st), reporter(emit), batch(emit):
         if merged:
             age = snapshots.anchor_age_hours(st)
             age_s = t("impl.hours_ago", v0=age) if age is not None else ""
@@ -148,8 +148,11 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
                     aggressive=aggressive,
                     emit=emit,
                 ):
-                    execute(KillCaffeinate(target))
-                    emit("ok", t("impl.terminated"))
+                    _, terminated_rc = execute(KillCaffeinate(target))
+                    emit(
+                        "ok" if terminated_rc == 0 else "bad",
+                        t("impl.terminated") if terminated_rc == 0 else t("failure.incomplete"),
+                    )
             rows = pmset.configured_sleep_blocking_assertions()
             if rows:
                 emit("warn", t("impl.system_sleep_blocking_assertions_found"))
@@ -284,22 +287,27 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
                 emit("ok" if okq else "warn", msg)
                 continue
             if act == "quit":
-                if execute(QuitApp(path, name)):
-                    emit("ok", t("impl.quit", v0=name))
-                    state_api.save_state(st)
-                elif (
-                    not work
-                    and ask(t("impl.has_not_quit_possible_unsaved_dialog", v0=name), yes=yes)
-                    and execute(ForceQuitApp(path))
-                ):
-                    emit("ok", t("impl.force_quit", v0=name))
+                fallback = (
+                    (lambda name=name: ask(t("impl.has_not_quit_possible_unsaved_dialog", v0=name), yes=yes))
+                    if not work
+                    else False
+                )
+                result = execute(QuitApp(path, name, fallback=fallback))
+                if result:
+                    if not getattr(result, "forced", False):
+                        emit("ok", t("impl.quit", v0=name))
                     state_api.save_state(st)
                 else:
                     emit("warn", t("impl.did_not_quit", v0=name))
-                    if work:
-                        raise RuntimeError(t("impl.did_not_quit", v0=name))
             elif act == "freeze":
-                for line in system_apps.app_sleep_assertions(name)[:1]:
+                from ..failures import probe
+
+                assertions = probe(
+                    st, name, system_apps.app_sleep_assertions, name, save=state_api.save_state, emit=emit
+                )
+                if assertions is None:
+                    continue
+                for line in assertions[:1]:
                     emit("warn", t("impl.holds_a_sleep_assertion_freezing_will", v0=name, v1=line[:90]))
                 if execute(FreezeApp(path)):
                     emit(
@@ -369,11 +377,10 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
                     continue
                 if not p or not system_apps.app_running(p):
                     continue
-                if execute(QuitApp(p, name)):
-                    emit("ok", t("impl.quit", v0=name))
-                    state_api.save_state(st)
-                elif execute(ForceQuitApp(p)):
-                    emit("ok", t("impl.force_quit", v0=name))
+                result = execute(QuitApp(p, name, fallback=True))
+                if result:
+                    if not getattr(result, "forced", False):
+                        emit("ok", t("impl.quit", v0=name))
                     state_api.save_state(st)
                 else:
                     emit("warn", t("impl.did_not_quit", v0=name))
@@ -467,11 +474,13 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
         ):
             output, rc = execute(DisplaySleepNow())
             if rc:
-                raise RuntimeError(
-                    t("json.command_failed", command="pmset displaysleepnow", rc=rc, detail=output)
-                )
+                emit("bad", t("json.command_failed", command="pmset displaysleepnow", rc=rc, detail=output))
         from ..system.shell import dry_run_unknowns
 
-        failed = bool(st.get("pending_commands") or (is_dry_run() and dry_run_unknowns()))
+        failed = bool(
+            st.get("pending_commands")
+            or (is_dry_run() and dry_run_unknowns())
+            or any(not r.get("recovered", False) for r in st.get("action_failures", []))
+        )
         runtime._finish_dry_run()
         return int(failed)

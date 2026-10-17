@@ -41,6 +41,12 @@ def test_dry_run_sudo_credentials(credentials, tty, exit_code, machine, monkeypa
             assert "sudo -n launchctl list" in output.out + output.err
             assert "sudo -v" in output.out + output.err
             assert "Power settings" in output.out
+        else:
+            assert "travel-mode.log" not in output.out + output.err
+            assert not any(
+                command[:2] in (["sudo", "kill"], ["kill", "-TERM"], ["kill", "-KILL"])
+                for command in shell.dry_run_commands()
+            )
         assert not any(cmd[:2] == ("sudo", "launchctl") for cmd in machine["fake"].calls)
         assert not any(cmd[0] in {"kill", "open", "osascript"} for cmd in machine["fake"].calls)
     finally:

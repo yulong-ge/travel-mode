@@ -21,11 +21,13 @@ APP_QUERY = ["ps", "-axo", "pid=,%cpu=,command="]
 INDEX_QUERY = ["mdfind", 'kMDItemContentType == "com.apple.application-bundle"']
 
 
-def write_fixture_config(root, *, graceful=None, battery_measure=False):
+def write_fixture_config(root, *, graceful=None, battery_measure=False, refusing=False):
     quit_apps = (
         ["TravelModeE2E-Quit"] if graceful is None else (["TravelModeE2E-Graceful"] if graceful else [])
     )
     skip = [] if graceful is None else ["TravelModeE2E-Quit"]
+    if refusing:
+        quit_apps.append("TravelModeE2E-Refusing")
     (root / "config.toml").write_text(
         '[apps]\ndefault="skip"\nwatch=[]\nask=[]\nwith_daemon=[]\n'
         + "quit="
@@ -55,7 +57,8 @@ class FixtureDiscoveryRunner:
     def __init__(self, runner, root):
         self.runner = runner
         self.bundles = tuple(
-            (root / f"TravelModeE2E-{name}.app").resolve() for name in ("Quit", "Freeze", "Graceful", "Burn")
+            (root / f"TravelModeE2E-{name}.app").resolve()
+            for name in ("Quit", "Freeze", "Graceful", "Burn", "Refusing")
         )
 
     def fixture_path(self, value):

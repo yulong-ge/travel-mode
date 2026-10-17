@@ -98,7 +98,8 @@ def test_demo_cli_driver_never_prompts_or_plans_foreign_apps(dirty_machine, scen
                 return select_answer(prompt, policy)[1]
 
             monkeypatch.setattr("builtins.input", answer)
-            assert cli.main(["--no-tui", "--lang", "en"]) == 0
+            expected = 1 if scenario == "work" and harness.refusing_ready else 0
+            assert cli.main(["--no-tui", "--lang", "en"]) == expected
             assert all(name not in prompt for prompt in prompts for name in FOREIGN)
             assert all(Path(row["path"]).is_relative_to(harness.root) for row in apps.scan_apps()["running"])
             assert not network_apps.configured_names()

@@ -9,6 +9,8 @@ import threading
 import time
 from pathlib import Path
 
+import e2e_refusal
+
 from travel_mode.system.health import PROCESS_COMMAND, native_command
 from travel_mode.system.shell import CmdResult, command_path, subprocess_runner
 
@@ -49,6 +51,8 @@ LABEL = "com.example.travelmode-e2e.agent"
 
 class GuardViolation(PermissionError):
     """An unapproved command aborts the harness before it reaches a backend."""
+
+    fatal = True
 
 
 class LocalBackend:
@@ -102,7 +106,11 @@ class GuardRunner:
             str(app / f"Contents/{directory}/sh") for app in self.apps for directory in ("MacOS", "Helpers")
         )
         self.graceful = self.root / "TravelModeE2E-Graceful.app"
-        self.shells += (str(self.graceful / "Contents/MacOS/applet"),)
+        self.refusing = self.root / "TravelModeE2E-Refusing.app"
+        self.shells += (
+            str(self.graceful / "Contents/MacOS/applet"),
+            str(self.refusing / "Contents/MacOS/refusing"),
+        )
         self.owned = {}
         self.plan = plan
         self.battery_measure = battery_measure
@@ -129,6 +137,15 @@ class GuardRunner:
 
     def validate(self, command):
         cmd = list(command)
+        if cmd == e2e_refusal.compile_command(self.root):
+            if not self.plan:
+                try:
+                    source = (self.root / "Refusing.swift").read_text()
+                except OSError:
+                    self.refuse(cmd)
+                if source != e2e_refusal.SOURCE:
+                    self.refuse(cmd)
+            return cmd
         # The battery harness needs no privileged command, including permission
         # probes. Refuse before normalization, independently of driver choices.
         if self.battery_measure and cmd and cmd[0] in {"sudo", "/usr/bin/sudo"}:
@@ -199,9 +216,15 @@ class GuardRunner:
             ["open", "-g", "-j", str(self.graceful)],
             [LSREGISTER, "-u", str(self.graceful)],
             QUIT_EVENT,
+            e2e_refusal.QUIT_EVENT,
+            ["codesign", "--force", "--sign", "-", str(self.refusing)],
+            ["open", "-g", "-j", str(self.refusing)],
+            [LSREGISTER, "-u", str(self.refusing)],
         ]
         if cmd == ["open", str(self.graceful)]:
             return ["open", "-g", "-j", str(self.graceful)]
+        if cmd == ["open", str(self.refusing)]:
+            return ["open", "-g", "-j", str(self.refusing)]
         if cmd[:4] == ["sudo", "-n", "/usr/bin/pmset", "-a"]:
             allowed |= cmd[4:] in [["disablesleep", "0"], ["disablesleep", "1"]]
         if cmd[:4] == ["sudo", "-n", "/usr/bin/pmset", "-c"]:

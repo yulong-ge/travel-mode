@@ -134,7 +134,15 @@ def test_one_click_batches_deduplicate_and_keep_explicit_exclusions():
     assert len(saves) == 2
 
 
-def test_one_click_failures_propagate():
+def test_one_click_failure_does_not_abort_other_services():
     service = {"label": "org.fixture.restic", "plist_path": "/tmp/fixture.plist"}
-    with pytest.raises(RuntimeError, match="5"):
-        pause_categories({"backup"}, [], [service], lambda action: ("failure", 5), lambda: None, {})
+    attempted, saved = [], []
+    other = {"label": "org.fixture.restic.second", "plist_path": "/tmp/second.plist"}
+
+    def execute(action):
+        attempted.append(action.path)
+        return ("failure", 5) if action.path == service["plist_path"] else ("", 0)
+
+    pause_categories({"backup"}, [], [service, other], execute, lambda: saved.append(True), {})
+    assert attempted == [service["plist_path"], other["plist_path"]]
+    assert saved == [True]

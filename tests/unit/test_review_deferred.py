@@ -290,19 +290,21 @@ async def test_tui_caffeinate_failure_never_logs_success(action_ui, fake_runner)
         await settled(app, pilot)
         messages = []
         app.logline = lambda *args: messages.append(args)
-        with pytest.raises(RuntimeError, match=r"kill.*exit 2.*denied"):
-            await app._dispatch_button(Button.Pressed(app.query_one("#b-killcaff-777")))
+        await app._dispatch_button(Button.Pressed(app.query_one("#b-killcaff-777")))
+        assert app.is_running and app._exception is None
+        assert any("denied" in text and "travel-mode.log" in text for _, text in messages)
         assert not any(kind == "ok" for kind, _ in messages)
 
 
-def test_display_sleep_failure_is_explicit(monkeypatch, fake_runner):
+def test_display_sleep_failure_is_explicit(monkeypatch, fake_runner, capsys):
     monkeypatch.setattr(system_apps, "scan_apps", lambda: {"running": [], "nobundle": []})
     monkeypatch.setattr(launchd, "svc_scan", lambda: {"unloadable": [], "kept": []})
     monkeypatch.setattr(network_api, "configured_names", lambda: [])
     monkeypatch.setattr(flow_apply, "ask", lambda message, **kw: "displaysleepnow" in message)
     fake_runner.responses[("pmset", "displaysleepnow")] = CmdResult("", "denied", 3)
-    with pytest.raises(RuntimeError, match=r"pmset displaysleepnow.*exit 3.*denied"):
-        flow_apply.mode_apply(yes=True)
+    assert flow_apply.mode_apply(yes=True) == 1
+    captured = capsys.readouterr()
+    assert "denied" in captured.out + captured.err and "Traceback" not in captured.out + captured.err
 
 
 @pytest.mark.parametrize("first", ["b-apps-all", "b-off"])

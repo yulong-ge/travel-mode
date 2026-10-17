@@ -109,7 +109,102 @@ class TravelApp(
         self._transaction_view = None
 
     def execute(self, action):
-        return self.executor.execute(action, Context(self.st, self.save))
+        from travel_mode.failures import reporter
+
+        with reporter(self.action_notice):
+            return self.executor.execute(action, Context(self.st, self.save))
+
+    def run_worker(self, *args, **kwargs):
+        import os
+
+        if os.environ.get("TRAVEL_MODE_DEBUG") != "1":
+            kwargs["exit_on_error"] = False
+        return super().run_worker(*args, **kwargs)
+
+    def on_worker_state_changed(self, event):
+        from textual.worker import WorkerState
+
+        if event.state == WorkerState.ERROR:
+            self.report_action_error(event.worker.error, t("failure.worker", group=event.worker.group))
+            self.worker_error_reported(event.worker).set()
+
+    def action_notice(self, kind, message):
+        import threading
+
+        if threading.current_thread() is threading.main_thread():
+            self.logline(kind, message)
+            if kind == "bad":
+                self.highlight_action_failure()
+        else:
+            self.tlog(kind, message)
+            if kind == "bad":
+                self.call_from_thread(self.highlight_action_failure)
+
+    def highlight_action_failure(self):
+        rows = self.st.get("action_failures", [])
+        if not rows:
+            return
+        failed = rows[-1]
+        for row in self.app_rows.values():
+            if row["path"] == failed["target"] and row["label"].is_attached:
+                row["label"].update(f"[red]{escape(failed['reason'])}[/]")
+        for index, button in self.svc_btns.items():
+            if (
+                index < len(self.svc["unloadable"])
+                and self.svc["unloadable"][index]["plist_path"] == failed["target"]
+            ):
+                button.variant = "error"
+                button.label = t("failure.retry")
+
+    def report_action_error(self, error, action=None):
+        from travel_mode import failures
+        from travel_mode.state import StateError
+        from travel_mode.system.shell import ReadError, SudoReadError
+
+        expected = isinstance(error, (failures.CommandError, ReadError, SudoReadError, PermissionError))
+
+        row = getattr(error, "travel_failure", None)
+        if row is None:
+            if (
+                "session" not in self.st
+                and not isinstance(error, StateError)
+                and self._mutation_action is not None
+            ):
+                from travel_mode import sessions
+
+                sessions.begin(self.st)
+            if "session" in self.st:
+                counts = self.st["session"]["actions"]
+                counts["attempted"] += 1
+                counts["failed"] += 1
+            try:
+                row = failures.record(
+                    self.st,
+                    action or self._mutation_action or t("failure.operation"),
+                    str(error),
+                    error=error,
+                    kind="state" if isinstance(error, StateError) else "action" if expected else "internal",
+                    save=self.save if "session" in self.st else None,
+                )
+            except StateError as log_error:
+                message = t(
+                    "failure.logging_failed", reason=error, logging=log_error, path=failures.log_path()
+                )
+                self.logline("bad", message)
+                self.notify(message, severity="error")
+                return
+        message = (
+            failures.message(row)
+            if expected
+            else t(
+                "failure.stopped" if isinstance(error, StateError) else "failure.internal",
+                kind=type(error).__name__,
+                reason=" ".join(str(error).split()),
+                path=failures.log_path(),
+            )
+        )
+        self.logline("bad", message)
+        self.notify(message, severity="error")
 
     def _disable_mutation_button(self, button):
         if self._origin_error is not None and button.id != "b-doctor":
@@ -233,9 +328,14 @@ class TravelApp(
         try:
             return await self.in_thread(fn, *a)
         except Exception as e:
-            self.logline("bad", t("impl.operation_failed", v0=type(e).__name__, v1=e))
-            self.notify(t("impl.operation_failed_2", v0=e), severity="error")
-            raise RuntimeError(t("impl.tui_worker_operation_failed", v0=e)) from e
+            import os
+
+            self.report_action_error(e)
+            if os.environ.get("TRAVEL_MODE_DEBUG") == "1":
+                raise
+            from travel_mode.failures import BatchStopped
+
+            raise BatchStopped() from e
         finally:
             # Recompose disposes the old button; only mounted widgets receive UI updates.
             if btn.is_attached:

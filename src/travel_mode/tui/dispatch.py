@@ -30,6 +30,15 @@ class Dispatch:
         try:
             if not self._interface_closing:
                 await self._handle_button_pressed(ev)
+        except Exception as exc:
+            import os
+
+            from travel_mode.failures import BatchStopped
+
+            if not isinstance(exc, BatchStopped):
+                self.report_action_error(exc)
+            if os.environ.get("TRAVEL_MODE_DEBUG") == "1":
+                raise
         finally:
             self.complete_input(completion)
 
@@ -95,26 +104,31 @@ class Dispatch:
                 self.logline("dim", self.sub_title)
                 for button in self.query(Button):
                     self._disable_mutation_button(button)
+                from travel_mode.failures import batch
+
                 try:
-                    if ev.button.id == "b-off":
-                        await self._dispatch_button(ev)
-                    else:
-                        with mutation_scope(self.st, self.save):
+                    with batch(self.logline):
+                        if ev.button.id == "b-off":
                             await self._dispatch_button(ev)
+                        else:
+                            with mutation_scope(self.st, self.save):
+                                await self._dispatch_button(ev)
                 finally:
-                    self.flush_session_observations()
-                    self._mutation_action = None
-                    self._transaction_view = None
-                    self._mutation_generation += 1
-                    for button, disabled in self._disabled_buttons.items():
-                        if button.is_attached:
-                            button.disabled = disabled or button._mutation_done
-                    self._disabled_buttons.clear()
-                    self.sub_title = (
-                        t("impl.travel_mode_dry_run")
-                        if self._dry_run or is_dry_run()
-                        else t("impl.travel_mode")
-                    )
+                    try:
+                        self.flush_session_observations()
+                    finally:
+                        self._mutation_action = None
+                        self._transaction_view = None
+                        self._mutation_generation += 1
+                        for button, disabled in self._disabled_buttons.items():
+                            if button.is_attached:
+                                button.disabled = disabled or button._mutation_done
+                        self._disabled_buttons.clear()
+                        self.sub_title = (
+                            t("impl.travel_mode_dry_run")
+                            if self._dry_run or is_dry_run()
+                            else t("impl.travel_mode")
+                        )
 
     async def _dispatch_button(self, ev):
         bid = ev.button.id or ""
@@ -137,8 +151,11 @@ class Dispatch:
             self.action_refresh()
         elif bid.startswith("b-killcaff-"):
             target = self.caffeinate_targets[int(bid.removeprefix("b-killcaff-"))]
-            await self.in_thread(self.execute, KillCaffeinate(target))
-            self.logline("ok", t("impl.caffeinate_terminated"))
+            _, rc = await self.in_thread(self.execute, KillCaffeinate(target))
+            self.logline(
+                "ok" if rc == 0 else "bad",
+                t("impl.caffeinate_terminated") if rc == 0 else t("failure.incomplete"),
+            )
             self.action_refresh()
         elif bid == "b-quituu":
             _, okq, msg = await self.in_thread(self.execute, QuitConfiguredDaemons(self.st, self.save))
@@ -176,6 +193,10 @@ class Dispatch:
                 ev.button._mutation_done = True
             else:
                 self.logline("warn", t("impl.mdutil_failed"))
+        elif bid.startswith("netretry-"):
+            index = int(bid.removeprefix("netretry-"))
+            self.net_failures.pop(self.net_paths[index][1], None)
+            await self.act_net(index, ev.button)
         elif bid.startswith("net-"):
             await self.act_net(int(bid[4:]), ev.button)
         elif bid == "b-wifi":

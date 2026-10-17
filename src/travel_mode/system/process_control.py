@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..actions import journal
+from ..failures import CommandError
 from ..i18n import t
 from .shell import is_dry_run, run_rc
 
@@ -28,7 +29,7 @@ class Process:
 def process_table() -> list[Process]:
     output, rc = run_rc(["ps", "-axo", "pid=,ppid=,stat=,lstart=,comm="], timeout=10)
     if rc:
-        raise RuntimeError(t("json.command_failed", command="ps process identities", rc=rc, detail=output))
+        raise CommandError(["ps", "process identities"], rc, output)
     result = []
     for line in output.splitlines():
         fields = line.split(None, 8)
@@ -105,9 +106,7 @@ def _signal(process, signal, *, sudo=False):
         return False
     output, rc = run_rc(["kill", signal, str(process.pid)], timeout=10, sudo=sudo)
     if rc:
-        raise RuntimeError(
-            t("json.command_failed", command=f"kill {signal} pid={process.pid}", rc=rc, detail=output)
-        )
+        raise CommandError(["kill", signal, str(process.pid)], rc, output)
     return True
 
 

@@ -41,6 +41,7 @@ SYSTEM_TOOLS = {
     "sw_vers": "/usr/bin/sw_vers",
     "lsappinfo": "/usr/bin/lsappinfo",
     "osacompile": "/usr/bin/osacompile",
+    "swiftc": "/usr/bin/swiftc",
     "codesign": "/usr/bin/codesign",
     "true": "/usr/bin/true",
     "sh": "/bin/sh",
@@ -293,6 +294,9 @@ def _invoke(cmd: list[str], timeout: float | None, interactive: bool) -> CmdResu
             ensure_command(cmd[2:] if cmd[1:2] == ["-n"] else cmd[1:])
     prepared = prepare_command(cmd)
     result = _runner(cmd, timeout, True) if interactive else _runner(cmd, timeout)
+    from ..failures import observe
+
+    observe(cmd, result)
     if privileged_read and result.rc:
         raise SudoReadError(
             t(
@@ -319,6 +323,11 @@ def run_rc(args, timeout=None, sudo=False, interactive=False):
     if result.rc == 127:
         print(t("shell.command_not_installed", v0=cmd[0]), file=sys.stderr)
     return result.stdout + result.stderr, result.rc
+
+
+def run_result(args, timeout=None):
+    """Keep stdout/stderr separate for structured external outcomes."""
+    return _invoke(list(args), timeout, False)
 
 
 def have_sudo():

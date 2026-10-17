@@ -136,6 +136,16 @@ def current_snapshot() -> AppSnapshot | None:
 
 
 @contextmanager
+def live_process_scope():
+    """Mutation verification must not reuse a discovery snapshot."""
+    token = _current.set(None)
+    try:
+        yield
+    finally:
+        _current.reset(token)
+
+
+@contextmanager
 def snapshot_scope(snapshot: AppSnapshot | None = None):
     existing = current_snapshot()
     if snapshot is None:

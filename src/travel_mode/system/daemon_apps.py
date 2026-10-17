@@ -7,6 +7,7 @@ from pathlib import Path
 
 from ..actions.journal import active_state, mutation_scope, persist, record_change
 from ..config import DaemonApp
+from ..failures import CommandError
 from ..presentation import action_message as t
 from .apps import app_path, bundle_alive, force_kill, grace_quit
 from .launchd import _loaded
@@ -33,9 +34,7 @@ def _configured_plist(value):
 def _loaded_labels(sudo=False):
     output, rc = run_rc(["launchctl", "list"], sudo=sudo, timeout=20)
     if rc:
-        raise RuntimeError(
-            t("json.command_failed", command=f"{'sudo ' if sudo else ''}launchctl list", rc=rc, detail=output)
-        )
+        raise CommandError((["sudo"] if sudo else []) + ["launchctl", "list"], rc, output)
     return set(_loaded(output.splitlines()))
 
 
@@ -97,18 +96,52 @@ def quit_with_daemons(spec: DaemonApp, state: dict, save=None):
     path = app_path(spec.name)
     if path and bundle_alive(path):
         record_change("quit_apps", path)
-        grace_quit(path, spec.name)
+        result = grace_quit(path, spec.name)
+        if is_dry_run() and result:
+            # A planned Quit cannot change the live process table. Do not turn
+            # that unchanged observation into a failure or extra force signals.
+            messages.append(t("daemon_apps.quit_off_restores_it", v0=spec.name))
+            return path, ok, "; ".join(messages)
+        if not result:
+            from ..config import load_config
+
+            message = (
+                result.explanation(spec.name) if hasattr(result, "explanation") else t("failure.incomplete")
+            )
+            if load_config().options.scenario == "work":
+                messages.append(message)
+                return path, False, "; ".join(messages)
+        normal_detail = (
+            getattr(result, "stderr", "") or getattr(result, "stdout", "") or t("failure.incomplete")
+        )
+        try:
+            if bundle_alive(path):
+                if spec.system_daemons:
+                    stop_bundle(path, sudo=True)
+                else:
+                    force_kill(path)
+            if bundle_alive(path):
+                stop_bundle(path, whole_bundle=True, sudo=bool(spec.system_daemons))
+        except CommandError as exc:
+            return (
+                path,
+                False,
+                t("failure.quit_steps_failed", name=spec.name, normal=normal_detail, force=str(exc)),
+            )
         if bundle_alive(path):
-            if spec.system_daemons:
-                stop_bundle(path, sudo=True)
-            else:
-                force_kill(path)
-        if bundle_alive(path):
-            stop_bundle(path, whole_bundle=True, sudo=bool(spec.system_daemons))
-        if bundle_alive(path):
-            return path, False, "; ".join([*messages, t("daemon_apps.remaining_processes", v0=spec.name)])
+            return (
+                path,
+                False,
+                t(
+                    "failure.quit_steps_failed",
+                    name=spec.name,
+                    normal=normal_detail,
+                    force=t("daemon_apps.remaining_processes", v0=spec.name),
+                ),
+            )
         persist()
-        messages.append(t("daemon_apps.quit_off_restores_it", v0=spec.name))
+        if result:
+            messages.append(t("daemon_apps.quit_off_restores_it", v0=spec.name))
     return path, ok, "; ".join(messages)
 
 

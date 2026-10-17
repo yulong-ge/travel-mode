@@ -42,6 +42,11 @@ class NetworkPage:
         actions = self.query_one("#net-actions", Vertical)
         await actions.remove_children()
         self.net_paths = {}
+        self.net_failures = {
+            r["target"]: r
+            for r in self.display_state().get("action_failures", [])
+            if not r.get("recovered") and r["command"][:1] == ["osascript"]
+        }
         w = []
         bottom = []
         idx = 0
@@ -52,10 +57,21 @@ class NetworkPage:
             if row["resident"]:
                 label += " · " + t("network.resident")
             if row["running"] and row["path"]:
+                extra = (
+                    [Button(t("failure.retry_quit"), id=f"netretry-{idx}", classes="btn")]
+                    if row["path"] in self.net_failures
+                    else []
+                )
                 w.append(
                     ItemGrid(
                         Label(f"{escape(row['name'])}: {label}", classes="grow"),
-                        Button(t("impl.quit_2"), id=f"net-{idx}", classes="btn"),
+                        Button(
+                            t("impl.force_quit_3") if row["path"] in self.net_failures else t("impl.quit_2"),
+                            id=f"net-{idx}",
+                            classes="btn",
+                            variant="error" if row["path"] in self.net_failures else "default",
+                        ),
+                        *extra,
                         classes="row",
                     )
                 )
@@ -102,21 +118,33 @@ class NetworkPage:
             if not res:
                 return
             _, okq, msg = res
-            self.logline("ok" if okq else "warn", f"{name}: {msg}")
+            if msg:
+                self.logline("ok" if okq else "warn", f"{name}: {msg}")
             if okq:
                 btn.disabled = True
                 btn._mutation_done = True
             return
-        okq = await self.busy(btn, self.execute, QuitApp(path, name))
-        if not okq:
-            okq = await self.busy(btn, self.execute, ForceQuitApp(path))
+        operation = (
+            ForceQuitApp(path)
+            if path in getattr(self, "net_failures", {})
+            else QuitApp(path, name, fallback=self.scenario != "work")
+        )
+        okq = await self.busy(btn, self.execute, operation)
         if okq:
             self.save()
-            self.logline("ok", t("impl.quit_off_reopens_it_2", v0=name))
+            if not getattr(okq, "forced", False):
+                self.logline("ok", t("impl.quit_off_reopens_it_2", v0=name))
             btn.disabled = True
             btn._mutation_done = True
         else:
-            self.logline("warn", t("impl.did_not_quit", v0=name))
+            self.logline(
+                "bad",
+                okq.explanation(name) if hasattr(okq, "explanation") else t("impl.did_not_quit", v0=name),
+            )
+            btn.variant = "error"
+            btn.label = t("impl.force_quit_3")
+            self.net_failures[path] = True
+            self.action_refresh()
 
     async def act_off(self, btn):
         age = snapshots.anchor_age_hours(self.st)

@@ -75,15 +75,30 @@ class AppsPage:
                 classes="btn",
             )
             bs = Button(t("impl.skip"), id=f"btn-{i}-s", classes="btn")
-            w.append(ItemGrid(lab, bq, bf, bs, classes="row"))
+            failure = next(
+                (
+                    row
+                    for row in reversed(st.get("action_failures", []))
+                    if row["target"] == app["path"] and not row.get("recovered")
+                ),
+                None,
+            )
+            kill = failure is not None and failure["command"][:1] == ["osascript"]
+            extra = []
+            if failure:
+                lab.update(f"[red]{escape(name)}: {escape(failure['reason'])}[/]")
+            if kill:
+                bq.label, bq.variant = t("impl.force_quit_3"), "error"
+                extra.append(Button(t("failure.retry_quit"), id=f"btn-{i}-r", classes="btn"))
+            w.append(ItemGrid(lab, bq, bf, bs, *extra, classes="row"))
             self.app_rows[i] = {
                 "defact": dfl,
                 "name": name,
                 "path": app["path"],
                 "label": lab,
-                "btns": (bq, bf, bs),
+                "btns": (bq, bf, bs, *extra),
                 "done": False,
-                "kill": False,
+                "kill": kill,
                 "frozen": frozen,
             }
         for notice in grouped(self.scan.get("notices", [])):
@@ -127,28 +142,34 @@ class AppsPage:
                     spec = configured_daemon(name)
                     if spec is not None:
                         _, okq, msg = self.execute(QuitDaemonApp(spec, self.st, self.save))
-                        self.tlog("ok" if okq else "warn", msg)
+                        if msg:
+                            self.tlog("ok" if okq else "warn", msg)
                         if okq:
                             nq += 1
                             self.call_from_thread(
                                 self.mark_row_done, i, t("impl.quit_3", v0=name), expected_path=path
                             )
                         continue
-                    if self.execute(QuitApp(path, name)) or (
-                        self.scenario != "work" and self.execute(ForceQuitApp(path))
-                    ):
+                    result = self.execute(QuitApp(path, name, fallback=self.scenario != "work"))
+                    if result:
                         self.save()
                         nq += 1
                         self.call_from_thread(
                             self.mark_row_done, i, t("impl.quit_3", v0=name), expected_path=path
                         )
-                        self.tlog("ok", t("impl.quit", v0=name))
+                        if not getattr(result, "forced", False):
+                            self.tlog("ok", t("impl.quit", v0=name))
                     else:
                         self.tlog("warn", t("impl.did_not_quit", v0=name))
-                        if self.scenario == "work":
-                            raise RuntimeError(t("impl.did_not_quit", v0=name))
                 elif act == "freeze":
-                    for _line in system_apps.app_sleep_assertions(name)[:1]:
+                    from travel_mode.failures import probe
+
+                    assertions = probe(
+                        self.st, name, system_apps.app_sleep_assertions, name, save=self.save, emit=self.tlog
+                    )
+                    if assertions is None:
+                        continue
+                    for _line in assertions[:1]:
                         self.tlog("warn", t("impl.holds_a_sleep_assertion_freezing_will_2", v0=name))
                     if self.execute(FreezeApp(path)):
                         self.save()
@@ -175,13 +196,18 @@ class AppsPage:
         if not row or row["done"]:
             return
         name, path = row["name"], row["path"]
+        if action == "r":
+            row["kill"] = False
+            action = "q"
         if action == "s":
             self.mark_row_done(i, t("impl.skipped_3", v0=name), "dim")
             return
         spec = configured_daemon(name)
         if action == "q" and spec is not None:
-            _, okq, msg = await self.busy(btn, self.execute, QuitDaemonApp(spec, self.st, self.save))
-            self.logline("ok" if okq else "warn", msg)
+            result = await self.busy(btn, self.execute, QuitDaemonApp(spec, self.st, self.save))
+            _, okq, msg = result
+            if msg:
+                self.logline("ok" if okq else "warn", msg)
             if okq:
                 self.mark_row_done(i, t("impl.quit_off_reopens_it", v0=name), expected_path=path)
             return
@@ -204,13 +230,24 @@ class AppsPage:
                 row["kill"] = True
                 btn.label = t("impl.force_quit_3")
                 btn.variant = "error"
-                self.logline("warn", t("impl.has_not_quit_possible_unsaved_dialog_2", v0=name))
+                message = (
+                    okq.explanation(name)
+                    if hasattr(okq, "explanation")
+                    else t("impl.has_not_quit_possible_unsaved_dialog_2", v0=name)
+                )
+                row["label"].update(f"[red]{escape(message)}[/]")
+                if not list(self.query(f"#btn-{i}-r")):
+                    retry = Button(t("failure.retry_quit"), id=f"btn-{i}-r", classes="btn")
+                    await row["label"].parent.mount(retry)
+                    row["btns"] += (retry,)
+                self.logline("bad", message)
         elif action == "f":
             if row.get("frozen"):
                 # 已冻结 → 按钮变为解冻: CONT 并移出恢复列表 (用户明确表示这次要带着它)
 
                 if not await self.in_thread(self.execute, ThawApp(path, self.st)):
-                    raise RuntimeError(t("impl.thaw_failed", v0=path))
+                    self.logline("bad", t("impl.thaw_failed", v0=path))
+                    return
                 if path in self.st.get("frozen_apps", []):
                     self.save()
                 self.mark_row_done(
@@ -218,7 +255,17 @@ class AppsPage:
                 )
                 self.logline("ok", t("impl.thawed_3", v0=name))
                 return
-            for line in (await self.in_thread(system_apps.app_sleep_assertions, name))[:1]:
+            from travel_mode.failures import probe
+
+            def inspect():
+                return probe(
+                    self.st, name, system_apps.app_sleep_assertions, name, save=self.save, emit=self.tlog
+                )
+
+            assertions = await self.in_thread(inspect)
+            if assertions is None:
+                return
+            for line in assertions[:1]:
                 self.logline(
                     "warn", t("impl.holds_a_sleep_assertion_freezing_will", v0=name, v1=_ellip(line, 70))
                 )

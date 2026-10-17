@@ -51,6 +51,7 @@ def describe(row):
 def reapply(state, execute, save):
     # Re-observe at admission, then existing Actions revalidate identities before mutation.
     seen = set()
+    failures = 0
     for row in detect(state):
         key = row["kind"], row["path"]
         if key in seen:
@@ -68,5 +69,6 @@ def reapply(state, execute, save):
             else:
                 ok = execute(QuitApp(row["path"], row["name"]))
         if not ok:
-            raise RuntimeError(t("resurrection.failed", name=row["name"]))
+            failures += 1
         save(state)
+    return failures

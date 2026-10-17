@@ -142,9 +142,27 @@
   ],
   "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
   "exit_code": 1,
-  "output": "✓ Restoring snapshot saved at: <TIME>\n✓ Battery profile restored: sleep 12\n✓ AC profile restored: womp 1\n✓ disablesleep → 1\n· Agent already running (loaded at login, no restore needed): org.demo.daemon\n· Agent already running (loaded at login, no restore needed): org.demo.worker\n✓ Spotlight indexing restored\n✓ Wi-Fi (en0) enabled\n! command failed: blueutil -p 1 (exit 2): fixture failure\n✓ Brightness restored → 0.8\n✓ Started: \n<ROOT>/Appl\nications/Quit Demo.app\n✗ 1 restores failed — snapshot retained. Resolve the failures and rerun off; discard with travel-mode off --force\n",
+  "output": "✓ Restoring snapshot saved at: <TIME>\n✓ Battery profile restored: sleep 12\n✓ AC profile restored: womp 1\n✓ disablesleep → 1\n· Agent already running (loaded at login, no restore needed): org.demo.daemon\n· Agent already running (loaded at login, no restore needed): org.demo.worker\n✓ Spotlight indexing restored\n✓ Wi-Fi (en0) enabled\n✗ Restore item: Bluetooth enabled: command failed: blueutil -p 1 (exit 2): fixture failure. Details: \n<ROOT>/trav\nel-mode.log\n! command failed: blueutil -p 1 (exit 2): fixture failure\n✓ Brightness restored → 0.8\n✓ Started: \n<ROOT>/Appl\nications/Quit Demo.app\n✗ Succeeded: 7; failed: 1. Failed actions: Restore item: Bluetooth enabled\n✗ 1 restores failed — snapshot retained. Resolve the failures and rerun off; discard with travel-mode off --force\n",
   "state": {
     "ac_prof": "",
+    "action_failures": [
+      {
+        "action": "Restore item: Bluetooth enabled",
+        "at": "2026-10-15T12:00:00+00:00",
+        "command": [
+          "blueutil",
+          "-p",
+          "1"
+        ],
+        "kind": "action",
+        "rc": 2,
+        "reason": "command failed: blueutil -p 1 (exit 2): fixture failure",
+        "scenario": null,
+        "stderr": "",
+        "stdout": "fixture failure",
+        "target": ""
+      }
+    ],
     "anchored_at": "<TIME>",
     "batt_prof": "",
     "brightness": "",

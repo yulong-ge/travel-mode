@@ -43,6 +43,12 @@ class ServicesPage:
             cpu = f", CPU {s['cpu']}%" if s["cpu"] else ""
             lab = Label(f"{escape(s['label'])} [dim]pid {s['pid']}{cpu}[/]", classes="grow")
             b = Button(t("impl.unload"), id=f"svc-{i}", classes="btn")
+            if any(
+                row["target"] == s["plist_path"] and not row.get("recovered")
+                for row in self.display_state().get("action_failures", [])
+            ):
+                b.variant, b.label = "error", t("failure.retry")
+                lab.styles.color = "red"
             w.append(ItemGrid(lab, b, classes="row"))
             self.svc_btns[i] = b
         if not self.svc["unloadable"]:

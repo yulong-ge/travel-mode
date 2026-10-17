@@ -157,6 +157,7 @@ def _mode_check():
 def reapply_paused():
     from ..actions.base import Context
     from ..actions.executor import Executor, _sudo_lifecycle
+    from ..failures import batch
     from ..resurrection import reapply
     from ..state import load_state, save_state
 
@@ -165,6 +166,8 @@ def reapply_paused():
         state = load_state()
         if state is not None:
             executor = Executor(Context(state, save_state))
-            reapply(state, executor.execute, save_state)
+            with batch():
+                return reapply(state, executor.execute, save_state)
+        return 0
 
-    apply()
+    return apply()

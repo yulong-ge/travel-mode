@@ -15,12 +15,16 @@
   "exit_code": 1,
   "messages": [
     [
-      "warn",
-      "<ROOT>/org.demo.daemon.plist: invalid or protected launchd Label 123"
+      "bad",
+      "Restore item: <ROOT>/org.demo.daemon.plist: <ROOT>/org.demo.daemon.plist: invalid or protected launchd Label 123. Details: <ROOT>/travel-mode.log"
     ],
     [
-      "warn",
-      "[Errno 2] No such file or directory: '<ROOT>/Library/LaunchAgents/org.demo.worker.plist'"
+      "bad",
+      "Restore item: <ROOT>/Library/LaunchAgents/org.demo.worker.plist: [Errno 2] No such file or directory: '<ROOT>/Library/LaunchAgents/org.demo.worker.plist'. Details: <ROOT>/travel-mode.log"
+    ],
+    [
+      "bad",
+      "Succeeded: 0; failed: 2. Failed actions: Restore item: <ROOT>/org.demo.daemon.plist, Restore item: <ROOT>/Library/LaunchAgents/org.demo.worker.plist"
     ]
   ],
   "output": "",
@@ -30,6 +34,32 @@
   ],
   "state": {
     "ac_prof": "",
+    "action_failures": [
+      {
+        "action": "Restore item: <ROOT>/org.demo.daemon.plist",
+        "at": "2026-10-15T12:00:00+00:00",
+        "command": [],
+        "kind": "action",
+        "rc": null,
+        "reason": "<ROOT>/org.demo.daemon.plist: invalid or protected launchd Label 123",
+        "scenario": null,
+        "stderr": "",
+        "stdout": "",
+        "target": "<ROOT>/org.demo.daemon.plist"
+      },
+      {
+        "action": "Restore item: <ROOT>/Library/LaunchAgents/org.demo.worker.plist",
+        "at": "2026-10-15T12:00:00+00:00",
+        "command": [],
+        "kind": "action",
+        "rc": null,
+        "reason": "[Errno 2] No such file or directory: '<ROOT>/Library/LaunchAgents/org.demo.worker.plist'",
+        "scenario": null,
+        "stderr": "",
+        "stdout": "",
+        "target": "<ROOT>/Library/LaunchAgents/org.demo.worker.plist"
+      }
+    ],
     "anchored_at": "<TIME>",
     "batt_prof": "",
     "brightness": "",

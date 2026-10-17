@@ -94,8 +94,8 @@ async def test_tui_failed_thaw_retains_receipt(fake_runner):
         logline=lambda *args: messages.append(args),
     )
     app.execute = Executor(Context(app.st, app.save)).execute
-    with pytest.raises(RuntimeError):
-        await TravelApp.act_app(app, 0, "f", SimpleNamespace())
+    await TravelApp.act_app(app, 0, "f", SimpleNamespace())
+    assert any(kind == "bad" for kind, _ in messages)
     assert app.st["frozen_apps"] == [path]
     assert not done
     assert app.st["session"]["actions"]["failed"] == 1
@@ -234,8 +234,9 @@ async def test_tui_removed_snapshot_preflight_prevents_mutation(
         await app.wait_for_idle()
         state_path().unlink()
         try:
-            with pytest.raises(StateError):
-                await app.on_button_pressed(Button.Pressed(Button(id=button_id)))
+            await app.on_button_pressed(Button.Pressed(Button(id=button_id)))
+            assert app.is_running and app._exception is None
+            assert "StateError" in (tmp_paths / "travel-mode.log").read_text()
         finally:
             await app.wait_for_idle()
             await pilot.pause()

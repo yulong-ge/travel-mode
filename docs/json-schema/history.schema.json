@@ -357,6 +357,107 @@
               "voltage_current",
               "capacity_delta"
             ]
+          },
+          "failures": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "at",
+                "scenario",
+                "action",
+                "target",
+                "command",
+                "rc",
+                "reason",
+                "stdout",
+                "stderr",
+                "kind"
+              ],
+              "properties": {
+                "at": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "action": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "target": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "reason": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "stdout": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "stderr": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "kind": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "scenario": {
+                  "enum": [
+                    null,
+                    "work",
+                    "away"
+                  ]
+                },
+                "rc": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "command": {
+                  "type": "array",
+                  "maxItems": 32,
+                  "items": {
+                    "type": "string",
+                    "maxLength": 512
+                  }
+                },
+                "recovered": {
+                  "type": "boolean"
+                },
+                "session_id": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "counts": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "attempted",
+                    "succeeded",
+                    "failed"
+                  ],
+                  "properties": {
+                    "attempted": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "succeeded": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "failed": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "additionalProperties": false

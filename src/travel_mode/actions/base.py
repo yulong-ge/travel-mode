@@ -36,3 +36,18 @@ class Command(Action):
         # shell.prepare_command persists this action's recovery record before
         # invoking any Runner, and clears only confirmed successful commands.
         return run_rc(self.command(), sudo=self.sudo, interactive=self.interactive)
+
+
+@dataclass
+class RecoveryCommand(Command):
+    argv: list
+    name: str
+    sudo: bool = False
+    requires_journal = False
+    description = "failure.restore"
+
+    def command(self):
+        return self.argv
+
+    def apply(self, ctx):
+        return run_rc(self.command(), sudo=self.sudo, timeout=30)

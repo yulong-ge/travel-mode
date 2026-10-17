@@ -6,11 +6,12 @@ import os
 import plistlib
 import re
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..config import load_config
 from ..i18n import t
-from .shell import is_dry_run, run_rc
+from .shell import is_dry_run, run_rc, run_result
 
 APP_DIRS = [
     "/Applications",
@@ -74,10 +75,35 @@ def bundle_alive(path):
     return bool(path) and bool(app_processes(path, whole_bundle=True))
 
 
+@dataclass(frozen=True)
+class QuitResult:
+    status: str
+    exited: bool
+    rc: int = 0
+    stdout: str = ""
+    stderr: str = ""
+    command: list = field(default_factory=list)
+
+    def __bool__(self):
+        return self.exited
+
+    def explanation(self, name):
+        if self.status == "not_running" and not self.exited:
+            return t("failure.quit_disagrees", name=name)
+        return t("failure.quit_" + self.status, name=name)
+
+
 def grace_quit(path, name):
+    from .app_snapshot import live_process_scope
+
+    with live_process_scope():
+        return _grace_quit(path, name)
+
+
+def _grace_quit(path, name):
     """AppleScript quit (8s 超时) + 轮询 10s. 没在跑直接成功."""
     if not app_running(path):
-        return True
+        return QuitResult("not_running", True)
     bid = app_bid(path)
     target = bid or name
     if not isinstance(target, str) or not target:
@@ -88,18 +114,28 @@ def grace_quit(path, name):
 
     if active_state() is not None:
         record_change("quit_apps", path)
-    output, rc = run_rc(
-        ["osascript", "-e", "with timeout of 8 seconds", "-e", tell, "-e", "end timeout"], timeout=10
-    )
-    if rc:
-        raise RuntimeError(t("json.command_failed", command=f"osascript quit {path}", rc=rc, detail=output))
+    command = ["osascript", "-e", "with timeout of 8 seconds", "-e", tell, "-e", "end timeout"]
+    result = run_result(command, timeout=10)
+    status = "exited"
+    if result.rc:
+        detail = result.stdout + result.stderr
+        status = (
+            "refused"
+            if re.search(r"\(-128\)", detail)
+            else "timeout"
+            if result.rc == 124 or re.search(r"\(-1712\)", detail)
+            else "not_running"
+            if re.search(r"\(-600\)", detail)
+            else "error"
+        )
+        return QuitResult(status, not app_running(path), result.rc, result.stdout, result.stderr, command)
     if is_dry_run():
-        return True
+        return QuitResult("exited", True, command=command)
     for _ in range(20):
         if not app_running(path):
-            return True
+            return QuitResult("exited", True, command=command)
         time.sleep(0.5)
-    return False
+    return QuitResult("timeout", False, result.rc, result.stdout, result.stderr, command)
 
 
 def force_kill(path):
@@ -141,7 +177,9 @@ def app_sleep_assertions(name):
     """该 app 名字命中的防睡断言行. 冻结不释放断言 — 命中时建议改为退出."""
     atext, rc = run_rc(["pmset", "-g", "assertions"], timeout=20)
     if rc:
-        raise RuntimeError(t("json.command_failed", command="pmset -g assertions", rc=rc, detail=atext))
+        from ..failures import CommandError
+
+        raise CommandError(["pmset", "-g", "assertions"], rc, atext)
     return [
         line.strip()
         for line in atext.splitlines()

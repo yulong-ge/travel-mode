@@ -4,6 +4,7 @@ import os
 import plistlib
 from pathlib import Path
 
+import e2e_refusal
 from e2e_guard import LABEL, PROCESS_QUERY, QUIT_EVENT, STATUS_QUERY
 
 from travel_mode.system.health import PROCESS_COMMAND, native_command
@@ -80,6 +81,11 @@ class Machine:
             out = "\n".join(f"{p} {s} {c}" for p, (s, _, c) in self.rows.items())
         elif cmd == ["ps", "-axo", "pid=,%cpu=,command="]:
             out = "\n".join(f"{p} 0.0 {c}" for p, (_, _, c) in self.rows.items())
+        elif cmd[:1] == ["swiftc"]:
+            Path(cmd[-1]).write_text("fixture executable; never run on the host\n")
+            out = ""
+        elif cmd == e2e_refusal.QUIT_EVENT:
+            return CmdResult("", "execution error: User canceled. (-128)", 1)
         elif cmd[:1] == ["osacompile"]:
             app = Path(cmd[3])
             (app / "Contents/MacOS").mkdir(parents=True)
@@ -89,7 +95,12 @@ class Machine:
             out = ""
         elif cmd[:1] == ["open"] or (len(cmd) == 1 and cmd[0].endswith("/Contents/MacOS/loop")):
             app = Path(cmd[-1]) if cmd[0] == "open" else Path(cmd[0]).parents[2]
-            for executable in ["MacOS/applet"] if cmd[0] == "open" else ["MacOS/sh", "Helpers/sh"]:
+            executables = ["MacOS/refusing"] if app.stem == "TravelModeE2E-Refusing" else ["MacOS/applet"]
+            if cmd[0] == "open" and any(
+                r[2] == str(app / "Contents" / executables[0]) for r in self.rows.values()
+            ):
+                return CmdResult("", "", 0)
+            for executable in executables if cmd[0] == "open" else ["MacOS/sh", "Helpers/sh"]:
                 self.rows[self.next_pid] = (
                     "S",
                     "Thu Oct 15 12:00:00 2026",

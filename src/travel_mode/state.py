@@ -133,6 +133,14 @@ def load_state(path=None):
     ):
         raise StateError(t("safety.invalid_receipt", path=target, field="pending_commands"))
     result["pending_commands"] = pending
+    if "action_failures" in raw:
+        from .failures import validate
+
+        try:
+            validate(raw["action_failures"])
+        except ValueError as exc:
+            raise StateError(f"{target}: action_failures: {exc}") from exc
+        result["action_failures"] = raw["action_failures"]
     if "measurement" in raw:
         from .measurement import validate_comparison
 

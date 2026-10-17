@@ -20,16 +20,32 @@ from travel_mode.system.shell import is_dry_run, run_rc
 def run_restore(st, emit):
     """Restore only outstanding receipts; checkpoint each successful item."""
     from ..actions.journal import suspend_mutations
+    from ..failures import batch, reporter
 
-    with suspend_mutations():
+    with suspend_mutations(), reporter(emit), batch(emit):
         return _run_restore(st, emit)
 
 
 def _run_restore(st, emit):
+    from .. import failures
+    from ..actions.apps import ThawApp
+    from ..actions.base import Context, RecoveryCommand
+    from ..actions.executor import Executor
+    from ..actions.power import SetBrightness
+    from ..failures import reporter
     from ..system.launchd import _loaded
-    from ..system.process_control import thaw_app
 
     n = fails = 0
+    executor = Executor(Context(st, state_api.save_state), count_actions=False)
+
+    def failed_read(path, error, commands=()):
+        nonlocal fails
+        label = t("failure.restore") + ": " + str(path)
+        row = failures.record(st, label, str(error), commands, target=str(path))
+        state_api.save_state(st)
+        failures.result(False, label)
+        emit("bad", failures.message(row))
+        fails += 1
 
     def restored(key, value=None):
         nonlocal n
@@ -62,7 +78,8 @@ def _run_restore(st, emit):
 
     def execute(key, cmd, message, *, sudo=False, value=None):
         nonlocal fails
-        output, rc = run_rc(cmd, sudo=sudo, timeout=30)
+        with reporter(emit):
+            output, rc = executor.execute(RecoveryCommand(cmd, message, sudo))
         if rc:
             emit("warn", t("json.command_failed", command=shlex.join(cmd), rc=rc, detail=output))
             fails += 1
@@ -101,14 +118,15 @@ def _run_restore(st, emit):
         paths = list(st.get(field, []))
         if not paths:
             continue
-        try:
-            loaded = _loaded(shell._read(["launchctl", "list"], sudo=sudo).splitlines())
-        except RuntimeError as exc:
-            if is_dry_run() and isinstance(exc, shell.SudoReadError):
-                shell.record_unknown(exc)
-            emit("warn", str(exc))
-            fails += len(paths)
-            continue
+        with failures.capture() as commands:
+            try:
+                loaded = _loaded(shell._read(["launchctl", "list"], sudo=sudo).splitlines())
+            except (shell.ReadError, shell.SudoReadError) as exc:
+                if is_dry_run() and isinstance(exc, shell.SudoReadError):
+                    shell.record_unknown(exc)
+                for path in paths:
+                    failed_read(path, exc, commands)
+                continue
         for path in paths:
             try:
                 with Path(path).open("rb") as fh:
@@ -119,8 +137,7 @@ def _run_restore(st, emit):
                 if not isinstance(label, str) or not label or label.startswith("com.apple."):
                     raise ValueError(t("safety.invalid_restore_label", path=path, label=repr(label)))
             except (OSError, ValueError, plistlib.InvalidFileException) as exc:
-                emit("warn", str(exc))
-                fails += 1
+                failed_read(path, exc)
                 continue
             if label in loaded:
                 restored(field, path)
@@ -147,13 +164,7 @@ def _run_restore(st, emit):
     if st.get("bt_off"):
         execute("bt_off", ["blueutil", "-p", "1"], t("impl.bluetooth_enabled"))
     if st.get("brightness"):
-        from ..system.brightness import set_brightness
-
-        try:
-            _, rc = set_brightness(st["brightness"])
-        except (RuntimeError, ValueError) as exc:
-            emit("warn", str(exc))
-            rc = 1
+        _, rc = executor.execute(SetBrightness(st["brightness"]))
         if rc:
             fails += 1
             emit("warn", t("impl.restoring_brightness_failed"))
@@ -167,11 +178,7 @@ def _run_restore(st, emit):
         )
     )
     for path in frozen_paths:
-        try:
-            ok = thaw_app(path, st)
-        except (RuntimeError, ValueError) as exc:
-            emit("warn", str(exc))
-            ok = False
+        ok = executor.execute(ThawApp(path, st))
         if not ok:
             fails += 1
             emit("warn", t("impl.thaw_failed", v0=path))

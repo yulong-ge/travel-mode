@@ -27,6 +27,7 @@ class SetPowerProfile(Command):
 
 @dataclass
 class KillCaffeinate(Action):
+    command_result = True
     target: processes.CaffeinateTarget
     requires_journal = False
     description = "impl.terminate"
@@ -47,12 +48,18 @@ class StopSpotlight(Command):
 
 @dataclass
 class SetBrightness(Action):
+    command_result = True
     value: str | float
     description = "impl.changing_brightness_failed"
     risk = "aggressive"
 
     def apply(self, ctx):
-        return brightness.set_brightness(self.value)
+        from ..failures import CommandError
+
+        try:
+            return brightness.set_brightness(self.value)
+        except RuntimeError as exc:
+            raise CommandError(["brightness", str(self.value)], 1, str(exc)) from exc
 
 
 class DisplaySleepNow(Command):
