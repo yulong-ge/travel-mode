@@ -13,7 +13,8 @@ hardware observations name the machine they were made on.
 - [Low Power Mode](#low-power-mode)
 - [Session reports and history](#session-reports-and-history)
 - [Event automation](#event-automation)
-- [Menu bar and sudoers](#menu-bar-and-sudoers)
+- [Menu bar](#menu-bar)
+- [Passwordless sudo](#passwordless-sudo)
 - [Restore and recovery](#restore-and-recovery)
 - [Configuration and environment](#configuration-and-environment)
 - [Exit codes and errors](#exit-codes-and-errors)
@@ -257,11 +258,43 @@ to the state file.
 Verified on a MacBook Pro (M1 Pro, macOS 27) with a separate test agent: unplugging started the
 handler once, it recorded the battery source, exited with status 0 and left no running process.
 
-## Menu bar and sudoers
+## Menu bar
 
-The SwiftBar plugin runs `travel-mode status --json` every 5 minutes; it reads the configured
-language, the local state file and one `pmset -g ps` (2-second limit). Other menu items open a
-terminal only when clicked. Set `TRAVEL_MODE_BIN` if `travel-mode` is not on `PATH`.
+The menu bar item is a [SwiftBar](https://swiftbar.app/) plugin
+([travel-mode.5m.sh](../integrations/swiftbar/travel-mode.5m.sh)); SwiftBar has to be installed
+separately (`brew install --cask swiftbar`) and given a plugin folder.
+
+- `menubar install` reads the plugin folder from SwiftBar's preferences
+  (`defaults read com.ameba.SwiftBar PluginDirectory`) and fails with an explanation if none is
+  set. It copies the plugin bundled with the installed package into that folder; it does not
+  create a symlink, so the plugin keeps working if the source checkout moves. A different file
+  with the same name is replaced only with `--force`. `--dry-run` shows the target and writes
+  nothing. SwiftBar is not started or refreshed for you.
+- `menubar uninstall` removes only a file carrying the travel-mode plugin marker; anything else
+  at that path is reported and left in place.
+- `menubar status` shows the target path, whether the plugin is installed and executable, and
+  whether the installed copy matches the version bundled with the current package.
+
+The `5m` in the file name sets the refresh interval. Each refresh runs `travel-mode status --json`,
+which reads the configured language, the local state file and one `pmset -g ps` (2-second limit);
+on the tested Mac a refresh takes about 0.1 s in total. Health check, power measurement and the
+other menu items run only when clicked, in a terminal, and refresh the plugin afterwards.
+
+The title is a monochrome SF Symbol that follows the light or dark menu bar: an outline leaf when
+no session is active, a filled leaf (work) or a moon (away) with the elapsed time during a session,
+and a warning triangle when `travel-mode` cannot be found or its status cannot be read. Menu text
+uses the configured language. SwiftBar's own menu items are hidden through plugin metadata.
+
+SwiftBar runs plugins with a short `PATH`, so the plugin looks for the executable in this order:
+`TRAVEL_MODE_BIN`, `~/.local/bin/travel-mode` (uv tool and pipx), `/opt/homebrew/bin/travel-mode`,
+`/usr/local/bin/travel-mode`, then `PATH`. If none is found, the menu shows the install command.
+
+`status --json` fields used by the plugin include `active`, `scenario`, `started_at`,
+`elapsed_seconds`, `duration_minutes`, `power_source`, `battery` (`percent`, `remaining_minutes`,
+`charging_state`) and `app_version`. Fields macOS does not report are `null`. The schema is
+[status.schema.json](json-schema/status.schema.json).
+
+## Passwordless sudo
 
 `sudoers install` writes only `/etc/sudoers.d/travel-mode`, validates it with `visudo`, shows the
 full policy and requires typing `yes`; replacing an existing file needs `--force` and a second

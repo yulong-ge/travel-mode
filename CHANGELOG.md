@@ -6,6 +6,8 @@ All notable changes follow Keep a Changelog.
 
 ### Fixed
 
+- Report power settings a Mac does not expose (for example `SleepDisabled` on a virtual machine) as unavailable in check, JSON (`unavailable` status) and the TUI instead of failing; e2e records such capabilities as SKIP.
+- Publish e2e harness telemetry atomically with a complete schema, including on Python 3.10.
 - Describe Low Power Mode as reducing energy use with effects that vary by Mac model, rather than promising CPU/GPU frequency or brightness changes; cite Apple's wording and dated third-party observations in both READMEs.
 - Share one structural AppleSmartBattery parser across session endpoints, measurements and the TUI; nested ChargerData keys and other registry nodes cannot overwrite top-level battery status.
 
@@ -25,6 +27,9 @@ All notable changes follow Keep a Changelog.
 
 - Explicit sudoers print/install/uninstall/status commands, a pmset-first scope and documented broader operational permissions, with syntax validation, confirmation and Action/Executor mutation routing.
 - Cheap bilingual status JSON and a five-minute SwiftBar plugin; scans and measurements run only after menu clicks.
+- `menubar install|uninstall|status`: copy the bundled SwiftBar plugin into SwiftBar's plugin folder (`--force` to replace a different file, dry-run preview), remove only our file, and compare the installed version.
+- Redesigned menu bar plugin: monochrome SF Symbols with session time, localized session and battery lines, terminal commands that refresh afterwards, hidden SwiftBar default items and a fixed executable search order. `status --json` adds battery percent, remaining time, charging state, elapsed time and app version without extra system calls.
+- `e2e_ui.py --demo --demo-vm` replays the hosted macOS runner's recorded capabilities, which lack some power settings.
 - A separate macOS e2e workflow for manual, weekly and selected main pushes, with observed VM capability SKIPs and 14-day failure evidence; no change to fixture guards or branch-protection checks.
 - A maintainer-only `measure_lowpower.py --plan` and guarded battery 0→1→0 experiment using fresh telemetry accumulator intervals, non-interactive passwordless pmset writes, contextual brightness/CPU observations and verified rollback on success, errors or Ctrl-C.
 - Optional power-source LaunchEvents automation with explicit install/uninstall/status, bounded local receipts, notification defaults and opt-in non-interactive safe work/restore actions. Consume XPC events before handling and exit; no resident monitor, periodic launch or lid/sleep trigger.

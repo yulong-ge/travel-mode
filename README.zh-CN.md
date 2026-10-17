@@ -122,10 +122,24 @@ travel-mode automation uninstall
 断电工作模式，插上电源且有未恢复的会话时提示运行 `travel-mode off`。自动执行动作需要在 `[automation]` 里手动开启。
 合盖不会触发：macOS 没有不需要常驻进程就能监听合盖的方法。
 
-### 菜单栏与免密 sudo（可选）
+### 菜单栏（可选）
 
-- [SwiftBar 插件](integrations/swiftbar/travel-mode.5m.sh)：每 5 分钟用开销很小的 `travel-mode status --json`
-  刷新一次，其它功能只在点击时运行。
+菜单栏图标需要先安装 [SwiftBar](https://swiftbar.app/)（免费、开源），由它来运行插件：
+
+```bash
+brew install --cask swiftbar            # 然后打开 SwiftBar，选择一个插件文件夹
+travel-mode menubar install             # 把插件复制到该文件夹
+travel-mode menubar status
+travel-mode menubar uninstall
+```
+
+安装后在 SwiftBar 里刷新一次即可。省电模式未开启时显示空心叶子；断电工作进行中显示实心叶子，合盖外出时显示月亮，
+旁边是已用时长。点开菜单可以看到当前会话和电池状态，点击菜单项会在终端里运行对应命令。插件每 5 分钟用
+`travel-mode status --json` 刷新一次，这个命令只读取本地状态文件和 `pmset -g ps`。常驻运行的只有 SwiftBar 本身，
+travel-mode 不会额外留下任何进程。
+
+### 免密 sudo（可选）
+
 - `travel-mode sudoers print` 会生成一条只针对 `/usr/bin/pmset` 的 sudoers 规则；`travel-mode sudoers install`
   先校验，再请你确认后安装。最稳妥的做法是不配置任何规则，需要时输入密码。`--scope all` 规则还允许以 root 身份
   加载系统服务、向任意进程发信号，不建议使用，详见 [docs/sudoers.md](docs/sudoers.md)。
@@ -149,6 +163,7 @@ travel-mode automation uninstall
 | `config set-language en\|zh`、`config set-interface cli\|tui` | 保存偏好设置 |
 | `automation install\|uninstall\|status` | 可选的电源事件自动触发 |
 | `sudoers print\|install\|uninstall\|status` | 可选的 sudoers 规则 |
+| `menubar install\|uninstall\|status` | 可选的 SwiftBar 菜单栏插件 |
 
 常用参数：`--scenario work|away`、`--profile NAME`、`--dry-run`、`--yes`、`--aggressive`、`--no-tui` / `--tui`、
 `--lang en|zh`。在界面里按 `L` 切换语言，并保存到配置。

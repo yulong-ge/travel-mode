@@ -139,10 +139,26 @@ travel-mode for work mode"; plugged in with an active session: "run travel-mode 
 actions automatically has to be enabled in `[automation]`. There is no lid-close trigger: macOS
 offers none that works without a resident process.
 
-### Menu bar and passwordless sudo (optional)
+### Menu bar (optional)
 
-- [SwiftBar plugin](integrations/swiftbar/travel-mode.5m.sh): refreshes every 5 minutes with the
-  cheap `travel-mode status --json`; everything else runs only when clicked.
+The menu bar item needs [SwiftBar](https://swiftbar.app/) (free, open source), which runs the
+plugin:
+
+```bash
+brew install --cask swiftbar            # then open SwiftBar and choose a plugin folder
+travel-mode menubar install             # copies the plugin into that folder
+travel-mode menubar status
+travel-mode menubar uninstall
+```
+
+After installing, refresh SwiftBar. The icon shows an outline leaf when power saving is off, and
+a filled leaf or a moon with the elapsed time while a work or away session is running. The menu
+shows the session and battery state and opens commands in a terminal when you click them. The
+plugin refreshes every 5 minutes with `travel-mode status --json`, which only reads the local
+state file and `pmset -g ps`. SwiftBar itself stays running; travel-mode adds no process of its own.
+
+### Passwordless sudo (optional)
+
 - `travel-mode sudoers print` shows a sudoers rule for `/usr/bin/pmset` only;
   `travel-mode sudoers install` validates it and asks you to confirm. Using no rule at all (typing
   your password when asked) is the safest choice. The `--scope all` rule also allows loading
@@ -168,6 +184,7 @@ offers none that works without a resident process.
 | `config set-language en\|zh`, `config set-interface cli\|tui` | Save preferences |
 | `automation install\|uninstall\|status` | Optional power-source automation |
 | `sudoers print\|install\|uninstall\|status` | Optional sudoers rule |
+| `menubar install\|uninstall\|status` | Optional SwiftBar menu bar plugin |
 
 Common options: `--scenario work|away`, `--profile NAME`, `--dry-run`, `--yes`, `--aggressive`,
 `--no-tui` / `--tui`, `--lang en|zh`. In the TUI, `L` switches language and saves it.
