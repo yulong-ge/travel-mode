@@ -14,16 +14,7 @@ uv run pytest tests/unit/test_config.py::test_name   # one test
 uv build && uv run python scripts/check_dist.py      # package contents
 ```
 
-CI runs the suite on Python 3.10–3.13 on Ubuntu and macOS. Before pushing, also run it once under
-the Linux simulation, which pins locale, terminal width, timezone, HOME and the platform the product
-sees:
-
-```bash
-mkdir -p /tmp/travel-mode-ci-home && env -i PATH="$PATH" HOME=/tmp/travel-mode-ci-home CI=true \
-  COLUMNS=57 LANG=C.UTF-8 TZ=Pacific/Honolulu PYTHONPATH=tests \
-  uv run --no-sync pytest -p ci_host </dev/null
-```
-
+CI runs the suite on Python 3.10–3.13 on macOS.
 `uv run --python 3.10 pytest` catches syntax or library features newer than 3.10.
 `uv run pre-commit install` adds local hooks. Use Conventional Commits, and describe how you
 validated the change (and what hardware it was not tested on) in the pull request.

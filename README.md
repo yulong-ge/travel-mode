@@ -226,7 +226,7 @@ battery: graceful and forced quit, freeze and resume, LaunchAgent unload and rel
 AC power settings, `hibernatemode`, sleep repair, `thaw`, brightness, CLI and TUI flows, power
 measurement, session reports and power-source automation. Not verified on hardware: Wi-Fi,
 Bluetooth, Spotlight, display sleep, `caffeinate` termination. CI runs the tests on Python
-3.10–3.13 (Ubuntu and macOS) and a guarded end-to-end run on a macOS runner. Other Mac models and
+3.10–3.13 on macOS and a guarded end-to-end run on a macOS runner. Other Mac models and
 macOS versions have not been tested.
 
 Details on every behavior, limit and exit code: [docs/reference.md](docs/reference.md).

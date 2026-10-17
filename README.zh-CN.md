@@ -200,7 +200,7 @@ pause = ["sync", "backup", "updater"]
 已在一台 MacBook Pro（M1 Pro，macOS 27）上，用临时创建的测试 app 和后台服务，分别在接电和电池供电下验证：
 正常退出与强制退出、冻结与恢复、LaunchAgent 卸载与重新加载、电池与接电的电源设置、`hibernatemode`、修复禁止睡眠、
 `thaw`、亮度、命令行和界面的完整流程、功耗测量、会话报告，以及电源事件自动触发。尚未在真机上验证：Wi-Fi、蓝牙、
-Spotlight、立即关屏、结束 `caffeinate`。CI 在 Python 3.10–3.13（Ubuntu 和 macOS）上运行测试，并在 macOS
+Spotlight、立即关屏、结束 `caffeinate`。CI 在 macOS 上用 Python 3.10–3.13 运行测试，并在 macOS
 云端机器上运行受保护的端到端测试。其它 Mac 机型和 macOS 版本尚未测试。
 
 各项行为、限制和退出码的完整说明见[技术参考](docs/reference.md)（英文）。

@@ -5,7 +5,7 @@ Guidance for coding agents working in this repository. Human-oriented details li
 
 travel-mode is a macOS battery-saving tool (Python 3.10–3.13, Textual TUI + CLI). It snapshots
 the current state, applies power/app/launchd/network changes, and `travel-mode off` restores
-exactly what was changed. Runtime is macOS-only; the test suite runs on macOS and Linux.
+exactly what was changed. It is developed and tested on macOS only.
 
 ## Commands
 
@@ -13,10 +13,9 @@ exactly what was changed. Runtime is macOS-only; the test suite runs on macOS an
 uv sync --group dev                      # environment (always use uv, never system python/pip)
 uv run ruff check && uv run ruff format --check
 uv run pytest                            # default suite; excludes the `macos` and `e2e` markers
-mkdir -p /tmp/travel-mode-ci-home && env -i PATH="$PATH" HOME=/tmp/travel-mode-ci-home CI=true COLUMNS=57 LANG=C.UTF-8 TZ=Pacific/Honolulu PYTHONPATH=tests uv run --no-sync pytest -p ci_host </dev/null # run before committing; CI includes Ubuntu
 uv run pytest tests/unit/test_config.py::test_name    # single test
 uv run pytest tests/characterization     # behavior contracts (golden files)
-uv run --python 3.10 pytest              # CI runs 3.10–3.13 on ubuntu and macOS
+uv run --python 3.10 pytest              # CI runs 3.10–3.13 on macOS
 uv build && uv run python scripts/check_dist.py       # package + wheel/sdist content check
 
 uv run travel-mode check                 # read-only audit of this machine
@@ -112,5 +111,5 @@ cli.py → flows/ (apply, restore, check, report, suggest, configuration, thaw)
 ## Repository workflow
 
 - Conventional Commits. `main` is protected (no force pushes; lint, build and the 3.10–3.13
-  ubuntu/macOS test matrix must pass).
+  macOS test matrix must pass).
 - Update `CHANGELOG.md` for user-visible changes.
