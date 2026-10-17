@@ -1,0 +1,4 @@
+ | sfimage=exclamationmark.triangle sfsize=16 dropdown=false symbolize=false emojize=false
+---
+未找到 travel-mode。请安装或设置 TRAVEL_MODE_BIN。
+安装 travel-mode | sfimage=arrow.down.circle bash=/bin/bash param1=-lc param2="uv tool install git+https://github.com/yulong-ge/travel-mode" terminal=true refresh=true

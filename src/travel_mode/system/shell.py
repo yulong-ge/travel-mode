@@ -37,6 +37,7 @@ SYSTEM_TOOLS = {
     "cat": "/bin/cat",
     "system_profiler": "/usr/sbin/system_profiler",
     "plutil": "/usr/bin/plutil",
+    "defaults": "/usr/bin/defaults",
     "sw_vers": "/usr/bin/sw_vers",
     "lsappinfo": "/usr/bin/lsappinfo",
     "osacompile": "/usr/bin/osacompile",
@@ -161,6 +162,8 @@ def _dry_run_readonly(cmd: list[str]) -> bool:
     if not cmd:
         return False
     base, args = cmd[0], cmd[1:]
+    if base == "defaults":
+        return args == ["read", "com.ameba.SwiftBar", "PluginDirectory"]
     if base == sys.executable:
         return (
             len(args) == 3

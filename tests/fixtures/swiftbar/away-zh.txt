@@ -1,0 +1,16 @@
+1:20 | sfimage=moon.fill sfsize=16 dropdown=false symbolize=false emojize=false
+---
+合盖外出中 · 已 1 小时 20 分
+电池 82% · 预计剩余 3 小时 10 分
+---
+恢复（off） | sfimage=arrow.uturn.backward bash="/fixture/travel-mode" param1="off" terminal=true refresh=true
+---
+体检 | sfimage=stethoscope bash="/fixture/travel-mode" param1="check" terminal=true refresh=true
+测量功耗 | sfimage=bolt bash="/fixture/travel-mode" param1="power" terminal=true refresh=true
+会话历史 | sfimage=clock bash="/fixture/travel-mode" param1="history" terminal=true refresh=true
+---
+更多 | sfimage=ellipsis.circle
+--自动触发状态 | sfimage=bolt.horizontal.circle bash="/fixture/travel-mode" param1="automation" param2="status" terminal=true refresh=true
+--编辑配置 | sfimage=slider.horizontal.3 bash="/fixture/travel-mode" param1="config" param2="edit" terminal=true refresh=true
+--项目主页 | sfimage=link href=https://github.com/yulong-ge/travel-mode
+--版本 1.1.0

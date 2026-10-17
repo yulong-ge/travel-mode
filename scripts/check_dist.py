@@ -9,6 +9,7 @@ from zipfile import ZipFile
 
 REQUIRED = {
     "travel_mode/categories.toml",
+    "travel_mode/resources/travel-mode.5m.sh",
     "travel_mode/cli.py",
     "travel_mode/tui/style.tcss",
     "travel_mode/config_template.toml",

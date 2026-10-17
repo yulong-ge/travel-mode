@@ -49,6 +49,7 @@ def _main(argv=None):
             "event",
             "sudoers",
             "status",
+            "menubar",
         ],
     )
     parser.add_argument(
@@ -102,7 +103,13 @@ def _main(argv=None):
     parser.add_argument("--all", action="store_true", help=t("cli.thaw_resume_all_stopped_app_processes"))
     parser.add_argument("--version", action="version", version="travel-mode 1.1.0")
     args = parser.parse_args(argv)
-    if args.config_cmd is not None and args.cmd not in {"config", "automation", "event", "sudoers"}:
+    if args.config_cmd is not None and args.cmd not in {
+        "config",
+        "automation",
+        "event",
+        "sudoers",
+        "menubar",
+    }:
         parser.error(t("cli.unexpected_config_value"))
     if args.scope is not None and (args.cmd != "sudoers" or args.config_cmd not in {"print", "install"}):
         parser.error(t("sudoers.usage"))
@@ -153,7 +160,7 @@ def _main(argv=None):
 
         try:
             ensure_macos()
-            if not args.demo and args.cmd not in {"automation", "sudoers", "status"}:
+            if not args.demo and args.cmd not in {"automation", "sudoers", "status", "menubar"}:
                 detect_capabilities()
         except SystemExit:
             raise
@@ -161,7 +168,9 @@ def _main(argv=None):
             print(str(exc), file=sys.stderr)
             return 2
     migration_messages = (
-        [] if args.cmd in {"suggest", "history", "automation", "sudoers", "status"} else migrate_legacy()
+        []
+        if args.cmd in {"suggest", "history", "automation", "sudoers", "status", "menubar"}
+        else migrate_legacy()
     )
     for message in migration_messages:
         print(message, file=sys.stderr)
@@ -180,6 +189,31 @@ def _main(argv=None):
             if args.json
             else result["swiftbar"].split("---")[1].strip()
         )
+        return 0
+    if args.cmd == "menubar":
+        import json
+
+        from . import menubar
+        from .actions.base import Context
+        from .actions.executor import Executor
+        from .actions.menubar import InstallMenubar, UninstallMenubar
+        from .presentation import yes_no
+
+        if args.config_cmd == "status":
+            result = menubar.status()
+            labels = {key: yes_no(result[key]) for key in ("installed", "current", "executable")}
+            print(
+                json.dumps(result, ensure_ascii=False)
+                if args.json
+                else t("menubar.plugin_status", **{**result, **labels})
+            )
+            return 0
+        if args.config_cmd not in {"install", "uninstall"} or args.json:
+            parser.error(t("menubar.usage"))
+        action = InstallMenubar(args.force) if args.config_cmd == "install" else UninstallMenubar()
+        Executor(Context(None)).execute(action)
+        if args.dry_run:
+            print(t("menubar.planned"))
         return 0
     if args.cmd == "sudoers":
         import json
@@ -220,6 +254,7 @@ def _main(argv=None):
         from .actions.automation import InstallAutomation, UninstallAutomation
         from .actions.base import Context
         from .actions.executor import Executor
+        from .presentation import yes_no
 
         if args.config_cmd == "status":
             result = automation.status()
@@ -228,9 +263,9 @@ def _main(argv=None):
                 if args.json
                 else t(
                     "automation.status",
-                    installed=result["installed"],
-                    loaded=result["loaded"],
-                    running=result["running"],
+                    installed=yes_no(result["installed"]),
+                    loaded=yes_no(result["loaded"]),
+                    running=yes_no(result["running"]),
                     path=result["path"],
                 )
                 + "\n"
@@ -407,6 +442,8 @@ def _handled_main(argv=None):
     from contextlib import nullcontext
 
     from .automation import AutomationError, preview_scope
+    from .menubar import MenubarError
+    from .menubar import preview_scope as menubar_preview_scope
     from .paths import state_path
     from .state import StateError
     from .status import StatusError
@@ -415,16 +452,27 @@ def _handled_main(argv=None):
 
     arguments = list(sys.argv[1:] if argv is None else argv)
     try:
-        with preview_scope() if "automation" in arguments and "--dry-run" in arguments else nullcontext():
+        preview = nullcontext()
+        if "--dry-run" in arguments:
+            if "automation" in arguments:
+                preview = preview_scope()
+            elif "menubar" in arguments:
+                preview = menubar_preview_scope()
+        with preview:
             return command_lifecycle(arguments, _main)
-    except (SudoersError, StatusError) as exc:
+    except (SudoersError, StatusError, MenubarError) as exc:
         if os.environ.get("TRAVEL_MODE_DEBUG") == "1":
             raise
         detail = " ".join(str(exc).splitlines())
         if "--json" in arguments:
             import json
 
-            print(json.dumps({"error": {"type": type(exc).__name__, "message": detail}}, ensure_ascii=False))
+            result = {"error": {"type": type(exc).__name__, "message": detail}}
+            if "status" in arguments and "menubar" not in arguments and "sudoers" not in arguments:
+                from .status import error_menu
+
+                result["swiftbar"] = error_menu(detail)
+            print(json.dumps(result, ensure_ascii=False))
         else:
             print(detail, file=sys.stderr)
         return 6 if isinstance(exc, SudoersError) else 1

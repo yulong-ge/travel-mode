@@ -1,0 +1,17 @@
+ | sfimage=leaf sfsize=16 dropdown=false symbolize=false emojize=false
+---
+Power saving is off
+Battery 82%
+---
+Enter unplugged work | sfimage=leaf bash="/fixture/travel-mode" param1="--scenario" param2="work" terminal=true refresh=true
+Enter away / overnight | sfimage=moon bash="/fixture/travel-mode" param1="--scenario" param2="away" terminal=true refresh=true
+---
+Health check | sfimage=stethoscope bash="/fixture/travel-mode" param1="check" terminal=true refresh=true
+Measure power | sfimage=bolt bash="/fixture/travel-mode" param1="power" terminal=true refresh=true
+Session history | sfimage=clock bash="/fixture/travel-mode" param1="history" terminal=true refresh=true
+---
+More | sfimage=ellipsis.circle
+--Automation status | sfimage=bolt.horizontal.circle bash="/fixture/travel-mode" param1="automation" param2="status" terminal=true refresh=true
+--Edit configuration | sfimage=slider.horizontal.3 bash="/fixture/travel-mode" param1="config" param2="edit" terminal=true refresh=true
+--Project homepage | sfimage=link href=https://github.com/yulong-ge/travel-mode
+--Version 1.1.0

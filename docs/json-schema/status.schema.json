@@ -12,7 +12,10 @@
     "language",
     "source_timeout_seconds",
     "elapsed_seconds",
-    "swiftbar"
+    "swiftbar",
+    "app_version",
+    "duration_minutes",
+    "battery"
   ],
   "properties": {
     "version": {
@@ -56,6 +59,52 @@
     },
     "swiftbar": {
       "type": "string"
+    },
+    "app_version": {
+      "type": "string"
+    },
+    "duration_minutes": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "battery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "percent",
+        "remaining_minutes",
+        "charging_state"
+      ],
+      "properties": {
+        "percent": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "remaining_minutes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "charging_state": {
+          "enum": [
+            null,
+            "charging",
+            "charged",
+            "discharging",
+            "not charging",
+            "finishing charge"
+          ]
+        }
+      }
     }
   }
 }

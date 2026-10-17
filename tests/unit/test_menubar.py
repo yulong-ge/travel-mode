@@ -1,0 +1,112 @@
+"""Only temporary plugin folders are writable; no SwiftBar refresh is emitted."""
+
+import json
+from pathlib import Path
+
+import pytest
+
+from travel_mode import cli, menubar
+from travel_mode.actions.base import Context
+from travel_mode.actions.executor import Executor
+from travel_mode.actions.menubar import InstallMenubar, UninstallMenubar
+from travel_mode.system import shell
+from travel_mode.system.shell import CmdResult
+
+
+@pytest.fixture
+def plugin_folder(tmp_path, fake_runner):
+    folder = tmp_path / "Plugin Folder"
+    folder.mkdir()
+    fake_runner.responses[tuple(menubar.PREFERENCE)] = CmdResult(str(folder) + "\n", "", 0)
+    return folder
+
+
+def test_copy_install_status_uninstall_only_our_file(plugin_folder, fake_runner, darwin_platform, capsys):
+    other = plugin_folder / "other.5m.sh"
+    other.write_text("untouched")
+    assert cli.main(["menubar", "install"]) == 0
+    path = plugin_folder / menubar.FILENAME
+    assert not path.is_symlink() and path.read_bytes() == menubar.payload()
+    assert path.stat().st_mode & 0o777 == 0o755
+    capsys.readouterr()
+    assert cli.main(["menubar", "status", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result == dict(
+        path=str(path),
+        installed=True,
+        current=True,
+        executable=True,
+        installed_version="2.0.0",
+        bundled_version="2.0.0",
+    )
+    assert cli.main(["menubar", "uninstall"]) == 0
+    assert not path.exists() and other.read_text() == "untouched"
+    assert fake_runner.calls == [tuple(menubar.PREFERENCE)] * 3
+
+
+def test_install_requires_force_for_different_content(plugin_folder):
+    path = plugin_folder / menubar.FILENAME
+    path.write_text("old")
+    with pytest.raises(menubar.MenubarError, match="--force"):
+        Executor(Context(None)).execute(InstallMenubar())
+    Executor(Context(None)).execute(InstallMenubar(force=True))
+    assert path.read_bytes() == menubar.payload()
+
+
+@pytest.mark.parametrize("kind", ["symlink", "directory", "foreign"])
+def test_uninstall_refuses_unowned_target(plugin_folder, kind):
+    path = plugin_folder / menubar.FILENAME
+    if kind == "symlink":
+        path.symlink_to(plugin_folder / "missing")
+    elif kind == "directory":
+        path.mkdir()
+    else:
+        path.write_text("unrelated")
+    with pytest.raises(menubar.MenubarError):
+        Executor(Context(None)).execute(UninstallMenubar())
+
+
+@pytest.mark.parametrize("operation", ["install", "uninstall"])
+def test_dry_run_preserves_preference_target_and_files(
+    plugin_folder, operation, darwin_platform, capsys, fake_runner
+):
+    path = plugin_folder / menubar.FILENAME
+    path.write_bytes(menubar.payload())
+    before = path.stat()
+    assert cli.main(["menubar", operation, "--dry-run"]) == 0
+    assert str(path) in capsys.readouterr().out
+    assert path.read_bytes() == menubar.payload() and path.stat() == before
+    assert fake_runner.calls == [tuple(menubar.PREFERENCE)]
+
+
+@pytest.mark.parametrize("output,rc", [("", 1), ("relative", 0), ("/not/a/folder", 0)])
+def test_directory_error_is_explicit(output, rc, fake_runner, darwin_platform, capsys):
+    fake_runner.responses[tuple(menubar.PREFERENCE)] = CmdResult(output, "missing preference", rc)
+    assert cli.main(["menubar", "status"]) == 1
+    assert "SwiftBar" in capsys.readouterr().err
+
+
+def test_packaged_copy_matches_integration_and_defaults_is_readonly():
+    assert menubar.payload() == Path("integrations/swiftbar/travel-mode.5m.sh").read_bytes()
+    assert shell.SYSTEM_TOOLS["defaults"] == "/usr/bin/defaults"
+    assert shell._dry_run_readonly(menubar.PREFERENCE)
+    assert not shell._dry_run_readonly(["defaults", "write", "com.ameba.SwiftBar", "PluginDirectory", "x"])
+    assert not shell._dry_run_readonly(["defaults", "read", "another.domain"])
+
+
+@pytest.mark.parametrize("language,yes,no", [("en", "yes", "no"), ("zh", "是", "否")])
+def test_plain_status_localizes_booleans_but_json_retains_types(
+    plugin_folder, language, yes, no, monkeypatch, darwin_platform, capsys
+):
+    monkeypatch.setenv("TRAVEL_MODE_LANG", language)
+    for installed in (False, True):
+        if installed:
+            Executor(Context(None)).execute(InstallMenubar())
+            capsys.readouterr()
+        assert cli.main(["menubar", "status"]) == 0
+        text = capsys.readouterr().out
+        assert (yes if installed else no) in text
+        assert not any(word in text for word in ("True", "False", "None"))
+        assert cli.main(["menubar", "status", "--json"]) == 0
+        data = json.loads(capsys.readouterr().out)
+        assert all(data[key] is installed for key in ("installed", "current", "executable"))

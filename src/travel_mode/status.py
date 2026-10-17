@@ -2,8 +2,11 @@
 
 import json
 import os
+import re
 import time
+from datetime import datetime
 
+from . import __version__
 from .i18n import get_language, t
 from .state import load_state
 from .system.shell import _read
@@ -15,20 +18,47 @@ class StatusError(RuntimeError):
     """A status observation failed."""
 
 
-def source():
+def observation():
     # Do not call capability detection, migration, snapshots, health or discovery.
     raw = _read(["pmset", "-g", "ps"], timeout=SOURCE_TIMEOUT)
     for name, value in (("AC Power", "ac"), ("Battery Power", "battery"), ("UPS Power", "ups")):
         if name in raw:
-            return value
-    raise StatusError(t("automation.unknown_source", detail=raw.strip()))
+            source = value
+            break
+    else:
+        raise StatusError(t("automation.unknown_source", detail=raw.strip()))
+    battery = dict(percent=None, remaining_minutes=None, charging_state=None)
+    for line in raw.splitlines():
+        if "InternalBattery" not in line:
+            continue
+        percent = re.search(r"\b(\d+)%", line)
+        if percent is None or not 0 <= int(percent[1]) <= 100:
+            raise StatusError(t("menubar.invalid_battery", detail=line.strip()))
+        battery["percent"] = int(percent[1])
+        tokens = [token.strip() for token in line.split(";")]
+        for state in ("discharging", "charging", "charged", "not charging", "finishing charge"):
+            if state in tokens:
+                battery["charging_state"] = state
+                break
+        estimate = re.search(r"\b(\d+):(\d{2}) remaining\b", line)
+        if estimate:
+            if int(estimate[2]) >= 60:
+                raise StatusError(t("menubar.invalid_battery", detail=line.strip()))
+            battery["remaining_minutes"] = int(estimate[1]) * 60 + int(estimate[2])
+    return source, battery
 
 
-def data(*, clock=time.monotonic):
+def source():
+    return observation()[0]
+
+
+def data(*, clock=time.monotonic, now=None):
     started = clock()
     snapshot = load_state()
+    power_source, battery = observation()
     result = dict(
         version=1,
+        app_version=__version__,
         active=snapshot is not None,
         scenario=(snapshot.get("scenario") or None) if snapshot else None,
         started_at=(
@@ -39,13 +69,74 @@ def data(*, clock=time.monotonic):
         )
         if snapshot
         else None,
-        power_source=source(),
+        power_source=power_source,
+        battery=battery,
         language=get_language(),
         source_timeout_seconds=SOURCE_TIMEOUT,
     )
+    result["duration_minutes"] = None
+    if result["started_at"]:
+        try:
+            start = datetime.fromisoformat(result["started_at"]).astimezone()
+            seconds = ((now or datetime.now().astimezone()) - start).total_seconds()
+            if seconds < 0:
+                raise ValueError("session start is in the future")
+            result["duration_minutes"] = int(seconds // 60)
+        except ValueError as exc:
+            raise StatusError(t("menubar.invalid_start", detail=str(exc))) from exc
     result["swiftbar"] = render(result)
     result["elapsed_seconds"] = clock() - started
     return result
+
+
+def duration(minutes):
+    return t("menubar.duration", hours=minutes // 60, minutes=minutes % 60)
+
+
+def header(symbol, text=""):
+    # SwiftBar 2.1.1 SF images are template images: omit sfcolor to follow appearance.
+    # https://github.com/swiftbar/SwiftBar/blob/v2.1.1/SwiftBar/MenuBar/MenuBarItem.swift
+    return f"{text} | sfimage={symbol} sfsize=16 dropdown=false symbolize=false emojize=false"
+
+
+def error_menu(detail):
+    return "\n".join(
+        (
+            header("exclamationmark.triangle"),
+            "---",
+            t("menubar.read_failed"),
+            " ".join(str(detail).replace("|", "/").split()),
+        )
+    )
+
+
+def power_line(result):
+    battery = result.get("battery", {})
+    percent = battery.get("percent")
+    state = battery.get("charging_state")
+    source = result["power_source"]
+    if source == "ac":
+        # Normalize only the display. JSON keeps pmset's exact state/percentage.
+        # A full percentage takes priority even while pmset says finishing charge.
+        if percent == 100 or (
+            percent is not None and percent >= 99 and state in {"charged", "finishing charge"}
+        ):
+            return t("menubar.ac_full")
+        if state in {"charging", "finishing charge"}:
+            return t("menubar.charging_charging") + (f" · {percent}%" if percent is not None else "")
+        if state in {"not charging", "charged", "discharging"}:
+            return (
+                t("menubar.ac_not_charging", percent=percent)
+                if percent is not None
+                else t("menubar.ac_not_charging_unknown")
+            )
+        return t("menubar.source_ac") + (f" · {percent}%" if percent is not None else "")
+    text = t("menubar.source_" + source)
+    if percent is not None:
+        text += f" {percent}%"
+    if battery.get("remaining_minutes") is not None:
+        text += " · " + t("menubar.remaining", duration=duration(battery["remaining_minutes"]))
+    return text
 
 
 def render(result):
@@ -54,28 +145,44 @@ def render(result):
         raise StatusError(t("menubar.invalid_executable"))
     quoted = json.dumps(executable, ensure_ascii=False)
 
-    def clean(value):
-        return " ".join(str(value or "—").split())[:160]
-
-    rows = ["✈️" if result["active"] else "🔋", "---"]
-    rows.append(
-        t(
-            "menubar.active" if result["active"] else "menubar.inactive",
-            scenario=clean(result["scenario"]),
-            started=clean(result["started_at"]),
-        ).replace("|", "/")
-    )
-    rows.append(t("menubar.source", source=t("menubar.source_" + result["power_source"])))
+    minutes = result.get("duration_minutes")
+    elapsed = f"{minutes // 60}:{minutes % 60:02d}" if minutes is not None else ""
+    active = result["active"]
+    scenario = result["scenario"]
+    symbol = ("moon.fill" if scenario == "away" else "leaf.fill") if active else "leaf"
+    rows = [header(symbol, elapsed), "---"]
+    if active:
+        label = t("menubar.session_" + scenario) if scenario else t("menubar.session_unknown")
+        rows.append(
+            t("menubar.session", label=label, duration=duration(minutes)) if minutes is not None else label
+        )
+    else:
+        rows.append(t("menubar.inactive"))
+    rows.append(power_line(result))
     rows.append("---")
-    for key, arguments in (
-        ("work", ("--scenario", "work")),
-        ("away", ("--scenario", "away")),
-        ("off", ("off",)),
-        ("check", ("check",)),
-        ("power", ("power",)),
-        ("history", ("history",)),
-        ("automation", ("automation", "status")),
-    ):
+
+    # Documented bash/paramN, terminal, refresh and -- submenu protocol:
+    # https://github.com/swiftbar/SwiftBar#parameters
+    def action(key, symbol, arguments, prefix=""):
         params = " ".join(f"param{index}={json.dumps(arg)}" for index, arg in enumerate(arguments, 1))
-        rows.append(f"{t('menubar.' + key)} | bash={quoted} {params} terminal=true refresh=true")
+        rows.append(
+            f"{prefix}{t('menubar.' + key)} | sfimage={symbol} bash={quoted} {params} "
+            "terminal=true refresh=true"
+        )
+
+    if active:
+        action("off", "arrow.uturn.backward", ("off",))
+    else:
+        action("work", "leaf", ("--scenario", "work"))
+        action("away", "moon", ("--scenario", "away"))
+    rows.append("---")
+    for key, symbol in (("check", "stethoscope"), ("power", "bolt"), ("history", "clock")):
+        action(key, symbol, (key,))
+    rows.extend(("---", t("menubar.more") + " | sfimage=ellipsis.circle"))
+    action("automation", "bolt.horizontal.circle", ("automation", "status"), "--")
+    action("edit", "slider.horizontal.3", ("config", "edit"), "--")
+    rows.append(
+        "--" + t("menubar.homepage") + " | sfimage=link href=https://github.com/yulong-ge/travel-mode"
+    )
+    rows.append("--" + t("menubar.version", version=result.get("app_version", __version__)))
     return "\n".join(rows)

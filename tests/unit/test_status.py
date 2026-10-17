@@ -40,7 +40,8 @@ def test_status_json_schema_only_source_command_and_no_migration(
     validate(result, json.loads(Path("docs/json-schema/status.schema.json").read_text()))
     assert result["active"] is active and result["language"] == language
     assert observed == [(["pmset", "-g", "ps"], 2, False)]
-    assert "--scenario" in result["swiftbar"] and 'param1="off"' in result["swiftbar"]
+    assert ("--scenario" in result["swiftbar"]) is not active
+    assert ('param1="off"' in result["swiftbar"]) is active
     assert "terminal=false" not in result["swiftbar"]
 
 
@@ -70,7 +71,7 @@ def test_swiftbar_script_is_five_minutes_and_parses_single_status_json():
     fixture = dict(active=True, scenario="work", started_at="2026-10-16 12:00:00", power_source="battery")
     payload = json.dumps({"swiftbar": status.render(fixture)}, ensure_ascii=False)
     menu = json.loads(payload)["swiftbar"]
-    assert "Active: work" in menu and "Battery" in menu
+    assert "Unplugged work active" in menu and "Battery" in menu
     assert all(
         f'param1="{command}"' in menu for command in ("off", "check", "power", "history", "automation")
     )

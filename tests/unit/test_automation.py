@@ -348,6 +348,22 @@ def test_status_reports_observation_failure_instead_of_claiming_unloaded(machine
         automation.status()
 
 
+@pytest.mark.parametrize("language,yes,no", [("en", "yes", "no"), ("zh", "是", "否")])
+def test_plain_status_localizes_booleans_and_preserves_json(machine, monkeypatch, capsys, language, yes, no):
+    monkeypatch.setenv("TRAVEL_MODE_LANG", language)
+    assert cli.main(["automation", "install"]) == 0
+    capsys.readouterr()
+    machine.responses[("launchctl", "print")] = CmdResult("state = not running\n", "", 0)
+    assert cli.main(["automation", "status"]) == 0
+    text = capsys.readouterr().out
+    assert yes in text and no in text
+    assert not any(word in text for word in ("True", "False", "None"))
+    assert cli.main(["automation", "status", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["installed"] is True and result["loaded"] is True and result["running"] is False
+    assert result["last_event"] is None
+
+
 def test_invalid_plist_reports_its_file(machine):
     path = automation.agent_path()
     path.parent.mkdir(parents=True)

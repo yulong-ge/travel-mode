@@ -1,0 +1,3 @@
+ | sfimage=exclamationmark.triangle sfsize=16 dropdown=false symbolize=false emojize=false
+---
+Could not read travel-mode status. Run travel-mode status --json in Terminal for the error.
