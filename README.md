@@ -179,6 +179,7 @@ state file and `pmset -g ps`. SwiftBar itself stays running; travel-mode adds no
 | `report [--json]` | Sleep and DarkWake report from the system power log |
 | `suggest [--write]` | Suggest apps, services and categories to add to the configuration |
 | `thaw [--all]` | List stopped app processes and resume them after confirmation |
+| `setup [--no-tui] [--yes]` | Choose what happens to each app in `work` and `away` |
 | `profiles` | List profiles |
 | `config path\|init\|validate\|edit` | Manage the configuration file |
 | `config set-language en\|zh`, `config set-interface cli\|tui` | Save preferences |
@@ -195,6 +196,13 @@ Common options: `--scenario work|away`, `--profile NAME`, `--dry-run`, `--yes`, 
 template with `travel-mode config init`; a full example is in
 [examples/config.toml](examples/config.toml).
 
+The first run opens a setup screen (also `travel-mode setup`) that lists your apps with a
+recommended action for each scenario: ordinary apps are frozen; Google Drive, OneDrive, Dropbox
+and Box are quit, because a frozen cloud-file provider can stall Finder; apps that keep the Mac
+awake are quit in `away`, because freezing does not release their sleep assertion; browsers and
+editors are asked about. Change any row, review the summary and save. When you change an app's
+action during a session, the tool offers to remember it.
+
 ```toml
 [options]
 scenario = "ask"        # ask | work | away
@@ -203,6 +211,9 @@ interface = "tui"       # tui | cli
 [apps]
 freeze = ["Slack"]      # pause, resume on off
 quit = ["Spotify"]      # quit, reopen on off
+
+[apps.away]             # overrides for one scenario
+quit = ["Slack"]
 
 [services]
 unload = ["syncthing"]  # LaunchAgent label, file name or pattern
@@ -213,8 +224,10 @@ pause = ["sync", "backup", "updater"]
 
 ## Restoring by hand
 
-If `off` cannot finish, the state file keeps the remaining items; fix the reported problem and
-run `travel-mode off` again. `travel-mode thaw` lists every stopped app process and resumes them
+If an action fails, the tool shows one line with the reason, continues with the other actions
+and records the command, exit code and error in `~/.local/state/travel-mode/travel-mode.log` and
+in the session report. If `off` cannot finish, the state file keeps the remaining items; fix the
+reported problem and run `travel-mode off` again. `travel-mode thaw` lists every stopped app process and resumes them
 after you confirm (`--all` skips the question). Without a state file,
 `travel-mode off` offers a confirmed reset of power settings to macOS defaults
 (`sudo pmset restoredefaults`).

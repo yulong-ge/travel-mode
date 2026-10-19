@@ -17,6 +17,8 @@ hardware observations name the machine they were made on.
 - [Passwordless sudo](#passwordless-sudo)
 - [Restore and recovery](#restore-and-recovery)
 - [Configuration and environment](#configuration-and-environment)
+- [Failed actions and the log](#failed-actions-and-the-log)
+- [App defaults and setup](#app-defaults-and-setup)
 - [Exit codes and errors](#exit-codes-and-errors)
 
 ## Scenarios and profiles
@@ -336,6 +338,44 @@ disable`.
 `suggest --write` asks for confirmation, keeps comments and validates before replacing the file.
 Pressing `L` in the TUI saves `options.language`, keeping comments. JSON schemas are in
 [json-schema/](json-schema/).
+
+## Failed actions and the log
+
+An action that fails (a command exits non-zero, an app refuses to quit, a service cannot be
+unloaded) is shown on one line with the reason; the other actions in the same batch continue and
+the batch ends with a summary such as "4 succeeded, 1 failed". A state file that cannot be read or
+written stops the remaining changes, because their recovery could not be recorded. An unexpected
+internal error keeps the TUI open and shows one line with the log path; set `TRAVEL_MODE_DEBUG=1`
+to see the traceback instead.
+
+Quitting an app uses AppleScript. If the app cancels the request (error -128, for example while
+it shows a confirmation dialog) or does not answer in time, `away` force-quits it and reports a
+warning; `work` marks the item failed and offers retry and force quit, and never force-quits on
+its own.
+
+Failures are appended as JSON lines to `travel-mode.log` next to the state file (mode 0600,
+rotated once at 1 MiB): time, scenario, action, command, exit code, reason, and stdout/stderr
+excerpts, plus the traceback for internal errors. The session state, the report printed by `off`
+and `travel-mode history` list the failed actions.
+
+## App defaults and setup
+
+`travel-mode setup` (shown automatically on the first run without a configuration file) lists
+installed and running apps with a recommended action for `work` and `away` and a one-line reason:
+
+| App | work | away |
+| --- | --- | --- |
+| Ordinary app | freeze | freeze |
+| Cloud-file provider (`file_provider = true` in categories.toml: Google Drive, OneDrive, Dropbox, Box) | quit | quit |
+| Holds a sleep assertion | freeze, with a note | quit |
+| Browser, editor, terminal | ask | ask |
+
+Protected apps (the terminal running the tool and its ancestors, the frontmost app, protected
+Apple apps) are not listed. Explicit configuration always wins over a recommendation, and
+`[apps.work]` / `[apps.away]` override the scenario-independent `[apps]` lists. Configuration
+files written before this feature have no `apps.policy` key and keep the previous built-in
+defaults (`legacy`); new files and files saved by setup use `adaptive`. Setup writes atomically,
+keeps comments, and with `--dry-run` only prints what it would write.
 
 ## Exit codes and errors
 

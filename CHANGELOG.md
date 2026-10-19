@@ -6,6 +6,7 @@ All notable changes follow Keep a Changelog.
 
 ### Fixed
 
+- An app that cancels the quit request (AppleScript -128, for example a "quit anyway?" dialog) no longer crashes the TUI with a traceback. Quit results are classified; `away` falls back to force quit and reports one warning, `work` marks the item failed and keeps retry and force-quit controls. Other actions in the batch continue, state errors stop further changes, and unexpected errors keep the TUI open with one line and a log path (`TRAVEL_MODE_DEBUG=1` keeps the traceback).
 - Report power settings a Mac does not expose (for example `SleepDisabled` on a virtual machine) as unavailable in check, JSON (`unavailable` status) and the TUI instead of failing; e2e records such capabilities as SKIP.
 - Publish e2e harness telemetry atomically with a complete schema, including on Python 3.10.
 - Describe Low Power Mode as reducing energy use with effects that vary by Mac model, rather than promising CPU/GPU frequency or brightness changes; cite Apple's wording and dated third-party observations in both READMEs.
@@ -24,6 +25,10 @@ All notable changes follow Keep a Changelog.
 - Document language persistence and remove the maintainer command proxy from public test instructions.
 
 ### Added
+
+- `travel-mode setup` (TUI and prompts, shown on first run): per-app actions for `work` and `away` with a recommendation and reason for each app, a reviewed summary and an atomic save that keeps comments. Per-scenario `[apps.work]` / `[apps.away]` tables; existing configuration files keep their previous behavior. After a changed action succeeds, the tool offers to remember it.
+- Failure log `travel-mode.log` in the state directory (mode 0600, 1 MiB with one rotation) and failed actions in session reports and history.
+- A fault-injection test sweep over every mutating command in the CLI and TUI flows, and an e2e fixture app that refuses to quit.
 
 - Explicit sudoers print/install/uninstall/status commands, a pmset-first scope and documented broader operational permissions, with syntax validation, confirmation and Action/Executor mutation routing.
 - Cheap bilingual status JSON and a five-minute SwiftBar plugin; scans and measurements run only after menu clicks.
