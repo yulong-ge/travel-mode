@@ -80,6 +80,11 @@
       "ps",
       "-axo",
       "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
     ]
   ],
   "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",

@@ -15,6 +15,7 @@ from tui_interaction import click_after_layout
 async def test_health_overview_refresh_and_executor_button(language, fake_runner, monkeypatch):
     set_language(language)
     fake_runner.responses[("pmset", "-g")] = CmdResult("SleepDisabled 1\nlowpowermode 0\n", "", 0)
+    fake_runner.responses[tuple(health.native_command("brightness"))] = CmdResult("0.87", "", 0)
     # The fixture has no native/system access. This exact native failure is rendered explicitly.
     fake_runner.responses[tuple(health.native_command("displays"))] = CmdResult("", "probe denied", 1)
     app = TravelApp(scenario="away")
@@ -32,11 +33,17 @@ async def test_health_overview_refresh_and_executor_button(language, fake_runner
         assert app.refresh_complete and "health" in app.pages_ready
         text = "\n".join(str(widget.content) for widget in app.query("#dash-health Static"))
         summary = "\n".join(str(w.content) for w in app.query("#dash-status Label"))
-        assert summary.count("SleepDisabled=1") == 1
+        assert "SleepDisabled" not in summary
+        assert text.count(t("health_view.sleep_disabled_hit")) == 1
         assert "SleepDisabled=1" not in text
         assert len(app.query("#overview-health.card")) == 1
-        assert t("health.unknown") in text and "probe denied" in text
-        assert len(app.query("#dash-health Button")) == 2
+        assert t("health.unknown") in text and "travel-mode.log" in text
+        assert len(app.query("#dash-health Button")) == 4
+        brightness_button = app.query_one("#b-health-brightness-0")
+        assert str(brightness_button.label) == t("health.action.brightness", percent=50)
+        assert brightness_button.health_descriptor["value"] == 0.5
+        assert "0.5" not in text and "  " not in text
+        assert all(len(row["display_actions"]) <= 1 for row in app.health_rows)
         native_reads = fake_runner.calls.count(tuple(health.native_command("displays")))
         await click_after_layout(pilot, "#b-doctor")
         await app.wait_for_idle()
@@ -57,7 +64,7 @@ async def test_health_language_recomposition_replaces_descriptors_without_stale_
         await app.wait_for_idle()
         assert app.refresh_complete and not old.is_attached
         text = "\n".join(str(widget.content) for widget in app.query("#dash-health Static"))
-        assert t("health.low_power.title") in text
+        assert t("health_view.low_power_hit") in text
         await click_after_layout(pilot, "#b-doctor")
         await app.wait_for_idle()
         assert app.refresh_complete
@@ -75,7 +82,7 @@ async def test_health_survives_shared_read_failure_and_blocks_mutation(fake_runn
         await app.wait_for_idle()
         assert app.refresh_complete and not app.origin_ready and app._origin_error
         text = "\n".join(str(w.content) for w in app.query("#dash-health Static"))
-        assert t("health.backup.title") in text and "read denied" in text
+        assert t("health.backup.title") in text and "travel-mode.log" in text
         assert t("health.unknown") in text
         await click_after_layout(pilot, "#b-doctor")
         await app.wait_for_idle()

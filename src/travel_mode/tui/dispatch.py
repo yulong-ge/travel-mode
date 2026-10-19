@@ -80,22 +80,29 @@ class Dispatch:
                 return
             if getattr(ev, "travel_generation", self._mutation_generation) != self._mutation_generation:
                 return
-            loop = asyncio.get_running_loop()
+            from travel_mode.snapshots import load_state
 
-            async def acquire():
-                from travel_mode.system.sudo import SudoKeepAlive
+            disk = await self.in_thread(load_state)
+            if disk and (
+                not self.merged or disk.get("session", {}).get("id") != self.st.get("session", {}).get("id")
+            ):
+                self.st, self.merged, self._session_admitted = disk, True, False
+            if self.merged and not _path().exists():
+                raise StateError(t("impl.snapshot_deleted_externally_possibly_by_off"))
+            if self.merged and not self._session_admitted and ev.button.id != "b-off":
+                from travel_mode.tui.conflict import SessionConflict
 
-                self.logline("dim", t("impl.sudo_required_enter_your_password_in"))
-                with self.suspend():
-                    keepalive = await self.in_thread(SudoKeepAlive().__enter__)
-                self.logline("ok", t("impl.sudo_credentials_acquired"))
-                return keepalive
+                def answered(choice):
+                    if choice != "cancel":
+                        self.run_worker(self.admit_session(choice, ev), group="session-decision")
+                    else:
+                        self.session_decision_complete.set()
 
-            def authenticate():
-                return asyncio.run_coroutine_threadsafe(acquire(), loop).result()
-
+                self.session_decision_complete.clear()
+                self.push_screen(SessionConflict(self.st), answered)
+                return
             async with self.executor.transaction(
-                self._mutation_lock, self.st, self.merged, self.save, authenticate
+                self._mutation_lock, self.st, self.merged, self.save, self.action_authenticator()
             ):
                 if self.merged and not _path().exists():
                     raise StateError(t("impl.snapshot_deleted_externally_possibly_by_off"))
@@ -133,6 +140,42 @@ class Dispatch:
                             else t("impl.travel_mode")
                         )
 
+    def action_authenticator(self):
+        loop = asyncio.get_running_loop()
+
+        async def acquire():
+            from travel_mode.system.sudo import SudoKeepAlive
+
+            self.logline("dim", t("impl.sudo_required_enter_your_password_in"))
+            with self.suspend():
+                keepalive = await self.in_thread(SudoKeepAlive().__enter__)
+            self.logline("ok", t("impl.sudo_credentials_acquired"))
+            return keepalive
+
+        return lambda: asyncio.run_coroutine_threadsafe(acquire(), loop).result()
+
+    async def admit_session(self, choice, event):
+        from travel_mode import snapshots
+        from travel_mode.session_conflict import resolve, restore_active
+
+        try:
+            if choice == "restore":
+                async with self.executor.transaction(
+                    self._mutation_lock, self.st, self.merged, self.save, self.action_authenticator()
+                ):
+                    if not await self.in_thread(restore_active, self.st, self.tlog):
+                        return
+                    with self.scenario_scope():
+                        self.st, self.merged = await self.in_thread(snapshots.snapshot_origin)
+                    self._app_outcomes = {}
+            else:
+                resolve(self.st, self.scenario, choice=choice, restore=lambda: False)
+            self._session_admitted = True
+            self.logline("ok", t("conflict.ready"))
+            await self._handle_button_pressed(event)
+        finally:
+            self.session_decision_complete.set()
+
     async def _dispatch_button(self, ev):
         bid = ev.button.id or ""
         # 焦点立即离开 pane 内控件: 焦点滞留隐藏 pane 会把 active 弹回旧页 (TabPane.Focused)
@@ -153,7 +196,7 @@ class Dispatch:
                 self.save()
             self.action_refresh()
         elif bid.startswith("b-killcaff-"):
-            target = self.caffeinate_targets[int(bid.removeprefix("b-killcaff-"))]
+            target = ev.button.caffeinate_target
             _, rc = await self.in_thread(self.execute, KillCaffeinate(target))
             self.logline(
                 "ok" if rc == 0 else "bad",

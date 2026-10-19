@@ -1,7 +1,7 @@
 1:20 | sfimage=leaf.fill sfsize=16 dropdown=false symbolize=false emojize=false
 ---
 Unplugged work active · 1 h 20 min elapsed
-Battery 82% · About 3 h 10 min remaining
+Battery 82% · About 3 h 10 min at this session's average of 9.8 W
 ---
 Restore (off) | sfimage=arrow.uturn.backward bash="/fixture/travel-mode" param1="off" terminal=true refresh=true
 ---

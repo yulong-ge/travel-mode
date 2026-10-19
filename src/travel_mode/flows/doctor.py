@@ -8,29 +8,39 @@ from ..system.process_control import Process
 from ..system.processes import CaffeinateTarget
 
 
-def lines(report):
-    from ..health_view import display_checks
+def lines(report, *, verbose=False, scenario=None):
+    from ..config import load_config
+    from ..health_view import presentation
 
-    yield t("health.timing", seconds=report["elapsed_seconds"], budget=report["budget_seconds"])
-    for row in display_checks(report):
-        yield f"{row['title']}: {t('health.' + row['status'])}"
-        if row["error"]:
-            yield f"  {row['error']}"
-        for reference in row["references"]:
-            yield "  " + t("health.see", title=reference)
-        for evidence in row["evidence"]:
-            yield f"  {evidence}"
-        if row["status"] == "hit":
-            if row["impact"]:
+    if verbose:
+        yield t("health.timing", seconds=report["elapsed_seconds"], budget=report["budget_seconds"])
+    for row in presentation(report, scenario=scenario or load_config().options.scenario):
+        yield row["summary"]
+        if verbose:
+            for line in row["details"]:
+                yield "  " + line
+            for reference in row["references"]:
+                yield "  " + t("health.see", title=reference)
+            if row["error"]:
+                yield "  " + row["error"]
+            for evidence in row["evidence"]:
+                yield f"  {evidence}"
+        if row["state"] == "action":
+            if verbose and row["impact"]:
                 yield f"  {row['impact']}"
-            if row["manual"]:
+            if verbose and row["manual"]:
                 yield f"  {row['manual']}"
-            for action in row["actions"]:
-                yield f"  {action_label(action)}"
-    yield from report["limitations"]
+            for action in row["actions"] if verbose else row["display_actions"]:
+                yield ("  " if verbose else " ") + action_label(action)
+            if not verbose and row["action_hint"]:
+                yield " " + row["action_hint"]
+    if verbose:
+        yield from report["limitations"]
 
 
 def action_label(descriptor):
+    if descriptor["kind"] == "brightness":
+        return t("health.action.brightness", percent=round(float(descriptor["value"]) * 100))
     return t(
         "health.action." + descriptor["kind"],
         name=descriptor.get("name", ""),

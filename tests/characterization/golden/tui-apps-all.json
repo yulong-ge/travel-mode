@@ -31,6 +31,11 @@
       "pid=,ppid=,stat=,lstart=,comm="
     ],
     [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
       "pmset",
       "-g",
       "assertions"
@@ -56,7 +61,7 @@
   "labels": [
     "Default actions come from config.toml",
     "Choose app actions for each scenario.",
-    "Other configured items",
+    "Other apps and services",
     "[green]✔ Quit Demo quit[/]",
     "Ask Demo [dim]CPU 1.0% · default ask[/]",
     "[green]✔ Freeze Demo frozen[/]",
@@ -74,7 +79,7 @@
     ],
     [
       "dim",
-      "Default action for Ask Demo is ask — skipped; handle each app manually"
+      "Ask Demo needs individual confirmation; skipped in the batch."
     ],
     [
       "ok",
@@ -82,7 +87,7 @@
     ],
     [
       "ok",
-      "Batch complete: 1 quit / 1 frozen / ask requires manual action: Ask Demo"
+      "Batch complete: 1 quit / 1 frozen / awaiting individual confirmation: Ask Demo"
     ]
   ],
   "output": "",

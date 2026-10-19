@@ -8,7 +8,7 @@ import pytest
 
 from travel_mode.config import DaemonApp
 from travel_mode.system import daemon_apps
-from travel_mode.system.shell import CmdResult, set_runner
+from travel_mode.system.shell import CmdResult, ReadError, set_runner
 
 
 def _state():
@@ -159,7 +159,7 @@ def test_daemon_rejects_apple_label_before_unload(tmp_path):
 
 def test_daemon_missing_configured_plist_fails_explicitly(tmp_path, monkeypatch):
     monkeypatch.setattr(daemon_apps, "app_path", lambda _: "")
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(ReadError):
         daemon_apps.quit_with_daemons(
             DaemonApp("Remote", (str(tmp_path / "missing.plist"),)), _state(), save=lambda _: None
         )

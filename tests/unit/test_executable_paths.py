@@ -149,7 +149,7 @@ def test_optional_paths_are_in_json_and_text_check(monkeypatch, capsys):
     monkeypatch.setattr(shell.shutil, "which", lambda tool: f"/fixture/bin/{tool}")
     result = structured.check_data()
     assert result["tool_paths"] == {tool: f"/fixture/bin/{tool}" for tool in shell.THIRD_PARTY_TOOLS}
-    check.mode_check()
+    check.mode_check(verbose=True)
     output = capsys.readouterr().out
     assert "Optional tool paths" in output
     for path in result["tool_paths"].values():

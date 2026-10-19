@@ -32,20 +32,30 @@ def blockers_lines():
     lines = BlockerLines(processes.caffeinate_procs())
     sd = pmset.sleep_disabled()
     lines.append(
-        ("bad", t("impl.sleepdisabled_sleep_disabled_globally_closing_the", v0=sd))
+        ("bad", t("health_view.sleep_disabled_hit"))
         if sd == "1"
         else ("dim", t("power.sleep_switch_unavailable"))
         if sd is None
-        else ("ok", "SleepDisabled=0")
+        else ("ok", t("health_view.sleep_disabled_clear"))
     )
     for target in lines.caffeinate_targets:
         lines.append(("warn", t("impl.caffeinate_prevents_sleep", v0=target.describe())))
     rows = pmset.configured_sleep_blocking_assertions()
     if rows:
         for row in rows:
-            detail = row.get("named") or row.get("process") or row["line"]
-            suffix = t("impl.this_app_is_kept_alive_by") if row.get("daemon_app") else ""
-            lines.append(("warn", f"{row['type']}: {detail}{suffix}"))
+            if not row["pid"]:
+                continue
+            from ..config import load_config
+            from ..health_view import assertion_context, assertion_text
+            from ..state import load_state
+
+            scenario = load_config().options.scenario
+            lines.append(
+                (
+                    "dim" if scenario == "away" and row["scope"] == "idle" else "warn",
+                    assertion_text(row, scenario=scenario, **assertion_context(load_state())),
+                )
+            )
     else:
         lines.append(("ok", t("impl.no_system_sleep_blocking_assertions")))
     au = pmset.audio_assertion()
@@ -56,7 +66,7 @@ def blockers_lines():
     return lines
 
 
-def mode_check():
+def mode_check(verbose=False):
     from rich.console import Console
 
     from ..system.shell import ReadError
@@ -66,15 +76,39 @@ def mode_check():
     from ..system.shell import optional_tool_paths
 
     console = Console()
-    console.rule(t("shell.optional_tools"))
-    for tool, path in optional_tool_paths().items():
-        console.print(t("shell.tool_path", tool=tool, path=path or t("shell.not_found")), markup=False)
+    if verbose:
+        console.rule(t("shell.optional_tools"))
+        for tool, path in optional_tool_paths().items():
+            console.print(t("shell.tool_path", tool=tool, path=path or t("shell.not_found")), markup=False)
     try:
-        _mode_check()
+        if verbose:
+            _mode_check()
+        else:
+            from ..resurrection import describe, detect
+            from ..sessions import note
+            from ..state import load_state
+
+            st = load_state()
+            if st:
+                revived = detect(st)
+                note(st, revived, external=pmset.on_ac_power())
+                for row in revived:
+                    console.print(describe(row), markup=False)
+            scan = launchd.svc_scan()
+            console.rule(t("services.title"))
+            for row in scan["unloadable"]:
+                console.print(t("services.ready", name=row.get("name", row["label"])), markup=False)
+            for message in launchd.service_information(scan):
+                console.print(message, markup=False)
+            preview = pmset.power_preview(pmset.pmset_custom())
+            for row in preview["changes"]:
+                console.print(row["explanation"], markup=False)
+            if preview["satisfied"]:
+                console.print(t("preview.satisfied", names=", ".join(preview["satisfied"])), markup=False)
     except ReadError as exc:
         Console().print(t("health.legacy_failed", reason=str(exc)), markup=False, highlight=False)
     console.rule(t("health.title"))
-    for line in lines(report):
+    for line in lines(report, verbose=verbose):
         console.print(line, markup=False, highlight=False)
     return 0
 

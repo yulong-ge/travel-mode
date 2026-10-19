@@ -129,6 +129,9 @@ def hermetic_environment(request, monkeypatch):
     if request.node.get_closest_marker("macos") is not None:
         yield
         return
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(apps, "time", SimpleNamespace(sleep=lambda _: None))
     previous_tz = os.environ.get("TZ")
     for name in tuple(os.environ):
         if (

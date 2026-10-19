@@ -80,21 +80,20 @@
       "ps",
       "-axo",
       "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
     ]
   ],
   "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
   "exit_code": null,
   "labels": [
     "",
-    "[dim]-InternalBattery-0 (id=1) 87%; · Battery power[/]",
-    "[red]✘[/]",
-    "SleepDisabled=1 · Normal system sleep is disabled.",
+    "[dim]87% · Battery power[/]",
     "[yellow]▲[/]",
-    "Keep-awake tools: caffeinate prevents sleep: PID 919999: /usr/bin/caffeinate -d; parent PID 919997: /Applications/Terminal.app/Contents/MacOS/Terminal",
-    "[yellow]▲[/]",
-    "Audio assertion: \"audio\" (quit the app playing audio to release it)",
-    "[yellow]▲[/]",
-    "daemon app Remote Demo",
+    "caffeinate is keeping the Mac awake; this keep-awake task can be ended.",
     "",
     "High-energy apps: [b]5[/] running",
     "",
@@ -103,11 +102,7 @@
   "log": [
     [
       "dim",
-      "Executing: Quit"
-    ],
-    [
-      "ok",
-      "daemon app: System daemon unloaded: <ROOT>/org.demo.daemon.plist; Remote Demo quit (off restores it)"
+      "Executing: Quit Remote Demo"
     ]
   ],
   "output": "",

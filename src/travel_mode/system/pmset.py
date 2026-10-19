@@ -40,6 +40,12 @@ def sleep_blocking_assertions(lines=None, daemon_apps=()):
         process = pid_match.group(2).strip() if pid_match else ""
         named = named_match.group(1).strip() if named_match else ""
         owner = named or process
+        duration = re.search(r"\b(\d+):(\d{2}):(\d{2})\b", line)
+        held = (
+            sum(int(v) * scale for v, scale in zip(duration.groups(), (3600, 60, 1), strict=True))
+            if duration
+            else None
+        )
         result.append(
             {
                 "pid": pid_match.group(1) if pid_match else "",
@@ -51,6 +57,8 @@ def sleep_blocking_assertions(lines=None, daemon_apps=()):
                 "daemon_app": owner in daemon_names
                 or any(name.lower() in line.lower() for name in daemon_names),
                 "line": line.strip(),
+                "scope": "system" if "PreventSystemSleep" in line else "idle",
+                "held_seconds": held,
             }
         )
     return result
@@ -221,3 +229,35 @@ def power_recommendations(profiles=None):
         (key, descriptions.get(key, desc), rec)
         for key, desc, rec in filter_power_keys(recommendations, supported)
     ]
+
+
+def power_preview(profiles, *, scenario=None, supported=None, config=None):
+    """A content model: actual changes, satisfied names and unavailable names."""
+    from .platform import map_pmset_key, supported_pmset_keys
+
+    config = config or load_config()
+    scenario = scenario or config.options.scenario
+    supported = supported_pmset_keys() if supported is None else supported
+    result = dict(changes=[], satisfied=[], unavailable=[], ac_changes=[])
+    for key, _, default in POWER_KEYS:
+        if scenario == "work" and key != "lowpowermode":
+            continue
+        actual = map_pmset_key(key, supported & profiles.get("b", {}).keys())
+        name = t("preview.name." + key)
+        current = profiles.get("b", {}).get(actual)
+        target = config.power_overrides.get(key, default)
+        if current is None:
+            result["unavailable"].append(name)
+        elif current == target:
+            result["satisfied"].append(name)
+        else:
+            result["changes"].append(
+                dict(key=actual, name=name, current=current, target=target, explanation=t("preview." + key))
+            )
+    for key in ("powernap", "womp"):
+        current = profiles.get("a", {}).get(key)
+        if current is not None and current != "0":
+            result["ac_changes"].append(
+                dict(key=key, current=current, target="0", explanation=t("preview.ac_" + key))
+            )
+    return result

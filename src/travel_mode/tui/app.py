@@ -93,10 +93,13 @@ class TravelApp(
             t("impl.travel_mode_dry_run") if self._dry_run or is_dry_run() else t("impl.travel_mode")
         )
         self.st, self.merged = state_api.new_state(), False
+        self._session_admitted = False
+        self.session_decision_complete = asyncio.Event()
         self.origin_ready = False
         self._origin_error = None
         self.scan = {"running": [], "nobundle": []}
         self.svc = {"unloadable": [], "kept": []}
+        self.caffeinate_targets = {}
         self.pw_boxes = []  # (key, rec, checkbox)
         self.app_rows = {}  # idx -> dict(name,path,btns,label,done,kill)
         self.svc_btns = {}
@@ -643,7 +646,9 @@ class TravelApp(
             if get_current_worker().is_cancelled or self._interface_closing:
                 return
             self.st, self.merged = origin, merged
-            self.st["scenario"] = config.options.scenario
+            if not merged:
+                self.st["scenario"] = config.options.scenario
+            self._session_admitted = not merged
             self.origin_ready = True
             self.start_pages()
 
@@ -663,18 +668,9 @@ class TravelApp(
 
     def start_pages(self):
         if self.merged:
-            age = snapshots.anchor_age_hours(self.st)
-            age_s = t("impl.hours_ago", v0=age) if age is not None else ""
-            self.logline(
-                "warn",
-                t(
-                    "impl.existing_snapshot_created_original_values_preserved",
-                    v0=self.st.get("anchored_at") or self.st.get("saved_at", "?"),
-                    v1=age_s,
-                ),
-            )
-            if age is not None and age > 24:
-                self.logline("warn", t("impl.old_snapshot_off_rolls_back_to_2"))
+            from travel_mode.session_conflict import describe
+
+            self.logline("warn", describe(self.st))
         if system_apps.ensure_conf():
             self.logline("dim", t("impl.created_default_action_configuration", v0=common.CONF_PATH))
         self.refresh_dash()

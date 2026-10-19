@@ -184,7 +184,7 @@ def test_history_cli_json_limit_and_no_observation(session_machine, darwin_platf
     assert main(["history"]) == 0
     from travel_mode.i18n import t
 
-    assert t("session.heading", scenario="work") in capsys.readouterr().out
+    assert t("session.heading", scenario=t("scenario.work")) in capsys.readouterr().out
     with pytest.raises(SystemExit):
         main(["history", "--limit", "0"])
 

@@ -32,13 +32,9 @@
   "exit_code": null,
   "labels": [
     "",
-    "[dim]-InternalBattery-0 (id=1) 87%; · Battery power[/]",
-    "[red]✘[/]",
-    "SleepDisabled=1 · Normal system sleep is disabled.",
+    "[dim]87% · Battery power[/]",
     "[yellow]▲[/]",
-    "Keep-awake tools: caffeinate prevents sleep: PID 919999: /usr/bin/caffeinate -d; parent PID 919997: /Applications/Terminal.app/Contents/MacOS/Terminal",
-    "[yellow]▲[/]",
-    "Audio assertion: \"audio\" (quit the app playing audio to release it)",
+    "caffeinate is keeping the Mac awake; this keep-awake task can be ended.",
     "",
     "High-energy apps: [b]5[/] running",
     "",
@@ -47,7 +43,7 @@
   "log": [
     [
       "dim",
-      "Executing: Fix"
+      "Executing: Enable system sleep"
     ],
     [
       "ok",

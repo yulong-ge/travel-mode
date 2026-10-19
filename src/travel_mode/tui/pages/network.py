@@ -37,20 +37,34 @@ class NetworkPage:
             yield Button(t("session.history"), id="b-history")
 
     async def build_net(self, network, dev, wifi, bluetooth):
+        from travel_mode.tui.view_models import refused
+
         box = self.main_query_one("#net-box", Vertical)
         await box.remove_children()
         actions = self.main_query_one("#net-actions", Vertical)
         await actions.remove_children()
         self.net_paths = {}
+        self.network_views = []
         self.net_failures = {
             r["target"]: r
             for r in self.display_state().get("action_failures", [])
-            if not r.get("recovered") and r["command"][:1] == ["osascript"]
+            if not r.get("recovered") and refused(r)
         }
         w = []
         bottom = []
         idx = 0
         for row in network:
+            self.network_views.append(
+                dict(
+                    name=row["name"],
+                    path=row["path"],
+                    state=row["status"],
+                    running=row["running"],
+                    resident=row["resident"],
+                    cpu=row["cpu"],
+                    operations=["quit"] if row["running"] and row["path"] else [],
+                )
+            )
             label = t("network.status." + row["status"])
             if row["cpu"] is not None:
                 label += f" · CPU {row['cpu']:.1f}%"
@@ -132,18 +146,25 @@ class NetworkPage:
         okq = await self.busy(btn, self.execute, operation)
         if okq:
             self.save()
-            if not getattr(okq, "forced", False):
+            if not (getattr(okq, "forced", False) or getattr(okq, "helpers_remaining", False)):
                 self.logline("ok", t("impl.quit_off_reopens_it_2", v0=name))
             btn.disabled = True
             btn._mutation_done = True
+            btn.display = False
+            for retry in self.main_query(f"#netretry-{i}"):
+                retry.display = False
+                retry.disabled = True
+                retry._mutation_done = True
+            self.net_failures.pop(path, None)
         else:
             self.logline(
                 "bad",
                 okq.explanation(name) if hasattr(okq, "explanation") else t("impl.did_not_quit", v0=name),
             )
-            btn.variant = "error"
-            btn.label = t("impl.force_quit_3")
-            self.net_failures[path] = True
+            if getattr(okq, "status", None) == "refused":
+                btn.variant = "error"
+                btn.label = t("impl.force_quit_3")
+                self.net_failures[path] = True
             self.action_refresh()
 
     async def act_off(self, btn):
@@ -186,6 +207,8 @@ class NetworkPage:
             self.logline("ok", t("impl.restore_complete_items_state_file_cleared", v0=n))
             self.notify(t("impl.original_state_restored_items", v0=n), severity="information")
         self.st, self.merged = snapshots.snapshot_origin()
+        self._session_admitted = True
+        self._app_outcomes = {}
         self.action_refresh()
 
     async def show_history(self):

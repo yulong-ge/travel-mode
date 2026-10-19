@@ -17,7 +17,7 @@ from travel_mode.actions.apps import (
 from travel_mode.categories import grouped
 from travel_mode.presentation import action_message as t
 from travel_mode.system import apps as system_apps
-from travel_mode.tui.widgets import Button, _ellip
+from travel_mode.tui.widgets import Button
 
 
 class AppsPage:
@@ -35,6 +35,9 @@ class AppsPage:
         box = self.main_query_one("#apps-box", Vertical)
         await box.remove_children()
         self.app_rows = {}
+        self.app_views = []
+        if not hasattr(self, "_app_outcomes"):
+            self._app_outcomes = {}
         w = []
         order = {"quit": 0, "ask": 1, "freeze": 2, "skip": 3}
         running = sorted(self.scan["running"], key=lambda a: order.get(a["defact"], 9))
@@ -50,6 +53,30 @@ class AppsPage:
                 category = group
             name, dfl = app["name"], app["defact"]
             frozen = app["path"] in st.get("frozen_apps", [])
+            from travel_mode.tui.view_models import app_row, refused
+
+            failure = next(
+                (
+                    r
+                    for r in reversed(st.get("action_failures", []))
+                    if r["target"] == app["path"] and not r.get("recovered")
+                ),
+                None,
+            )
+            current_state = self._app_outcomes.get(
+                app["path"],
+                "frozen"
+                if frozen
+                else "skipped"
+                if dfl == "skip"
+                else "refused"
+                if refused(failure)
+                else "error"
+                if failure
+                else "running",
+            )
+            view = app_row(app, state=current_state, failure=failure["reason"] if failure else None)
+            self.app_views.append(view)
             state_s = t("impl.frozen") if frozen else ""
             lab = Label(
                 t(
@@ -80,21 +107,17 @@ class AppsPage:
                 classes="btn",
             )
             bs = Button(t("impl.skip"), id=f"btn-{i}-s", classes="btn")
-            failure = next(
-                (
-                    row
-                    for row in reversed(st.get("action_failures", []))
-                    if row["target"] == app["path"] and not row.get("recovered")
-                ),
-                None,
-            )
-            kill = failure is not None and failure["command"][:1] == ["osascript"]
+            kill = "force_quit" in view["operations"]
             extra = []
-            if failure:
+            if failure and current_state in {"refused", "error"}:
                 lab.update(f"[red]{escape(name)}: {escape(failure['reason'])}[/]")
             if kill:
                 bq.label, bq.variant = t("impl.force_quit_3"), "error"
                 extra.append(Button(t("failure.retry_quit"), id=f"btn-{i}-r", classes="btn"))
+            if current_state in {"exited", "frozen", "skipped"}:
+                lab.update(f"{escape(name)}: {escape(view['explanation'])}")
+                bq.display = bs.display = False
+                bf.display = current_state == "frozen"
             w.append(ItemGrid(lab, bq, bf, bs, *extra, classes="row"))
             self.app_rows[i] = {
                 "defact": dfl,
@@ -105,6 +128,7 @@ class AppsPage:
                 "done": False,
                 "kill": kill,
                 "frozen": frozen,
+                "view": view,
             }
         for notice in grouped(self.scan.get("notices", [])):
             w.append(
@@ -120,9 +144,22 @@ class AppsPage:
         if row is None or (expected_path is not None and row["path"] != expected_path):
             return
         row["done"] = True
+        row["kill"] = False
+        state = (
+            "running"
+            if style == "cyan"
+            else "skipped"
+            if style == "dim"
+            else "frozen"
+            if row["path"] in self.st.get("frozen_apps", [])
+            else "exited"
+        )
+        self._app_outcomes[row["path"]] = state
+        row["view"].update(state=state, operations=[], explanation=text)
         for b in row["btns"]:
             b.disabled = True
             b._mutation_done = True
+            b.display = False
         row["label"].update(f"[{style}]{text}[/]")
 
     async def act_apps_all(self, btn):
@@ -132,7 +169,7 @@ class AppsPage:
             nq = nf = 0
             ask_pending = []
             for i, row in rows:
-                if row["done"]:
+                if row["done"] or row.get("frozen"):
                     continue
                 name, path = row["name"], row["path"]
                 act = row["defact"]
@@ -162,7 +199,9 @@ class AppsPage:
                         self.call_from_thread(
                             self.mark_row_done, i, t("impl.quit_3", v0=name), expected_path=path
                         )
-                        if not getattr(result, "forced", False):
+                        if not (
+                            getattr(result, "forced", False) or getattr(result, "helpers_remaining", False)
+                        ):
                             self.tlog("ok", t("impl.quit", v0=name))
                     else:
                         self.tlog("warn", t("impl.did_not_quit", v0=name))
@@ -252,22 +291,35 @@ class AppsPage:
             return
         if action == "q":
             okq = await self.busy(btn, self.execute, QuitApp(path, name))
+            row = self.app_rows.get(i)
+            if row is None or row["path"] != path:
+                return
+            btn = row["btns"][0]
             if okq:
                 self.save()
                 self.mark_row_done(i, t("impl.quit_off_reopens_it", v0=name), expected_path=path)
-                self.logline("ok", t("impl.quit_off_reopens_it_2", v0=name))
+                if not getattr(okq, "helpers_remaining", False):
+                    self.logline("ok", t("impl.quit_off_reopens_it_2", v0=name))
                 self.offer_remember(name, "quit", row["defact"])
             else:
-                row["kill"] = True
-                btn.label = t("impl.force_quit_3")
-                btn.variant = "error"
+                is_refused = getattr(okq, "status", None) == "refused"
+                row["kill"] = is_refused
+                row["view"].update(
+                    state="refused" if is_refused else "error",
+                    operations=["retry_quit", "force_quit", "freeze", "skip"]
+                    if is_refused
+                    else ["quit", "freeze", "skip"],
+                )
+                if is_refused:
+                    btn.label = t("impl.force_quit_3")
+                    btn.variant = "error"
                 message = (
                     okq.explanation(name)
                     if hasattr(okq, "explanation")
                     else t("impl.has_not_quit_possible_unsaved_dialog_2", v0=name)
                 )
                 row["label"].update(f"[red]{escape(message)}[/]")
-                if not list(self.main_query(f"#btn-{i}-r")):
+                if row["kill"] and not list(self.main_query(f"#btn-{i}-r")):
                     retry = Button(t("failure.retry_quit"), id=f"btn-{i}-r", classes="btn")
                     await row["label"].parent.mount(retry)
                     row["btns"] += (retry,)
@@ -296,10 +348,8 @@ class AppsPage:
             assertions = await self.in_thread(inspect)
             if assertions is None:
                 return
-            for line in assertions[:1]:
-                self.logline(
-                    "warn", t("impl.holds_a_sleep_assertion_freezing_will", v0=name, v1=_ellip(line, 70))
-                )
+            for _line in assertions[:1]:
+                self.logline("warn", t("impl.holds_a_sleep_assertion_freezing_will", v0=name, v1=""))
             okf = await self.busy(btn, self.execute, FreezeApp(path))
             if okf:
                 n = await self.in_thread(system_apps.freeze_result_count, path)

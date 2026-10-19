@@ -97,7 +97,8 @@ async def test_vm_tui_fixture_only_round_trip_waits_for_actions(vm, scenario):
         assert not app.query("#b-fixsleep")
         assert not app.query("#b-health-sleep_disabled-0")
         health_text = "\n".join(str(w.content) for w in app.query("#dash-health Static"))
-        assert t("power.sleep_switch_reason") in health_text
+        assert t("health_view.capability_unavailable") in health_text
+        assert "SleepDisabled" not in health_text
         await pilot.press("2")
         await app.wait_for_idle()
         assert app.query_one("#cb-ac", Checkbox).disabled

@@ -18,12 +18,12 @@ from travel_mode.system.shell import CmdResult
 )
 @pytest.mark.parametrize("alive", [False, True])
 def test_quit_result_classifies_and_rechecks_processes(rc, detail, status, alive, monkeypatch, fake_runner):
-    observations = iter((True, alive))
-    monkeypatch.setattr(apps, "app_running", lambda path: next(observations))
+    observations = iter((True,))
+    monkeypatch.setattr(apps, "app_running", lambda path: next(observations, alive))
     monkeypatch.setattr(apps, "app_bid", lambda path: "org.demo.refusing")
     fake_runner.responses[("osascript",)] = CmdResult("fixture stdout", detail, rc)
     result = apps.grace_quit("/fixture/Refusing.app", "Refusing")
-    assert result.status == status
+    assert result.status == ("exited" if not alive and status in {"refused", "timeout"} else status)
     assert bool(result) is not alive and result.exited is not alive
     assert result.rc == rc and result.stderr == detail and result.stdout == "fixture stdout"
     assert result.command[0] == "osascript"
@@ -65,8 +65,8 @@ def test_quit_action_records_each_external_outcome_without_raising(
     from travel_mode.actions.base import Context
     from travel_mode.actions.executor import Executor
 
-    observations = iter((True, alive))
-    monkeypatch.setattr(apps, "app_running", lambda path: next(observations))
+    observations = iter((True,))
+    monkeypatch.setattr(apps, "app_running", lambda path: next(observations, alive))
     monkeypatch.setattr(apps, "app_bid", lambda path: "org.demo.refusing")
     fake_runner.responses[("osascript",)] = CmdResult("fixture stdout", detail, rc)
     st = state.new_state()
@@ -95,7 +95,7 @@ def test_quit_never_uses_cached_discovery_to_verify_exit(monkeypatch, fake_runne
     def runner(command, timeout=None, interactive=False):
         if command == query:
             fake_runner.calls.append(tuple(command))
-            return CmdResult(next(observations), "", 0)
+            return CmdResult(next(observations, ""), "", 0)
         return fake_runner(command, timeout, interactive)
 
     set_runner(runner)
@@ -106,7 +106,7 @@ def test_quit_never_uses_cached_discovery_to_verify_exit(monkeypatch, fake_runne
         assert apps.grace_quit(path, "Fresh")
         assert current_snapshot() is cached
     assert sum(command[:1] == ("osascript",) for command in fake_runner.calls) == 1
-    assert fake_runner.calls.count(tuple(query)) == 3
+    assert fake_runner.calls.count(tuple(query)) == 4
 
 
 @pytest.mark.parametrize("force_ok", [True, False])

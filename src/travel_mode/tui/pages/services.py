@@ -32,6 +32,18 @@ class ServicesPage:
         box = self.main_query_one("#svc-box", Vertical)
         await box.remove_children()
         self.svc_btns = {}
+        self.service_views = [
+            dict(
+                name=r.get("name", r["label"]),
+                label=r["label"],
+                path=r["plist_path"],
+                category=r.get("category", "other"),
+                state="running",
+                operations=["unload"],
+                explanation="",
+            )
+            for r in self.svc["unloadable"]
+        ]
         w = []
         category = None
         for s in grouped(self.svc["unloadable"]):

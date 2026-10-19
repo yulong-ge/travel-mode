@@ -56,6 +56,9 @@ def data(*, clock=time.monotonic, now=None):
     started = clock()
     snapshot = load_state()
     power_source, battery = observation()
+    # Keep pmset's volatile estimate for diagnostics, never use it in the menu.
+    battery["system_remaining_minutes"] = battery["remaining_minutes"]
+    battery.update(remaining_minutes=None, average_watts=None, estimate_source=None, estimate_error=None)
     result = dict(
         version=1,
         app_version=__version__,
@@ -84,6 +87,40 @@ def data(*, clock=time.monotonic, now=None):
             result["duration_minutes"] = int(seconds // 60)
         except ValueError as exc:
             raise StatusError(t("menubar.invalid_start", detail=str(exc))) from exc
+    active = (snapshot or {}).get("session", {})
+    if (
+        power_source == "battery"
+        and active.get("start", {}).get("telemetry")
+        and not active.get("external_seen", True)
+    ):
+        from .system import battery as battery_api
+        from .system.shell import ReadError
+
+        try:
+            reading = battery_api.read(timeout=SOURCE_TIMEOUT)
+            if not reading["available"]:
+                battery["estimate_error"] = t("battery.reason." + reading["reason"])
+            elif reading["external_connected"] or reading["is_charging"]:
+                battery["estimate_error"] = t("battery.reason.external_power")
+            else:
+                start = {
+                    "telemetry": active["start"]["telemetry"],
+                    "power_source": "PowerTelemetryData.SystemLoad",
+                }
+                seconds = (
+                    (now or datetime.now().astimezone())
+                    - datetime.fromisoformat(active["started_at"]).astimezone()
+                ).total_seconds()
+                interval = battery_api.interval(start, reading, seconds=seconds)
+                if interval:
+                    watts = interval["average_watts"]
+                    battery.update(
+                        average_watts=watts,
+                        remaining_minutes=round(reading["remaining_wh"] / watts * 60),
+                        estimate_source="session_telemetry",
+                    )
+        except (battery_api.BatteryError, ReadError) as exc:
+            battery["estimate_error"] = str(exc)
     result["swiftbar"] = render(result)
     result["elapsed_seconds"] = clock() - started
     return result
@@ -134,8 +171,12 @@ def power_line(result):
     text = t("menubar.source_" + source)
     if percent is not None:
         text += f" {percent}%"
-    if battery.get("remaining_minutes") is not None:
-        text += " · " + t("menubar.remaining", duration=duration(battery["remaining_minutes"]))
+    if battery.get("remaining_minutes") is not None and battery.get("estimate_source") == "session_telemetry":
+        text += " · " + t(
+            "menubar.session_remaining",
+            watts=battery["average_watts"],
+            duration=duration(battery["remaining_minutes"]),
+        )
     return text
 
 

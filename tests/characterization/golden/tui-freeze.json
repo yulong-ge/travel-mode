@@ -42,7 +42,7 @@
   "labels": [
     "Default actions come from config.toml",
     "Choose app actions for each scenario.",
-    "Other configured items",
+    "Other apps and services",
     "Quit Demo [dim]CPU 1.0% · default quit[/]",
     "[green]✔ Ask Demo frozen (1 processes; off resumes them)[/]",
     "Freeze Demo [dim]CPU 1.0% · default freeze[/]",

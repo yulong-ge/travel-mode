@@ -9,11 +9,20 @@ import pytest
 from travel_mode.config import Config, ServicesConfig
 from travel_mode.i18n import t
 from travel_mode.system import launchd
+from travel_mode.system.shell import CmdResult
 
 
 @pytest.fixture(autouse=True)
 def english_messages(monkeypatch):
     monkeypatch.setattr("travel_mode.i18n._language", "en")
+
+
+def _as_result(reader):
+    def run(command, **kwargs):
+        output, rc = reader(command, **kwargs)
+        return CmdResult(output, "", rc)
+
+    return run
 
 
 def _plist(path, label):
@@ -57,7 +66,7 @@ def test_svc_scan_classifies_loaded_agents_and_ignores_apple(tmp_path, monkeypat
             return ("1.25\n", 0)
         raise AssertionError(f"unexpected command: {command}")
 
-    monkeypatch.setattr(launchd, "run_out", fake_run_out)
+    monkeypatch.setattr(launchd, "run_result", _as_result(fake_run_out))
     monkeypatch.setattr(launchd, "run_rc", fake_run_out)
     config = Config(services=ServicesConfig(unload=("com.example.unload",), keep=("homebrew.mxcl.keep",)))
 
@@ -124,7 +133,7 @@ def test_svc_scan_short_config_name_matches_and_unmatched_is_reported(tmp_path, 
             return ("", 0)
         raise AssertionError(f"unexpected command: {command}")
 
-    monkeypatch.setattr(launchd, "run_out", fake_run_out)
+    monkeypatch.setattr(launchd, "run_result", _as_result(fake_run_out))
     config = Config(services=ServicesConfig(unload=("backup", "no-such-service")))
 
     result = launchd.svc_scan(config)
@@ -151,7 +160,7 @@ def test_invalid_plists_collapse_to_one_summary_with_deduped_details(tmp_path, m
             return ("PID\tStatus\tLabel\n", 0)
         raise AssertionError(f"unexpected command: {command}")
 
-    monkeypatch.setattr(launchd, "run_out", fake_run_out)
+    monkeypatch.setattr(launchd, "run_result", _as_result(fake_run_out))
     config = Config()
 
     # the same directory twice must not duplicate invalid entries
@@ -161,7 +170,7 @@ def test_invalid_plists_collapse_to_one_summary_with_deduped_details(tmp_path, m
     info = launchd.service_information(result)
     summary = t("services.invalid_summary", count=len(result["invalid"]))
     # exactly one collapsed summary line, no per-plist detail lines
-    assert sum(1 for line in info if line == summary) == 1
+    assert sum(1 for line in info if line.startswith(summary)) == 1
     details = launchd.invalid_plist_details(result)
     assert len(details) == 2
     assert len(set(details)) == 2

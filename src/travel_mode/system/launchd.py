@@ -14,13 +14,25 @@ from ..categories import identify, ignored, metadata, protected
 from ..categories import selected as category_selected
 from ..config import Config, load_config
 from ..i18n import t
-from .shell import command_path, get_runner, run_out, run_rc, subprocess_runner
+from .shell import command_path, get_runner, run_rc, run_result, subprocess_runner
 
 
 def launchctl_names() -> list[str]:
-    output, rc = run_out(["launchctl", "list"], timeout=20)
+    result = run_result(["launchctl", "list"], timeout=20)
+    output, rc = result.stdout + result.stderr, result.rc
     if rc:
-        raise RuntimeError(t("json.command_failed", command="launchctl list", rc=rc, detail=output))
+        from ..failures import CommandError, record
+
+        error = CommandError(["launchctl", "list"], rc, output)
+        record(
+            None,
+            t("services.discovery"),
+            t("services.discovery_failed", reason=output.strip()),
+            [dict(command=["launchctl", "list"], rc=rc, stdout=result.stdout, stderr=result.stderr)],
+            error=error,
+            store=False,
+        )
+        raise error
     return output.splitlines()
 
 
@@ -72,9 +84,21 @@ def time_machine_info(loaded_labels: set[str] | None = None) -> dict:
             "running": False,
             "available": False,
         }
-    output, rc = run_out(["tmutil", "status"], timeout=20)
+    result = run_result(["tmutil", "status"], timeout=20)
+    output, rc = result.stdout + result.stderr, result.rc
     if rc:
-        raise RuntimeError(t("json.command_failed", command="tmutil status", rc=rc, detail=output))
+        from ..failures import CommandError, record
+
+        error = CommandError(["tmutil", "status"], rc, output)
+        record(
+            None,
+            t("health.backup.title"),
+            str(error),
+            [dict(command=["tmutil", "status"], rc=rc, stdout=result.stdout, stderr=result.stderr)],
+            error=error,
+            store=False,
+        )
+        raise error
     match = re.search(r"\bRunning\s*=\s*([01])\s*;", output)
     if not match:
         return {
@@ -94,9 +118,14 @@ def time_machine_info(loaded_labels: set[str] | None = None) -> dict:
 
 def service_information(scan: dict) -> list[str]:
     lines = [t("services.unmatched", item=row["item"]) for row in scan.get("unmatched", [])]
+    lines.extend(row["cpu_error"] for row in scan.get("recognized", []) if row.get("cpu_error"))
     invalid = scan.get("invalid", [])
     if invalid:
-        lines.append(t("services.invalid_summary", count=len(invalid)))
+        from ..failures import log_path
+
+        lines.append(
+            t("services.invalid_summary", count=len(invalid)) + " " + t("services.log_hint", path=log_path())
+        )
     tm = scan.get("time_machine")
     if tm is not None:
         lines.extend(
@@ -159,10 +188,29 @@ def svc_scan(config: Config | None = None, *, directories: tuple[Path, ...] | No
     rows, invalid = [], []
     seen_labels = set()
     seen_invalid: set[str] = set()
-    for plist_path in sorted(path for directory in directories for path in directory.glob("*.plist")):
+    paths = []
+    for directory in directories:
+        try:
+            paths.extend(path for path in directory.iterdir() if path.suffix == ".plist")
+        except FileNotFoundError:
+            continue  # A user without a LaunchAgents directory has no agents there.
+        except OSError as exc:
+            from ..failures import record
+
+            invalid.append(dict(plist_path=str(directory), error=str(exc)))
+            record(
+                None,
+                t("services.discovery"),
+                t("services.invalid", path=directory, error=exc),
+                target=str(directory),
+                store=False,
+            )
+    for plist_path in sorted(paths):
         try:
             with plist_path.open("rb") as fh:
                 plist = plistlib.load(fh)
+            if not isinstance(plist, dict):
+                raise ValueError(t("suggest.plist_not_dictionary"))
             label = plist.get("Label")
             if not isinstance(label, str) or not label:
                 raise ValueError(t("launchd.missing_label"))
@@ -177,19 +225,38 @@ def svc_scan(config: Config | None = None, *, directories: tuple[Path, ...] | No
             if str(plist_path) not in seen_invalid:
                 seen_invalid.add(str(plist_path))
                 invalid.append({"plist_path": str(plist_path), "error": str(exc)})
+                from ..failures import record
+
+                record(
+                    None,
+                    t("services.discovery"),
+                    t("services.invalid", path=plist_path, error=exc),
+                    target=str(plist_path),
+                    store=False,
+                )
             continue
         if label not in loaded or label in seen_labels:
             continue
         seen_labels.add(label)
         pid, _ = loaded[label]
         cpu = ""
+        cpu_error = None
         if pid.lstrip("-").isdigit() and int(pid) > 0:
             cpu_out, rc = run_rc(["ps", "-p", pid, "-o", "%cpu="])
             if rc:
-                raise RuntimeError(
-                    t("json.command_failed", command=f"ps -p {pid} -o %cpu=", rc=rc, detail=cpu_out)
+                from ..failures import record
+
+                cpu_error = t("services.cpu_failed", name=label, reason=cpu_out.strip() or f"exit {rc}")
+                record(
+                    None,
+                    t("services.discovery"),
+                    t("services.cpu_failed", name=label, reason=cpu_out.strip()),
+                    [dict(command=["ps", "-p", pid, "-o", "%cpu="], rc=rc, stdout=cpu_out, stderr="")],
+                    target=str(plist_path),
+                    store=False,
                 )
-            cpu = cpu_out.strip()
+            else:
+                cpu = cpu_out.strip()
         program = plist.get("Program")
         arguments = plist.get("ProgramArguments", [])
         executable = (
@@ -203,6 +270,8 @@ def svc_scan(config: Config | None = None, *, directories: tuple[Path, ...] | No
         )
         rule = identify(label=label, executable=executable)
         row = {"label": label, "plist_path": str(plist_path), "name": label, "pid": pid, "cpu": cpu}
+        if cpu_error:
+            row["cpu_error"] = cpu_error
         if rule:
             row.update(metadata(rule), executable=executable, category_ignored=ignored(rule, config))
         rows.append(row)

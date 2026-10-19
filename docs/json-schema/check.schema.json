@@ -5,10 +5,23 @@
     "tool_paths": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["blueutil", "brightness"],
+      "required": [
+        "blueutil",
+        "brightness"
+      ],
       "properties": {
-        "blueutil": {"type": ["string", "null"]},
-        "brightness": {"type": ["string", "null"]}
+        "blueutil": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "brightness": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
     "version": {
@@ -272,7 +285,8 @@
                 "enum": [
                   "hit",
                   "clear",
-                  "unknown", "unavailable"
+                  "unknown",
+                  "unavailable"
                 ]
               },
               "error": {
@@ -351,6 +365,30 @@
               "evidence",
               "references"
             ]
+          }
+        },
+        "assertion_context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "session_seconds",
+            "power_transition"
+          ],
+          "properties": {
+            "session_seconds": {
+              "type": "number",
+              "minimum": 0
+            },
+            "power_transition": {
+              "type": "boolean"
+            },
+            "scenario": {
+              "enum": [
+                "work",
+                "away",
+                null
+              ]
+            }
           }
         }
       }

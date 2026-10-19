@@ -49,6 +49,7 @@ async def test_tui_overview_reapply_button_uses_same_actions(machine):
         await pilot.pause()
         assert app.refresh_complete
         assert {row["kind"] for row in app.resurrected} == {"agent", "app", "pid"}
+        app._session_admitted = True  # The separate session-decision tests cover explicit consent.
         button = app.query_one("#b-reapply")
         assert button.display and not button.disabled
         await click_after_layout(pilot, "#b-reapply")

@@ -65,25 +65,7 @@
       "sleep",
       "5",
       "displaysleep",
-      "3",
-      "powernap",
-      "0",
-      "tcpkeepalive",
-      "1",
-      "womp",
-      "0",
-      "standby",
-      "1",
-      "hibernatemode",
-      "3",
-      "ttyskeepawake",
-      "1",
-      "disksleep",
-      "10",
-      "lessbright",
-      "1",
-      "networkoversleep",
-      "0"
+      "3"
     ],
     [
       "sudo",
@@ -94,25 +76,7 @@
       "sleep",
       "5",
       "displaysleep",
-      "3",
-      "powernap",
-      "0",
-      "tcpkeepalive",
-      "1",
-      "womp",
-      "0",
-      "standby",
-      "1",
-      "hibernatemode",
-      "3",
-      "ttyskeepawake",
-      "1",
-      "disksleep",
-      "10",
-      "lessbright",
-      "1",
-      "networkoversleep",
-      "0"
+      "3"
     ],
     [
       "mdfind",
@@ -136,6 +100,11 @@
       "tell application id \"org.demo.app910001\" to quit",
       "-e",
       "end timeout"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
     ],
     [
       "ps",
@@ -285,6 +254,11 @@
       "pid=,ppid=,stat=,lstart=,comm="
     ],
     [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
       "mdfind",
       "kMDItemContentType == \"com.apple.application-bundle\""
     ],
@@ -342,6 +316,11 @@
       "tell application id \"org.demo.app910005\" to quit",
       "-e",
       "end timeout"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
     ],
     [
       "ps",
@@ -436,13 +415,9 @@
   "exit_code": null,
   "labels": [
     "",
-    "[dim]-InternalBattery-0 (id=1) 87%; · Battery power[/]",
-    "[red]✘[/]",
-    "SleepDisabled=1 · Normal system sleep is disabled.",
+    "[dim]87% · Battery power[/]",
     "[yellow]▲[/]",
-    "Keep-awake tools: caffeinate prevents sleep: PID 919999: /usr/bin/caffeinate -d; parent PID 919997: /Applications/Terminal.app/Contents/MacOS/Terminal",
-    "[yellow]▲[/]",
-    "Audio assertion: \"audio\" (quit the app playing audio to release it)",
+    "caffeinate is keeping the Mac awake; this keep-awake task can be ended.",
     "",
     "High-energy apps: [b]5[/] running",
     "",
@@ -474,8 +449,12 @@
       "Applying recommended power settings…"
     ],
     [
+      "dim",
+      "Already set: Power Nap, Network connections during sleep, Network wake, Deep standby, Hibernation mode, Stay awake for terminal activity, Disk sleep delay, Dim display on battery, Network activity during sleep"
+    ],
+    [
       "ok",
-      "Battery profile updated (12 settings)"
+      "Updated 3 battery settings"
     ],
     [
       "ok",
@@ -487,11 +466,11 @@
     ],
     [
       "dim",
-      "Default action for Ask Demo is ask — skipped; handle it manually"
+      "Ask Demo needs individual confirmation; skipped in the batch."
     ],
     [
       "ok",
-      "Apps done: 1 quit / 1 frozen / ask requires manual action: Ask Demo"
+      "Apps complete: 1 quit / 1 frozen / awaiting individual confirmation: Ask Demo"
     ],
     [
       "ok",
@@ -523,7 +502,19 @@
     ],
     [
       "bad",
-      "Final audit: SleepDisabled=1 still prevents sleep!"
+      "System sleep: globally disabled; closing the lid may not allow sleep"
+    ],
+    [
+      "bad",
+      "Final audit: System sleep: globally disabled; closing the lid may not allow sleep"
+    ],
+    [
+      "warn",
+      "Final audit: caffeinate prevents sleep: PID 919999: /usr/bin/caffeinate -d; parent PID 919997: /Applications/Terminal.app/Contents/MacOS/Terminal"
+    ],
+    [
+      "warn",
+      "Final audit: Remote Demo prevents system sleep; this may also affect sleep when the lid is closed."
     ],
     [
       "warn",
@@ -531,7 +522,7 @@
     ],
     [
       "ok",
-      "Power-saving actions complete — snapshot updated; travel-mode off restores it"
+      "Power-saving actions complete — recovery record updated; travel-mode off restores it"
     ]
   ],
   "output": "",
@@ -541,7 +532,7 @@
   "state": {
     "ac_prof": "",
     "anchored_at": "<TIME>",
-    "batt_prof": "lowpowermode 0 sleep 1 displaysleep 10 powernap 0 tcpkeepalive 1 womp 0 standby 1 hibernatemode 3 ttyskeepawake 1 disksleep 10 lessbright 1 networkoversleep 0",
+    "batt_prof": "lowpowermode 0 sleep 1 displaysleep 10",
     "brightness": "",
     "bt_off": "1",
     "frozen_apps": [

@@ -5,17 +5,13 @@
   "exit_code": null,
   "labels": [
     "",
-    "[dim]-InternalBattery-0 (id=1) 87%; · 电池供电[/]",
-    "[red]✘[/]",
-    "SleepDisabled=1 · 当前设置会阻止正常系统睡眠。",
+    "[dim]87% · 电池供电[/]",
     "[yellow]▲[/]",
-    "防睡工具: caffeinate 阻断睡眠: PID 919999：/usr/bin/caffeinate -d；父进程 PID 919997：/Applications/Terminal.app/Contents/MacOS/Terminal",
-    "[yellow]▲[/]",
-    "音频断言: \"audio\" (退出在出声的 app 可解)",
+    "caffeinate 正在保持唤醒，可结束这次防睡任务。",
     "",
-    "高耗电 app: [b]5[/] 个运行中",
+    "高耗电应用: [b]5[/] 个运行中",
     "",
-    "后台守护: [b]1[/] 个可卸载"
+    "后台服务: [b]1[/] 个可卸载"
   ],
   "log": [],
   "output": "",
