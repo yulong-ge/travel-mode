@@ -2,10 +2,38 @@
 
 import asyncio
 from collections import defaultdict
+from contextlib import contextmanager
+from inspect import isawaitable
 
 from textual.widget import Widget
 
 from travel_mode.tui.messages import PageRefreshed
+
+
+@contextmanager
+def modal_result(monkeypatch, app, screen_type):
+    """Observe dismissal through the real result callback, including its side effects."""
+    completed = asyncio.get_running_loop().create_future()
+    original = app.push_screen
+
+    def push_screen(screen, callback=None, **kwargs):
+        if isinstance(screen, screen_type):
+
+            async def answered(result):
+                if callback is not None:
+                    outcome = callback(result)
+                    if isawaitable(outcome):
+                        await outcome
+                # Textual pops the screen before dispatching this callback.
+                assert screen not in app.screen_stack
+                completed.set_result(result)
+
+            return original(screen, answered, **kwargs)
+        return original(screen, callback, **kwargs)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(app, "push_screen", push_screen)
+        yield completed
 
 
 class PageSignals:

@@ -1,12 +1,15 @@
 """Reports and local history use committed frames and no host observations."""
 
+import asyncio
+
 import pytest
 from textual.widgets import Static
 
 from travel_mode import sessions, state
 from travel_mode.i18n import set_language, t
 from travel_mode.tui.app import TravelApp
-from tui_interaction import click_after_layout
+from travel_mode.tui.session_screen import SessionScreen
+from tui_interaction import click_after_layout, modal_result
 
 
 @pytest.mark.parametrize("language", ["en", "zh"])
@@ -22,20 +25,25 @@ async def test_restore_report_and_history_share_scrollable_view(
         sessions.begin(app.st)
         app.save()
         app.action_goto("p-net")
-        await click_after_layout(pilot, "#b-off")
-        await app.wait_for_idle()
-        text = str(app.screen.query_one("#session-text", Static).content)
-        assert t("session.heading", scenario=t("scenario.work")) in text
-        assert not state._path().exists() and len(sessions.read_history()) == 1
-        await pilot.press("escape")
-        await app.screen.wait_for_refresh()
+        with modal_result(monkeypatch, app, SessionScreen) as closed:
+            await click_after_layout(pilot, "#b-off")
+            await app.wait_for_idle()
+            text = str(app.screen.query_one("#session-text", Static).content)
+            assert t("session.heading", scenario=t("scenario.work")) in text
+            assert not state._path().exists() and len(sessions.read_history()) == 1
+            await pilot.press("escape")
+            await asyncio.wait_for(closed, 10)
+        assert await app.screen.wait_for_refresh()
         calls = list(fake_runner.calls)
-        await click_after_layout(pilot, "#b-history")
-        assert t("session.heading", scenario=t("scenario.work")) in str(
-            app.screen.query_one("#session-text", Static).content
-        )
-        assert fake_runner.calls == calls
-        await pilot.press("escape")
+        with modal_result(monkeypatch, app, SessionScreen) as closed:
+            await click_after_layout(pilot, "#b-history")
+            assert t("session.heading", scenario=t("scenario.work")) in str(
+                app.screen.query_one("#session-text", Static).content
+            )
+            assert fake_runner.calls == calls
+            await pilot.press("escape")
+            await asyncio.wait_for(closed, 10)
+        assert await app.screen.wait_for_refresh()
 
 
 async def test_overview_has_one_status_health_region_and_one_sleep_fact(fake_runner):
@@ -54,8 +62,6 @@ async def test_overview_has_one_status_health_region_and_one_sleep_fact(fake_run
 
 @pytest.mark.parametrize("scenario", ["work", "away"])
 async def test_e2e_scenario_selector_is_mounted_and_enters_requested_scenario(scenario):
-    import asyncio
-
     app = TravelApp(scenario="ask", measure=False)
     async with app.run_test(size=(120, 36)) as pilot:
         assert await asyncio.wait_for(app.screen.wait_for_refresh(), 5)
