@@ -82,6 +82,9 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
     config = config_api.load_config()
     profile = active_values()
     work = config.options.scenario == "work"
+    from .setup import Remember
+
+    remember = Remember()
     aggressive = aggressive or config.options.aggressive
     profile_disconnect = profile.get("network", {}).get("disconnect", False)
     profile_wifi_off = profile.get("wifi") == "off"
@@ -276,7 +279,7 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
             if app["defact"] == "skip":
                 emit("dim", t("impl.keeping_skip", v0=name))
                 continue
-            if work and app["defact"] == "ask" and yes:
+            if (work or config.apps.policy == "adaptive") and app["defact"] == "ask" and yes:
                 emit("dim", t("impl.default_action_for_is_ask_skipped", v0=name))
                 continue
             default_act = ("skip" if work else "quit") if app["defact"] == "ask" else app["defact"]
@@ -297,6 +300,8 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
                     if not getattr(result, "forced", False):
                         emit("ok", t("impl.quit", v0=name))
                     state_api.save_state(st)
+                    if not yes:
+                        remember.cli(name, "work" if work else "away", "quit", app["defact"], dry_run=dry_run)
                 else:
                     emit("warn", t("impl.did_not_quit", v0=name))
             elif act == "freeze":
@@ -319,6 +324,10 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
                         ),
                     )
                     state_api.save_state(st)
+                    if not yes:
+                        remember.cli(
+                            name, "work" if work else "away", "freeze", app["defact"], dry_run=dry_run
+                        )
                 else:
                     emit("warn", t("impl.freezing_failed", v0=name))
 

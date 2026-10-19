@@ -87,7 +87,9 @@ def test_quit_never_uses_cached_discovery_to_verify_exit(monkeypatch, fake_runne
 
     path = "/fixture/Fresh.app"
     query = ["ps", "-axo", "pid=,ppid=,stat=,lstart=,comm="]
-    observations = iter((f"910001 1 S Thu Oct 15 12:00:00 2026 {path}/Contents/MacOS/Fresh", ""))
+    running = f"910001 1 S Thu Oct 15 12:00:00 2026 {path}/Contents/MacOS/Fresh"
+    # Initial observation, fresh protection check, and post-quit verification.
+    observations = iter((running, running, ""))
     fake_runner.responses[("osascript",)] = CmdResult("", "", 0)
 
     def runner(command, timeout=None, interactive=False):
@@ -104,6 +106,7 @@ def test_quit_never_uses_cached_discovery_to_verify_exit(monkeypatch, fake_runne
         assert apps.grace_quit(path, "Fresh")
         assert current_snapshot() is cached
     assert sum(command[:1] == ("osascript",) for command in fake_runner.calls) == 1
+    assert fake_runner.calls.count(tuple(query)) == 3
 
 
 @pytest.mark.parametrize("force_ok", [True, False])

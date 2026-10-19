@@ -50,6 +50,7 @@ def _main(argv=None):
             "sudoers",
             "status",
             "menubar",
+            "setup",
         ],
     )
     parser.add_argument(
@@ -160,7 +161,7 @@ def _main(argv=None):
 
         try:
             ensure_macos()
-            if not args.demo and args.cmd not in {"automation", "sudoers", "status", "menubar"}:
+            if not args.demo and args.cmd not in {"automation", "sudoers", "status", "menubar", "setup"}:
                 detect_capabilities()
         except SystemExit:
             raise
@@ -169,11 +170,24 @@ def _main(argv=None):
             return 2
     migration_messages = (
         []
-        if args.cmd in {"suggest", "history", "automation", "sudoers", "status", "menubar"}
+        if args.cmd in {"suggest", "history", "automation", "sudoers", "status", "menubar", "setup"}
         else migrate_legacy()
     )
     for message in migration_messages:
         print(message, file=sys.stderr)
+    if args.cmd == "setup":
+        if args.demo:
+            demo._configure_demo_views()
+        if args.yes or args.interface == "cli" or interface == "cli":
+            from .flows.setup import run
+
+            return run(yes=args.yes, dry_run=args.dry_run)
+        from .tui.setup import SetupApp
+
+        result = SetupApp(dry_run=args.dry_run).run()
+        if result:
+            print(result)
+        return 0
     if args.cmd == "status":
         import json
 
@@ -413,6 +427,20 @@ def _main(argv=None):
                 if args.yes:
                     raise ConfigError("<cli>", "--scenario", t("scenario.required"))
                 scenario = ask_scenario()
+        from .paths import config_path
+
+        if (
+            not config_path().exists()
+            and not args.yes
+            and (
+                args.interface == "cli" or (interface == "cli" and sys.stdin.isatty() and sys.stdout.isatty())
+            )
+        ):
+            from .flows.setup import run
+
+            if run(dry_run=args.dry_run):
+                return 1
+            config = load_config()
         with profile_scope(config, args.profile, aggressive=args.aggressive, scenario=scenario):
             if args.yes or args.interface == "cli":
                 return mode_apply(

@@ -58,10 +58,39 @@ def app_processes(path, *, whole_bundle=False, main_only=False):
     return [process for process in process_table() if process.command.startswith(prefixes)]
 
 
+def protected_app_identity(path, bundle_id=""):
+    """Shared immutable app protection for setup and the mutation boundary."""
+    resolved = Path(path).resolve()
+    return (
+        resolved.is_relative_to("/System")
+        or resolved.stem.casefold()
+        in {"terminal", "iterm", "iterm2", "warp", "wezterm", "alacritty", "ghostty"}
+        or bundle_id.startswith("com.apple.")
+        or bundle_id
+        in {
+            "com.googlecode.iterm2",
+            "dev.warp.Warp-Stable",
+            "com.github.wez.wezterm",
+            "org.alacritty",
+            "com.mitchellh.ghostty",
+        }
+    )
+
+
+def protected_process_ids(rows):
+    """The tool and its full observed ancestor chain, including resource executables."""
+    parents = {process.pid: process.ppid for process in rows}
+    protected = {os.getpid(), os.getppid()}
+    parent = os.getppid()
+    while parent in parents and parents[parent] not in protected:
+        parent = parents[parent]
+        protected.add(parent)
+    return protected
+
+
 def _protected(path, rows):
     resolved = Path(path).resolve()
-    terminal_names = {"terminal", "iterm", "iterm2", "warp", "wezterm", "alacritty", "ghostty"}
-    if resolved.is_relative_to("/System") or resolved.stem.casefold() in terminal_names:
+    if protected_app_identity(path):
         raise PermissionError(t("safety.protected_app", path=path))
     info = resolved / "Contents/Info.plist"
     if info.exists():
@@ -72,20 +101,20 @@ def _protected(path, rows):
         bundle_id = metadata.get("CFBundleIdentifier", "")
         if not isinstance(bundle_id, str):
             raise ValueError(t("safety.invalid_bundle_id", path=info))
-        if bundle_id.startswith("com.apple.") or bundle_id in {
-            "com.googlecode.iterm2",
-            "dev.warp.Warp-Stable",
-            "com.github.wez.wezterm",
-            "org.alacritty",
-            "com.mitchellh.ghostty",
-        }:
+        if protected_app_identity(path, bundle_id):
             raise PermissionError(t("safety.protected_app", path=f"{path} ({bundle_id})"))
-    parents = {process.pid: process.ppid for process in rows}
-    protected = {os.getpid(), os.getppid()}
-    parent = os.getppid()
-    while parent in parents and parents[parent] not in protected:
-        parent = parents[parent]
-        protected.add(parent)
+    from ..config import load_config
+
+    if load_config().apps.policy == "adaptive":
+        from ..app_policy import foreground_pid
+
+        foreground = int(foreground_pid())
+        if any(
+            process.pid == foreground and process.command.startswith(_prefixes(path, True))
+            for process in rows
+        ):
+            raise PermissionError(t("setup.foreground_protected", path=path))
+    protected = protected_process_ids(rows)
     prefixes = _prefixes(path, whole_bundle=True)
     if any(process.pid in protected and process.command.startswith(prefixes) for process in rows):
         raise PermissionError(t("safety.protected_ancestor", path=path))

@@ -16,9 +16,10 @@ from travel_mode.config import Config, ConfigError, load_config
 
 def test_defaults_are_portable_and_complete(tmp_path: Path):
     config = Config.defaults()
-    assert config.apps.default == "ask"
+    assert config.apps.default == "freeze"
     assert "WeChat" in config.apps.freeze
-    assert "Spotify" in config.apps.quit
+    assert "Spotify" in config.apps.freeze
+    assert "Google Drive" in config.apps.quit
     assert config.network.apps
     assert config.services.unload == ()
     assert config.power_overrides == {}

@@ -63,13 +63,15 @@ def test_profile_scenario_conflict_is_explicit():
 
 def test_cli_scenario_is_first_question(monkeypatch, darwin_platform, capsys):
     prompts = []
-    monkeypatch.setattr("builtins.input", lambda prompt: prompts.append(prompt) or "work")
+    monkeypatch.setattr(
+        "builtins.input", lambda prompt: prompts.append(prompt) or ("work" if len(prompts) == 1 else "s")
+    )
     observed = []
     monkeypatch.setattr(
         "travel_mode.flows.apply.mode_apply", lambda **kw: observed.append(active_scenario()) or 0
     )
     assert cli.main(["--no-tui"]) == 0
-    assert prompts == ["  [work/away] "]
+    assert prompts == [t("scenario.input"), t("setup.begin")]
     assert observed == ["work"]
     assert capsys.readouterr().out.splitlines()[0] == t("scenario.prompt")
 

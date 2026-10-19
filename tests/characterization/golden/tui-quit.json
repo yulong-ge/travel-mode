@@ -35,6 +35,7 @@
   "exit_code": null,
   "labels": [
     "Default actions come from config.toml",
+    "Choose app actions for each scenario.",
     "Other configured items",
     "[green]✔ Quit Demo quit (off reopens it)[/]",
     "Ask Demo [dim]CPU 1.0% · default ask[/]",

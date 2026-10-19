@@ -68,6 +68,8 @@ def write_interface(interface: str, path: Path | None = None) -> None:
 def _write_option(key: str, value: str, target: Path) -> None:
     load_config(target)
     doc = tomlkit.parse(target.read_text("utf-8")) if target.exists() else tomlkit.document()
+    if not target.exists():
+        doc["apps"] = {"policy": "adaptive"}
     if "options" not in doc:
         doc["options"] = tomlkit.table()
     doc["options"][key] = value
@@ -84,6 +86,90 @@ def _write_option(key: str, value: str, target: Path) -> None:
         raise ConfigError(target, f"options.{key}", str(exc), cause=exc) from exc
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def preview_app_choices(selected, *, completed=False, adaptive=False, path=None):
+    """Edit only the selected names; tomlkit retains comments and unrelated tables."""
+    target = Path(path) if path is not None else config_path()
+    load_config(target)
+    try:
+        doc = tomlkit.parse(target.read_text("utf-8")) if target.exists() else tomlkit.document()
+    except (OSError, ValueError) as exc:
+        raise ConfigError(target, "<read>", str(exc), cause=exc) from exc
+    if "apps" not in doc:
+        doc["apps"] = tomlkit.table()
+    apps = doc["apps"]
+    if adaptive or not target.exists():
+        apps["policy"] = "adaptive"
+    if completed:
+        apps["setup_completed"] = True
+    for scenario, choices in selected.items():
+        if scenario not in {"work", "away"}:
+            raise ConfigError(target, f"apps.{scenario}", t("scenario.invalid"))
+        if any(not isinstance(n, str) or not n.strip() or a not in _ACTIONS for n, a in choices.items()):
+            raise ConfigError(target, f"apps.{scenario}", t("config.invalid_action"))
+        if scenario not in apps:
+            apps[scenario] = tomlkit.table()
+        scoped = apps[scenario]
+        for action in _ACTIONS:
+            previous = scoped.get(action)
+            additions = [name for name, value in choices.items() if value == action]
+            if previous is None:
+                if additions:
+                    scoped[action] = additions
+                continue
+            _edit_action_array(previous, choices, action, additions)
+    return tomlkit.dumps(doc)
+
+
+def _edit_action_array(array, choices, action, additions):
+    from collections import Counter
+
+    from tomlkit.items import Comment
+
+    def comments():
+        # TOMLKit groups value, comma and comment trivia together. Removing a value
+        # also removes its trailing comment; retain that comment as a standalone
+        # note in the original array. Other items and their formatting stay intact.
+        return [item.trivia.comment for group in array._value for item in group if isinstance(item, Comment)]
+
+    original = comments()
+    for index in reversed(range(len(array))):
+        name = str(array[index])
+        if name in choices and choices[name] != action:
+            del array[index]
+    for name in additions:
+        if name not in array:
+            array.append(name)
+    remaining = Counter(comments())
+    for comment in original:
+        if remaining[comment]:
+            remaining[comment] -= 1
+        else:
+            array.add_line(comment=comment.removeprefix("#").lstrip())
+
+
+def write_app_choices(selected, *, completed=False, adaptive=False, path=None):
+    import tempfile
+
+    target = Path(path) if path is not None else config_path()
+    temporary = None
+    try:
+        content = preview_app_choices(selected, completed=completed, adaptive=adaptive, path=target)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(dir=target.parent, prefix=".apps-", delete=False) as handle:
+            temporary = Path(handle.name)
+            handle.write(content.encode("utf-8"))
+            handle.flush()
+            os.fsync(handle.fileno())
+        load_config(temporary)
+        temporary.replace(target)
+        temporary = None
+    except OSError as exc:
+        raise ConfigError(target, "apps", str(exc), cause=exc) from exc
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 @dataclass(frozen=True)
@@ -105,6 +191,14 @@ class AppsConfig:
     ask: tuple[str, ...] = ()
     with_daemon: tuple[DaemonApp, ...] = ()
     configured_actions: tuple[str, ...] = ()
+    policy: str = "legacy"
+    setup_completed: bool = False
+    work: dict[str, str] = field(default_factory=dict)
+    away: dict[str, str] = field(default_factory=dict)
+
+    def explicit(self, name: str, scenario: str) -> str | None:
+        scoped = getattr(self, scenario, {}) if scenario in {"work", "away"} else {}
+        return scoped.get(name, self.actions.get(name) if name in self.configured_actions else None)
 
     @property
     def actions(self) -> dict[str, str]:
@@ -117,6 +211,8 @@ class AppsConfig:
         names = list(DEFAULT_APPS) + list(self.watch)
         for action in ("quit", "freeze", "skip", "ask"):
             names.extend(getattr(self, action))
+        names.extend(self.work)
+        names.extend(self.away)
         names.extend(item.name for item in self.with_daemon)
         return tuple(dict.fromkeys(name for name in names if name not in self.ignore))
 
@@ -185,7 +281,11 @@ class Config:
         from .profiles import builtin_profiles
 
         return cls(
-            apps=AppsConfig(**{key: tuple(value) for key, value in DEFAULT_ACTIONS.items()}),
+            apps=AppsConfig(
+                default="freeze",
+                policy="adaptive",
+                **{key: tuple(value) for key, value in DEFAULT_ACTIONS.items()},
+            ),
             profiles=builtin_profiles(),
         )
 
@@ -203,7 +303,20 @@ _TOP_KEYS = {
     "measurement",
     "health",
 }
-_APP_KEYS = {"default", "watch", "ignore", "quit", "freeze", "skip", "ask", "with_daemon"}
+_APP_KEYS = {
+    "default",
+    "watch",
+    "ignore",
+    "quit",
+    "freeze",
+    "skip",
+    "ask",
+    "with_daemon",
+    "work",
+    "away",
+    "policy",
+    "setup_completed",
+}
 _ACTIONS = ("quit", "freeze", "skip", "ask")
 
 
@@ -287,7 +400,7 @@ def load_config(path: str | Path | None = None) -> Config:
 
     apps = _table(data, "apps", target)
     _check_keys(apps, _APP_KEYS, target, "apps")
-    default = apps.get("default", "ask")
+    default = apps.get("default", "freeze" if apps.get("policy") == "adaptive" else "ask")
     if default not in _ACTIONS:
         raise _error(target, "apps.default", t("config.invalid_action"))
     actions = {action: _strings(apps.get(action, []), target, f"apps.{action}") for action in _ACTIONS}
@@ -299,7 +412,35 @@ def load_config(path: str | Path | None = None) -> Config:
                     target, f"apps.{action}[{index}]", t("config.app_also_appears_in_apps", v0=seen[name])
                 )
             seen[name] = action
+    scenario_actions = {}
+    for scenario in ("work", "away"):
+        scoped = apps.get(scenario, {})
+        if not isinstance(scoped, dict):
+            raise _error(
+                target, f"apps.{scenario}", t("config.expected_a_table_got", v0=type(scoped).__name__)
+            )
+        _check_keys(scoped, set(_ACTIONS), target, f"apps.{scenario}")
+        choices = {}
+        for action, values in scoped.items():
+            for index, name in enumerate(_strings(values, target, f"apps.{scenario}.{action}")):
+                if name in choices:
+                    raise _error(
+                        target,
+                        f"apps.{scenario}.{action}[{index}]",
+                        t("config.app_also_appears_in_apps", v0=choices[name]),
+                    )
+                choices[name] = action
+        scenario_actions[scenario] = choices
+    policy = apps.get("policy", "legacy")
+    if not isinstance(policy, str) or policy not in {"legacy", "adaptive"}:
+        raise _error(target, "apps.policy", t("setup.invalid_policy"))
+    completed = apps.get("setup_completed", False)
+    if type(completed) is not bool:
+        raise _error(target, "apps.setup_completed", t("config.expected_a_boolean"))
     app_config = AppsConfig(
+        policy=policy,
+        setup_completed=completed,
+        **scenario_actions,
         configured_actions=tuple(seen),
         default=default,
         watch=_strings(apps.get("watch", []), target, "apps.watch"),

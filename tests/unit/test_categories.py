@@ -68,11 +68,11 @@ def test_service_executable_rule_and_app_skip_priority(fake_runner, tmp_path):
     assert not scan["unloadable"]
 
 
-def test_work_does_not_apply_away_builtin_app_defaults():
+def test_new_user_work_defaults_freeze_ordinary_apps_and_quit_file_providers():
     config = Config.defaults()
     with profile_scope(config, "work") as effective:
-        assert app_action("Slack", None, effective) == "ask"
-        assert app_action("Docker", identify(name="Docker"), effective) == "ask"
+        assert app_action("Slack", None, effective) == "freeze"
+        assert app_action("Docker", identify(name="Docker"), effective) == "freeze"
         assert app_action("Google Drive", identify(name="Google Drive"), effective) == "quit"
 
 

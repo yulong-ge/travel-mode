@@ -103,7 +103,7 @@ class DashboardPage:
 
         from travel_mode.flows.doctor import action_label
 
-        box = self.query_one("#dash-health", Vertical)
+        box = self.main_query_one("#dash-health", Vertical)
         widgets = [
             Static(t("health.timing", seconds=report["elapsed_seconds"], budget=report["budget_seconds"]))
         ]
@@ -170,10 +170,12 @@ class DashboardPage:
 
         self.spotlight_enabled = spot
 
-        self.query_one("#dash-revived", Static).update("\n".join(describe(row) for row in self.resurrected))
-        self.query_one("#dash-revived", Static).display = bool(self.resurrected)
-        self.query_one("#b-reapply", Button).disabled = not self.resurrected
-        self.query_one("#b-reapply", Button).display = bool(self.resurrected)
+        self.main_query_one("#dash-revived", Static).update(
+            "\n".join(describe(row) for row in self.resurrected)
+        )
+        self.main_query_one("#dash-revived", Static).display = bool(self.resurrected)
+        self.main_query_one("#b-reapply", Button).disabled = not self.resurrected
+        self.main_query_one("#b-reapply", Button).display = bool(self.resurrected)
         box = self._dash_status
         await box.remove_children()
         source = t("impl.ac_power") if ac else t("impl.battery_power")
@@ -236,9 +238,9 @@ class DashboardPage:
             await self.build_health(self.health_report)
 
     async def act_quick(self, btn):
-        measure_requested = self.query_one("#q-measure", Checkbox).value
+        measure_requested = self.main_query_one("#q-measure", Checkbox).value
         scope = {
-            k: self.query_one(f"#q-{k}", Checkbox).value
+            k: self.main_query_one(f"#q-{k}", Checkbox).value
             for k in ("power", "apps", "svc", "spot", "net", "sync", "updater")
         }
         if not any(scope.values()):

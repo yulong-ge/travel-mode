@@ -37,9 +37,9 @@ class NetworkPage:
             yield Button(t("session.history"), id="b-history")
 
     async def build_net(self, network, dev, wifi, bluetooth):
-        box = self.query_one("#net-box", Vertical)
+        box = self.main_query_one("#net-box", Vertical)
         await box.remove_children()
-        actions = self.query_one("#net-actions", Vertical)
+        actions = self.main_query_one("#net-actions", Vertical)
         await actions.remove_children()
         self.net_paths = {}
         self.net_failures = {
@@ -94,7 +94,7 @@ class NetworkPage:
         bottom.append(Label(t("network.services_hint", tab=t("services.title")), classes="srow"))
         await box.mount(*w)
         await actions.mount(*bottom)
-        info = self.query_one("#off-info", Static)
+        info = self.main_query_one("#off-info", Static)
         st = self.display_state()
         if st.get("saved_at"):
             info.update(

@@ -49,6 +49,9 @@ class Dispatch:
         if ev.button.id in {"scenario-work", "scenario-away"}:
             await self.choose_scenario(ev.button.id.removeprefix("scenario-"))
             return
+        if ev.button.id == "b-setup":
+            self.open_setup()
+            return
         if ev.button.id == "b-history":
             await self.show_history()
             return
@@ -102,7 +105,7 @@ class Dispatch:
                 self._mutation_action = str(ev.button.label)
                 self.sub_title = t("impl.executing_action", action=self._mutation_action)
                 self.logline("dim", self.sub_title)
-                for button in self.query(Button):
+                for button in self.main_query(Button):
                     self._disable_mutation_button(button)
                 from travel_mode.failures import batch
 
@@ -133,7 +136,7 @@ class Dispatch:
     async def _dispatch_button(self, ev):
         bid = ev.button.id or ""
         # 焦点立即离开 pane 内控件: 焦点滞留隐藏 pane 会把 active 弹回旧页 (TabPane.Focused)
-        self.query_one(TabbedContent).focus()
+        self.main_query_one(TabbedContent).focus()
         if bid == "b-quick":
             await self.act_quick(ev.button)
         elif bid.startswith("b-health-"):

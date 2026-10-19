@@ -149,7 +149,15 @@ def lint_active_tab(text: str, layout: dict, *, observed: bool) -> list[dict]:
 
 class Session:
     def __init__(
-        self, root: Path, cols: int, rows: int, language: str, live: bool, config: Path | None = None
+        self,
+        root: Path,
+        cols: int,
+        rows: int,
+        language: str,
+        live: bool,
+        config: Path | None = None,
+        *,
+        setup: bool = False,
     ):
         self.root, self.cols, self.rows, self.language = root, cols, rows, language
         # Live read-only discovery scans the real host; give refresh workers time to settle.
@@ -176,6 +184,8 @@ class Session:
             "--telemetry",
             str(root / "layout.json"),
         ]
+        if setup:
+            command.append("--setup")
         if live:
             command.append("--live-readonly")
         else:
@@ -276,6 +286,7 @@ class Session:
         issues.extend(layout["issues"])
         issues.extend(lint_active_tab(plain, layout, observed=observed))
         expected = {
+            "setup": "setup",
             "scenario": "scenario",
             "dashboard": "p-dash",
             "power": "p-power",
@@ -456,8 +467,75 @@ def child(args) -> int:
         _configure_demo()
         _configure_demo_views()
     set_language(args.lang)
-    DebugApp(Path(args.telemetry)).run()
+    if args.setup:
+        setup_debug_app(Path(args.telemetry)).run()
+    else:
+        DebugApp(Path(args.telemetry)).run()
     return 0
+
+
+def setup_debug_app(telemetry):
+    """Publish the visible setup screen, never a second hidden base-class screen."""
+    from travel_mode.tui.setup import SetupApp, SetupScreen
+
+    class DebugSetupScreen(SetupScreen):
+        async def on_mount(self, event):
+            event.prevent_default()
+            await super().on_mount()
+            self.call_after_refresh(self.publish)
+
+        def on_resize(self, event):
+            event.prevent_default()
+            super().on_resize()
+            self.call_after_refresh(self.publish)
+
+        def action_column(self, scenario):
+            super().action_column(scenario)
+            self.call_after_refresh(self.publish)
+
+        def on_descendant_focus(self):
+            self.call_after_refresh(self.publish)
+
+        def reveal_focused_row(self):
+            super().reveal_focused_row()
+            self.call_after_refresh(self.publish)
+
+        def publish(self):
+            ready = self.ready.is_set()
+            write_layout(
+                telemetry,
+                {
+                    "schema_version": 1,
+                    "active": "setup",
+                    "setup_reviewed": self.reviewed.is_set(),
+                    "setup_column": self.column,
+                    "widgets": [
+                        dict(
+                            id=w.id,
+                            type=type(w).__name__,
+                            region=list(w.region),
+                            value=getattr(w, "value", None),
+                        )
+                        for w in self.query("*")
+                    ],
+                    "issues": [],
+                    "ready": ready,
+                    "pages_ready": ["setup"] if ready else [],
+                    "refresh_complete": ready,
+                    "body_visible": True,
+                    "content_visible": bool(self.rows),
+                    "action_generation": 0,
+                    "mutation_busy": False,
+                    "focused_id": self.focused.id if self.focused else None,
+                },
+            )
+
+    class DebugSetupApp(SetupApp):
+        def on_mount(self, event):
+            event.prevent_default()
+            self.push_screen(DebugSetupScreen(dry_run=True), self.exit)
+
+    return DebugSetupApp(dry_run=True)
 
 
 def write_report(output: Path, results: list[dict], mode: str, error: str | None = None) -> dict:
@@ -472,6 +550,48 @@ def write_report(output: Path, results: list[dict], mode: str, error: str | None
 
 
 def run_group(output: Path, cols: int, rows: int, language: str, args, results: list[dict]) -> None:
+    if args.setup:
+        root = output / f"{cols}x{rows}-{language}" / "setup"
+        session = Session(root, cols, rows, language, args.live_readonly, args.config, setup=True)
+        try:
+            session.wait_started()
+            session.wait_complete()
+            results.append(session.capture("setup", "setup"))
+            session.keys("Right", "End")
+            deadline = time.monotonic() + session.timeout
+            while time.monotonic() < deadline:
+                layout = read_layout(session.root / "layout.json")
+                app_ids = [w["id"] for w in layout["widgets"] if w["id"] and w["id"].startswith("setup-app-")]
+                focused = next(w for w in layout["widgets"] if w["id"] == app_ids[-1])
+                body = next(w for w in layout["widgets"] if w["id"] == "setup-body")
+                _, fy, _, fh = focused["region"]
+                _, by, _, bh = body["region"]
+                if (
+                    layout["setup_column"] == "away"
+                    and layout["focused_id"] == app_ids[-1]
+                    and by <= fy
+                    and fy + fh <= by + bh
+                ):
+                    break
+                time.sleep(0.1)
+            else:
+                raise TimeoutError("Setup did not focus and reveal the last app")
+            results.append(session.capture("setup-away-last", "setup"))
+            review = next(row for row in layout["widgets"] if row["id"] == "setup-review")
+            x, y, width, height = review["region"]
+            session.click(x + width // 2, y + height // 2)
+            deadline = time.monotonic() + session.timeout
+            while time.monotonic() < deadline:
+                layout = read_layout(session.root / "layout.json")
+                if layout["setup_reviewed"] and layout["focused_id"] == "setup-save":
+                    break
+                time.sleep(0.1)
+            else:
+                raise TimeoutError("Setup summary and Save did not finish layout")
+            results.append(session.capture("setup-reviewed", "setup"))
+        finally:
+            session.close()
+        return
     # Each initial-tab probe is a fresh process: no earlier tab switch can repair layout.
     for key, tab in enumerate(TABS, 1):
         root = output / f"{cols}x{rows}-{language}" / f"initial-{tab}"
@@ -535,6 +655,7 @@ def run_group(output: Path, cols: int, rows: int, language: str, args, results: 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--setup", action="store_true", help="capture the app defaults setup screen")
     parser.add_argument("--all", action="store_true", help="5 tabs × 2 languages × 3 sizes plus key states")
     parser.add_argument("--config", type=Path, help="copy this config read-only into each isolated session")
     parser.add_argument("--jobs", type=int, default=1, help="parallel isolated tmux groups (default: 1)")

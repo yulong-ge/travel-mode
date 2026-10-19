@@ -65,6 +65,21 @@ def test_renderer_positions_punctuation_symbols_and_sgr(debug_modules, tmp_path,
     assert im.getpixel((7 * renderer.CELL_W, 23)) == renderer.PALETTE[1]
 
 
+def test_renderer_preserves_trimmed_button_background(debug_modules, tmp_path, monkeypatch):
+    renderer, _ = debug_modules
+    fonts = {size: ImageFont.load_default(size=size) for size in (18, 19)}
+    monkeypatch.setattr(renderer.ImageFont, "truetype", lambda font, size, **kwargs: fonts[size])
+    path = tmp_path / "buttons.png"
+    # Real tmux captures omit trailing blank cells after the final SGR sequence.
+    renderer.render("\x1b[48;2;53;108;70m Save \x1b[0m\x1b[48;2;53;108;70m\n", path, 20, 2)
+    im = Image.open(path)
+    assert im.getpixel((19 * renderer.CELL_W, renderer.CELL_H - 1)) == (53, 108, 70)
+    assert im.getpixel((19 * renderer.CELL_W, 2 * renderer.CELL_H - 1)) == renderer.DEFAULT_BG
+    underlined, plain = list(renderer.styled_cells("\x1b[4mA\x1b[24mB"))
+    assert underlined[4].underline
+    assert not plain[4].underline
+
+
 def test_renderer_missing_system_font_is_an_error(debug_modules, tmp_path, monkeypatch):
     renderer, _ = debug_modules
 
@@ -255,3 +270,41 @@ async def test_debug_scrolled_page_bottom_is_not_blank(
         assert app.visible_region(target).area
         layout = json.loads(telemetry.read_text())
         assert layout["body_visible"] and layout["content_visible"]
+
+
+async def test_setup_debug_telemetry_tracks_the_only_visible_screen(debug_modules, tmp_path, monkeypatch):
+    import asyncio
+
+    from textual.widgets import Button
+
+    from travel_mode import app_policy
+    from travel_mode.demo import setup_rows
+
+    _, debug = debug_modules
+    scans = []
+
+    def discover():
+        scans.append(True)
+        return setup_rows()
+
+    monkeypatch.setattr(app_policy, "discover", discover)
+    path = tmp_path / "layout.json"
+    app = debug.setup_debug_app(path)
+    async with app.run_test(size=(120, 36)) as pilot:
+        screen = app.screen
+        await asyncio.wait_for(screen.ready.wait(), 10)
+        assert await screen.wait_for_refresh()
+        assert len(scans) == 1
+        assert app.screen_stack == [app.screen_stack[0], screen]
+        screen.action_column("away")
+        assert await screen.wait_for_refresh()
+        screen.query_one("#setup-review", Button).press()
+        await asyncio.wait_for(screen.reviewed.wait(), 10)
+        await pilot._wait_for_screen()
+        assert await screen.wait_for_refresh()
+        layout = debug.read_layout(path)
+        assert layout["setup_column"] == "away"
+        assert layout["setup_reviewed"]
+        assert layout["focused_id"] == "setup-save"
+        rows = [w for w in layout["widgets"] if w["id"] and w["id"].startswith("setup-app-")]
+        assert len(rows) == len(setup_rows()) >= 25

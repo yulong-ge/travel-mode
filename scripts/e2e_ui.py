@@ -348,6 +348,14 @@ def answers(scenario="away", *, battery_measure=False):
             v2="F" if default == "freeze" else "f",
         )
         result[cpu_pattern(prompt)] = (row["name"], "f" if default == "freeze" else "y")
+        if row["defact"] != ("freeze" if default == "freeze" else "quit"):
+            from travel_mode.flows.setup import Remember
+
+            chosen = "freeze" if default == "freeze" else "quit"
+            result[Remember().prompt(row["name"], scenario, chosen)] = (
+                "decline-remember-" + row["name"],
+                "n",
+            )
         if row["name"] == "TravelModeE2E-Refusing" and scenario == "away":
             result[t("impl.has_not_quit_possible_unsaved_dialog", v0=row["name"])] = (
                 "force-refusing-fixture",

@@ -39,15 +39,15 @@ class PowerPage:
     async def build_power(self, profs, supported):
         supported = supported & profs.get("b", {}).keys()
         self.hib25_supported = "hibernatemode" in supported and "hibernatemode" in profs.get("b", {})
-        ac_control = self.query_one("#cb-ac", Checkbox)
+        ac_control = self.main_query_one("#cb-ac", Checkbox)
         ac_control.disabled = not all(key in profs.get("a", {}) for key in ("powernap", "womp"))
         if ac_control.disabled:
             ac_control.value = False
         ac_control.label = t(
             "power.ac_unavailable" if ac_control.disabled else "impl.disable_powernap_womp_on_ac_too"
         )
-        hib = self.query_one("#hib25-control")
-        if self.hib25_supported and not list(self.query("#cb-hib25")):
+        hib = self.main_query_one("#hib25-control")
+        if self.hib25_supported and not list(self.main_query("#cb-hib25")):
             await hib.mount(
                 Checkbox(
                     t("impl.hibernatemode_for_extended_sleep"),
@@ -58,7 +58,7 @@ class PowerPage:
             )
         elif not self.hib25_supported:
             await hib.remove_children()
-        box = self.query_one("#power-list", Vertical)
+        box = self.main_query_one("#power-list", Vertical)
         await box.remove_children()
         self.pw_boxes = []
         w = []
@@ -94,31 +94,31 @@ class PowerPage:
 
     def _update_power_btn(self):
         n = sum(1 for _, _, cb in self.pw_boxes if cb.value)
-        if any(cb.value for cb in self.query("#cb-hib25")):
+        if any(cb.value for cb in self.main_query("#cb-hib25")):
             n += 1
-        self.query_one("#b-power", Button).label = t("impl.apply_selected_2", v0=n)
+        self.main_query_one("#b-power", Button).label = t("impl.apply_selected_2", v0=n)
 
     def on_checkbox_changed(self, ev):
         if ev.checkbox.id and (ev.checkbox.id.startswith("pw-") or ev.checkbox.id in ("cb-hib25",)):
             self._update_power_btn()
         # 焦点立即离开 pane 内控件: 焦点滞留隐藏 pane 会把 active 弹回旧页 (TabPane.Focused)
-        self.query_one(TabbedContent).focus()
+        self.main_query_one(TabbedContent).focus()
 
     async def act_power(self):
         chg = []
         for key, rec, cb in self.pw_boxes:
             if cb.value:
                 chg += [key, rec]
-        if self.hib25_supported and any(cb.value for cb in self.query("#cb-hib25")):
+        if self.hib25_supported and any(cb.value for cb in self.main_query("#cb-hib25")):
             for i in range(0, len(chg), 2):
                 if chg[i] == "hibernatemode":
                     chg[i + 1] = "25"
                     break
             else:
                 chg += ["hibernatemode", "25"]
-        ac_control = self.query_one("#cb-ac", Checkbox)
+        ac_control = self.main_query_one("#cb-ac", Checkbox)
         ac_wanted = ac_control.value and not ac_control.disabled
-        bright_wanted = any(cb.value for cb in self.query("#cb-bright"))
+        bright_wanted = any(cb.value for cb in self.main_query("#cb-bright"))
         if not chg and not ac_wanted and not bright_wanted:
             self.notify(t("impl.no_power_settings_selected"), severity="warning")
             return

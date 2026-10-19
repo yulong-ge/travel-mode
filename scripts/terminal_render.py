@@ -72,6 +72,7 @@ class Style:
     bold: bool = False
     reverse: bool = False
     dim: bool = False
+    underline: bool = False
 
 
 def apply_sgr(style: Style, parameters: str) -> Style:
@@ -81,12 +82,14 @@ def apply_sgr(style: Style, parameters: str) -> Style:
         code = codes[index]
         if code == 0:
             style = Style()
-        elif code in (1, 2, 7, 22, 27):
+        elif code in (1, 2, 4, 7, 22, 24, 27):
             if code == 22:
                 style = replace(style, bold=False, dim=False)
             else:
-                field = {1: "bold", 2: "dim", 7: "reverse", 27: "reverse"}[code]
-                style = replace(style, **{field: code != 27})
+                field = {1: "bold", 2: "dim", 4: "underline", 7: "reverse", 24: "underline", 27: "reverse"}[
+                    code
+                ]
+                style = replace(style, **{field: code not in (24, 27)})
         elif code in (39, 49):
             style = replace(style, **{"fg" if code == 39 else "bg": DEFAULT_FG if code == 39 else DEFAULT_BG})
         elif 30 <= code <= 37 or 90 <= code <= 97:
@@ -110,7 +113,7 @@ def apply_sgr(style: Style, parameters: str) -> Style:
     return style
 
 
-def styled_cells(text: str):
+def styled_cells(text: str, *, cols: int | None = None):
     """Yield (row, column, character, width, style), preserving SGR across lines."""
     style, row, column, index = Style(), 0, 0, 0
     while index < len(text):
@@ -122,6 +125,11 @@ def styled_cells(text: str):
         char = text[index]
         index += 1
         if char == "\n":
+            # tmux capture-pane omits trailing blanks but preserves their SGR background.
+            # Paint those terminal cells too, including the last button's right padding.
+            if cols is not None:
+                for trailing in range(column, cols):
+                    yield row, trailing, " ", 1, style
             row, column = row + 1, 0
         elif char == "\r":
             column = 0
@@ -131,6 +139,9 @@ def styled_cells(text: str):
             width = cell_width(char)
             yield row, column, char, width, style
             column += width
+    if cols is not None and column:
+        for trailing in range(column, cols):
+            yield row, trailing, " ", 1, style
 
 
 def render(text: str, path: Path, cols: int = 120, rows: int = 36) -> None:
@@ -142,7 +153,7 @@ def render(text: str, path: Path, cols: int = 120, rows: int = 36) -> None:
     bold_font = ImageFont.truetype("/System/Library/Fonts/Menlo.ttc", 18, index=1)
     image = Image.new("RGB", (cols * CELL_W, rows * CELL_H), DEFAULT_BG)
     draw = ImageDraw.Draw(image)
-    cells = list(styled_cells(text))
+    cells = list(styled_cells(text, cols=cols))
     # Paint backgrounds first so a following cell cannot erase a glyph's right edge.
     for row, column, _char, width, style in cells:
         if row >= rows or column >= cols:
@@ -164,6 +175,8 @@ def render(text: str, path: Path, cols: int = 120, rows: int = 36) -> None:
         font = bold_font if style.bold and family == "mono" else fonts[family]
         # All fonts share a baseline; glyph width never changes terminal positioning.
         draw.text((x, y + 18), char, font=font, fill=fg, anchor="ls", stroke_width=0)
+        if style.underline:
+            draw.line((x, y + 21, x + _width * CELL_W - 1, y + 21), fill=fg)
     from harness_evidence import atomic_output
 
     with atomic_output(path) as temporary:

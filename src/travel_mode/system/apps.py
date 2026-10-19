@@ -104,6 +104,10 @@ def _grace_quit(path, name):
     """AppleScript quit (8s 超时) + 轮询 10s. 没在跑直接成功."""
     if not app_running(path):
         return QuitResult("not_running", True)
+    if load_config().apps.policy == "adaptive":
+        from .process_control import _protected, process_table
+
+        _protected(path, process_table())
     bid = app_bid(path)
     target = bid or name
     if not isinstance(target, str) or not target:
@@ -183,7 +187,7 @@ def app_sleep_assertions(name):
     return [
         line.strip()
         for line in atext.splitlines()
-        if "preventuseridle" in line.lower() and name.lower() in line.lower()
+        if re.search(r"Prevent(?:UserIdle)?SystemSleep", line) and name.lower() in line.lower()
     ]
 
 
@@ -207,10 +211,21 @@ def scan_apps():
 
         config = load_config()
         running, nobundle, seen = [], [], set()
+        scoped = (
+            getattr(config.apps, config.options.scenario, {})
+            if config.options.scenario in {"work", "away"}
+            else {}
+        )
+
+        def chosen_name(path, discovered):
+            # Setup keys use installed filenames; built-in names may be plist aliases.
+            return next((name for name in scoped if snapshot.index.find(name) == path), discovered)
+
         for name in config.apps.all:
             p = app_path(name)
             if p:
                 if app_running(p) and p not in seen:
+                    name = chosen_name(p, name)
                     rule = identify(name=name, bundle_id=app_bid(p))
                     running.append(
                         {
@@ -231,7 +246,7 @@ def scan_apps():
                         t("impl.processes_for_were_found_but_its", v0=name, v1="; ".join(hits[:2])[:90])
                     )
         for p in snapshot.index.paths:
-            name = Path(p).stem
+            name = chosen_name(p, Path(p).stem)
             if p in seen or name in config.apps.ignore or not app_running(p):
                 continue
             bid = app_bid(p)
@@ -249,6 +264,37 @@ def scan_apps():
                     }
                 )
                 seen.add(p)
+        if config.apps.policy == "adaptive":
+            from ..app_policy import recommendations
+
+            recommended = {row["path"]: row for row in recommendations(snapshot)}
+            for p, row in recommended.items():
+                if p not in seen and row["running"] and row["name"] not in config.apps.ignore:
+                    rule = identify(name=row["name"], bundle_id=row["bundle_id"])
+                    running.append(
+                        dict(
+                            name=row["name"],
+                            path=p,
+                            cpu=snapshot.cpu_for(row["name"], p),
+                            defact=app_action(row["name"], rule, config),
+                            **metadata(rule),
+                        )
+                    )
+                    seen.add(p)
+            for app in running:
+                row = recommended.get(app["path"])
+                if row:
+                    app["reason"] = row["reason"]
+                    if row["reason"] == "foreground":
+                        app["defact"] = "skip"
+                    elif (
+                        config.apps.explicit(app["name"], config.options.scenario) is None
+                        and app["defact"] != "skip"
+                    ):
+                        scenario = (
+                            config.options.scenario if config.options.scenario in {"work", "away"} else "work"
+                        )
+                        app["defact"] = config.apps.default if row["reason"] == "freeze" else row[scenario]
         notices = []
         for process in snapshot.processes:
             rule = identify(executable=process.command)

@@ -25,11 +25,14 @@ class AppsPage:
         with ItemGrid(classes="cardrow"):
             yield Label(t("impl.default_actions_come_from_config_toml"), classes="grow")
             yield Button(t("impl.apply_all_defaults"), id="b-apps-all", variant="primary", classes="btn")
+        with ItemGrid(classes="cardrow"):
+            yield Label(t("setup.scenarios_hint"), classes="grow")
+            yield Button(t("setup.adjust"), id="b-setup", classes="btn")
         yield Vertical(Label(t("impl.scanning"), classes="srow"), id="apps-box")
 
     async def build_apps(self):
         st = self.display_state()
-        box = self.query_one("#apps-box", Vertical)
+        box = self.main_query_one("#apps-box", Vertical)
         await box.remove_children()
         self.app_rows = {}
         w = []
@@ -58,6 +61,8 @@ class AppsPage:
                 ),
                 classes="grow",
             )
+            if app.get("reason"):
+                lab.update(str(lab.content) + "\n" + t("setup.reason_" + app["reason"]))
             if dfl == "skip":
                 reason = t("categories.notice") if app.get("category_action") == "notice" else t("impl.skip")
                 w.append(Label(f"○ {escape(name)} [dim]({reason})[/]", classes="srow"))
@@ -191,6 +196,28 @@ class AppsPage:
         await self.busy(btn, flow)
         self.action_refresh()
 
+    def offer_remember(self, name, action, default):
+        from travel_mode.flows import setup
+        from travel_mode.tui.setup import ConfirmRemember
+
+        if self._dry_run or not self.remember.offer(name, self.scenario, action, default):
+            return
+        scenario = self.scenario
+
+        def answered(accepted):
+            try:
+                text = self.remember.answer(name, scenario, action, accepted)
+                if text:
+                    self.logline("ok", text)
+                    from travel_mode.config import load_config
+                    from travel_mode.paths import config_path
+
+                    self.config = load_config(config_path())
+            except Exception as exc:  # noqa: BLE001 - UI boundary logs and explicitly presents every failure
+                self.logline("bad", setup.failure(exc))
+
+        self.push_screen(ConfirmRemember(self.remember.prompt(name, scenario, action)), answered)
+
     async def act_app(self, i, action, btn):
         row = self.app_rows.get(i)
         if not row or row["done"]:
@@ -201,6 +228,7 @@ class AppsPage:
             action = "q"
         if action == "s":
             self.mark_row_done(i, t("impl.skipped_3", v0=name), "dim")
+            self.offer_remember(name, "skip", row["defact"])
             return
         spec = configured_daemon(name)
         if action == "q" and spec is not None:
@@ -210,6 +238,7 @@ class AppsPage:
                 self.logline("ok" if okq else "warn", msg)
             if okq:
                 self.mark_row_done(i, t("impl.quit_off_reopens_it", v0=name), expected_path=path)
+                self.offer_remember(name, "quit", row["defact"])
             return
         if action == "q" and row["kill"]:
             okk = await self.busy(btn, self.execute, ForceQuitApp(path))
@@ -217,6 +246,7 @@ class AppsPage:
                 self.save()
                 self.mark_row_done(i, t("impl.force_quit_2", v0=name), "red", expected_path=path)
                 self.logline("ok", t("impl.force_quit", v0=name))
+                self.offer_remember(name, "quit", row["defact"])
             else:
                 self.logline("bad", t("impl.force_quitting_failed", v0=name))
             return
@@ -226,6 +256,7 @@ class AppsPage:
                 self.save()
                 self.mark_row_done(i, t("impl.quit_off_reopens_it", v0=name), expected_path=path)
                 self.logline("ok", t("impl.quit_off_reopens_it_2", v0=name))
+                self.offer_remember(name, "quit", row["defact"])
             else:
                 row["kill"] = True
                 btn.label = t("impl.force_quit_3")
@@ -236,7 +267,7 @@ class AppsPage:
                     else t("impl.has_not_quit_possible_unsaved_dialog_2", v0=name)
                 )
                 row["label"].update(f"[red]{escape(message)}[/]")
-                if not list(self.query(f"#btn-{i}-r")):
+                if not list(self.main_query(f"#btn-{i}-r")):
                     retry = Button(t("failure.retry_quit"), id=f"btn-{i}-r", classes="btn")
                     await row["label"].parent.mount(retry)
                     row["btns"] += (retry,)
@@ -277,5 +308,6 @@ class AppsPage:
                     i, t("impl.frozen_processes_off_resumes_them", v0=name, v1=n), expected_path=path
                 )
                 self.logline("ok", t("impl.frozen_processes_stopped_off_resumes_them", v0=name, v1=n))
+                self.offer_remember(name, "freeze", row["defact"])
             else:
                 self.logline("warn", t("impl.freezing_failed", v0=name))

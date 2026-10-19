@@ -63,13 +63,17 @@ class TravelApp(
 
     CSS_PATH = str(Path(__file__).with_name("style.tcss"))
 
-    def __init__(self, dry_run=False, *, scenario=None, measure=None):
+    def __init__(self, dry_run=False, *, scenario=None, measure=None, first_run=False):
         super().__init__()
         self._init_lifecycle()
         self._recomposing = False
         self._pending_logs = []
         self._pending_progress = None
         self._dry_run = dry_run
+        self._setup_first_run = first_run
+        from travel_mode.flows.setup import Remember
+
+        self.remember = Remember()
         self.measure_enabled = measure
         import threading
 
@@ -214,6 +218,13 @@ class TravelApp(
             self._disabled_buttons.setdefault(button, button.disabled)
             button.disabled = True
 
+    def main_query_one(self, selector, expect_type=None):
+        # Read workers update the mounted main screen even while a modal is open.
+        return self.screen_stack[0].query_one(selector, expect_type)
+
+    def main_query(self, selector=None):
+        return self.screen_stack[0].query(selector)
+
     def display_state(self):
         from travel_mode.state import state_snapshot
 
@@ -225,12 +236,12 @@ class TravelApp(
             self._pending_logs.append((kind, msg))
             return
         mark = {"ok": "[green]✔[/]", "warn": "[yellow]▲[/]", "bad": "[red]✘[/]", "dim": "[dim]○[/]"}[kind]
-        self.query_one("#log", RichLog).write(f"{mark} {escape(msg)}")
+        self.main_query_one("#log", RichLog).write(f"{mark} {escape(msg)}")
 
     def update_measurement_progress(self, message):
         self._pending_progress = message
         if not self._recomposing:
-            self.query_one("#measurement-progress", Static).update(escape(message))
+            self.main_query_one("#measurement-progress", Static).update(escape(message))
 
     async def recompose(self):
         self._recomposing = True
@@ -461,7 +472,7 @@ class TravelApp(
                     message = t("health.legacy_failed", reason=str(exc))
 
                     async def failed():
-                        box = self.query_one(selector)
+                        box = self.main_query_one(selector)
                         await box.remove_children()
                         await box.mount(Static(escape(message)))
 
@@ -509,7 +520,7 @@ class TravelApp(
                         and generation == self._refresh_generation
                         and not self._interface_closing
                     ):
-                        self.query_one("#dash-audit", Static).update("\n".join(lines))
+                        self.main_query_one("#dash-audit", Static).update("\n".join(lines))
 
             try:
                 from travel_mode.system.processes import power_top
@@ -554,7 +565,7 @@ class TravelApp(
                 and not self._interface_closing
             ):
                 message = t("measurement.failed", reason=str(exc))
-                self.query_one("#dash-battery", Static).update(escape(message))
+                self.main_query_one("#dash-battery", Static).update(escape(message))
                 self.logline("warn", message)
             return
         if (
@@ -565,7 +576,7 @@ class TravelApp(
             self._observed_external |= reading.get("reason") in {"external_power", "charging"}
             if not self._mutation_lock.locked():
                 self.flush_session_observations()
-            self.query_one("#dash-battery", Static).update(battery.describe(reading))
+            self.main_query_one("#dash-battery", Static).update(battery.describe(reading))
 
     def flush_session_observations(self):
         from travel_mode.sessions import note
@@ -583,9 +594,29 @@ class TravelApp(
         self._translate_bindings()
         self.refresh_bindings()
         if self.scenario == "ask":
-            self.query_one("#scenario-work").focus()
+            self.main_query_one("#scenario-work").focus()
             return
-        self.initialize_origin()
+        if self._setup_first_run:
+            self.open_setup(initial=True)
+        else:
+            self.initialize_origin()
+
+    def open_setup(self, *, initial=False):
+        from .setup import SetupScreen
+
+        def finished(text):
+            from travel_mode.paths import config_path
+
+            self.config = load_config(config_path())
+            self._setup_first_run = False
+            if initial:
+                self.initialize_origin()
+            else:
+                self.action_refresh()
+            if text:
+                self.logline("ok", text)
+
+        self.push_screen(SetupScreen(dry_run=self._dry_run), finished)
 
     def scenario_scope(self):
         return profile_scope(self.config, self.profile_name, scenario=self.scenario)
@@ -601,7 +632,7 @@ class TravelApp(
                 self._origin_error = str(exc)
                 from .widgets import Button
 
-                for button in self.query(Button):
+                for button in self.main_query(Button):
                     self._disable_mutation_button(button)
                 self.logline("warn", t("health.origin_failed", reason=str(exc)))
                 self.refresh_dash()
@@ -621,7 +652,10 @@ class TravelApp(
         with self.scenario_scope():
             self.profile_values = active_values()
         await self.recompose()
-        self.initialize_origin()
+        if self._setup_first_run:
+            self.open_setup(initial=True)
+        else:
+            self.initialize_origin()
 
     async def action_select_scenario(self, scenario):
         if self.scenario == "ask":
@@ -662,14 +696,14 @@ class TravelApp(
     def action_goto(self, pane: str):
         if self.scenario == "ask":
             return
-        self.query_one(TabbedContent).active = pane
+        self.main_query_one(TabbedContent).active = pane
 
     def on_tabbed_content_tab_activated(self, event):
         """1) 同步段: 若焦点仍滞留在旧 pane, 立即交给 Tabs 本体 — 否则隐藏 pane 重新获得焦点会
         触发 TabPane.Focused 把 active 弹回旧页 (新页 display 永不生效);
         2) 异步段: 等新 pane 真正显示后把焦点交给它的滚动容器 (方向键可滚页)."""
-        tb = self.query_one(TabbedContent)
-        new_pane = self.query_one(f"#{tb.active}") if tb.active else None
+        tb = self.main_query_one(TabbedContent)
+        new_pane = self.main_query_one(f"#{tb.active}") if tb.active else None
         f = self.focused
         if (
             f is not None
@@ -702,7 +736,9 @@ def tui(return_class=False, dry_run=False, measure=None):
                 super().__init__(dry_run=True)
 
         return DryRunTravelApp
-    return TravelApp(dry_run=dry_run, measure=measure).run()
+    from travel_mode.paths import config_path
+
+    return TravelApp(dry_run=dry_run, measure=measure, first_run=not config_path().exists()).run()
 
 
 def run_tui():

@@ -29,7 +29,7 @@ class ServicesPage:
     async def build_svc(self, spot):
         from travel_mode.system.launchd import service_information
 
-        box = self.query_one("#svc-box", Vertical)
+        box = self.main_query_one("#svc-box", Vertical)
         await box.remove_children()
         self.svc_btns = {}
         w = []

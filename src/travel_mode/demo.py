@@ -96,7 +96,89 @@ def _configure_demo() -> None:
     set_runner(DemoRunner())
 
 
+def setup_rows():
+    """A realistic-sized setup snapshot, grouped like the finite discovery result."""
+    from . import app_policy
+    from .categories import identify
+
+    names = (
+        "WeChat",
+        "Slack",
+        "Discord",
+        "Signal",
+        "Telegram",
+        "Spotify",
+        "Music",
+        "Photos",
+        "Preview",
+        "Calendar",
+        "Calculator",
+        "Notes",
+        "Reminders",
+        "Books",
+        "Mail",
+        "Google Drive",
+        "OneDrive",
+        "Dropbox",
+        "Box",
+        "Nextcloud",
+        "UURemote",
+        "Amphetamine",
+        "KeepingYouAwake",
+        "Google Chrome",
+        "Safari",
+        "Firefox",
+        "Visual Studio Code",
+        "Terminal",
+        "TextEdit",
+        "VLC",
+        "IINA",
+        "HandBrake",
+        "Audacity",
+        "Calibre",
+        "Anki",
+        "Zotero",
+        "Maccy",
+        "Rectangle",
+        "KeePassXC",
+    )
+    # Public CFBundleIdentifier values: model the same Apple-app exclusions as live setup.
+    apple_ids = {
+        "Music": "com.apple.Music",
+        "Photos": "com.apple.Photos",
+        "Preview": "com.apple.Preview",
+        "Calendar": "com.apple.iCal",
+        "Calculator": "com.apple.calculator",
+        "Notes": "com.apple.Notes",
+        "Reminders": "com.apple.reminders",
+        "Books": "com.apple.iBooksX",
+        "Mail": "com.apple.mail",
+        "Safari": "com.apple.Safari",
+        "TextEdit": "com.apple.TextEdit",
+    }
+    rows = [
+        dict(
+            name=name,
+            path=f"/Demo/{name}.app",
+            bundle_id=apple_ids.get(name, ""),
+            running=True,
+            **app_policy.recommend(
+                name,
+                rule=identify(name=name),
+                assertion=name in {"UURemote", "Amphetamine", "KeepingYouAwake"},
+            ),
+        )
+        for name in names
+    ]
+    return app_policy.setup_candidates(
+        sorted(rows, key=lambda row: (row["reason"], row["name"].casefold())), []
+    )
+
+
 def _configure_demo_views() -> None:
+    from . import app_policy
+
+    app_policy.discover = setup_rows
 
     apps.APP_DIRS = []
     apps.app_path = lambda name: f"/Demo/{name}.app" if name in {"Clash Party", "aTrust", "UURemote"} else ""
@@ -107,6 +189,7 @@ def _configure_demo_views() -> None:
                 "path": "/Demo/Google Drive.app",
                 "cpu": "1.2",
                 "defact": "quit",
+                "reason": "provider",
                 "category": "sync",
                 "rule_id": "google-drive",
                 "category_action": "quit",
@@ -115,7 +198,8 @@ def _configure_demo_views() -> None:
                 "name": "Docker",
                 "path": "/Demo/Docker.app",
                 "cpu": "0.8",
-                "defact": "ask",
+                "defact": "freeze",
+                "reason": "freeze",
                 "category": "vm",
                 "rule_id": "docker",
                 "category_action": "quit",

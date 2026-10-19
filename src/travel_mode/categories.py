@@ -57,10 +57,16 @@ def ignored(rule: dict, config) -> bool:
 
 
 def protected(rule: dict, config) -> bool:
-    return bool(
-        {value.casefold() for value in (*rule["apps"], rule["name"])}
-        & {value.casefold() for value in (*config.apps.skip, *config.apps.ignore)}
+    names = {value.casefold(): value for value in (*rule["apps"], rule["name"])}
+    ignored_names = {value.casefold() for value in config.apps.ignore}
+    scoped = (
+        getattr(config.apps, config.options.scenario, {})
+        if config.options.scenario in {"work", "away"}
+        else {}
     )
+    skipped = {value.casefold() for value in config.apps.skip if scoped.get(value, "skip") == "skip"}
+    skipped.update(value.casefold() for value, action in scoped.items() if action == "skip")
+    return bool(names.keys() & (ignored_names | skipped))
 
 
 def selected(rule: dict, config) -> bool:
@@ -74,7 +80,23 @@ def selected(rule: dict, config) -> bool:
 
 
 def app_action(name: str, rule: dict | None, config) -> str:
-    if name in config.apps.ignore or name in config.apps.skip:
+    explicit = config.apps.explicit(name, config.options.scenario)
+    if name in config.apps.ignore:
+        return "skip"
+    if explicit is not None:
+        return explicit
+    if config.apps.policy == "adaptive":
+        from .app_policy import recommend
+
+        if rule and (rule["action"] == "notice" or ignored(rule, config)):
+            return "skip"
+        recommendation = recommend(name, rule=rule)
+        if recommendation["reason"] == "freeze":
+            return config.apps.default
+        return recommendation[
+            config.options.scenario if config.options.scenario in {"work", "away"} else "work"
+        ]
+    if name in config.apps.skip:
         return "skip"
     if rule and protected(rule, config):
         return "skip"
@@ -140,13 +162,19 @@ def pause_categories(categories, app_rows, service_rows, execute, save, state):
             or ignored(rule, config)
             or protected(rule, config)
             or rule["action"] not in {"quit", "freeze"}
-            or row["name"] in (*config.apps.skip, *config.apps.ignore, *config.apps.ask)
+            or app_action(row["name"], rule, config) in {"skip", "ask"}
             or row["path"] in seen
             or row["path"] in (*state.get("quit_apps", []), *state.get("frozen_apps", []))
         ):
             continue
         seen.add(row["path"])
-        action = config.apps.actions.get(row["name"], rule["action"])
+        action = (
+            row["defact"]
+            if config.apps.policy == "adaptive" and "defact" in row
+            else app_action(row["name"], rule, config)
+        )
+        if action not in {"quit", "freeze"}:
+            continue
         operation = FreezeApp(row["path"]) if action == "freeze" else QuitApp(row["path"], row["name"])
         if not execute(operation):
             continue

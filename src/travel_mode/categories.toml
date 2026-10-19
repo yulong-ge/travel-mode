@@ -8,7 +8,9 @@ version = 1
 # Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/g/google-drive.rb
 # Public identity: com.google.drivefs, Google Drive
 [[rules]]
+# File Provider source: https://support.google.com/drive/answer/12178485?hl=en
 id = "google-drive"
+file_provider = true
 category = "sync"
 name = "Google Drive"
 action = "quit"
@@ -20,7 +22,9 @@ executables = []
 # Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/d/dropbox.rb
 # Public identity: com.getdropbox.dropbox, Dropbox
 [[rules]]
+# File Provider source: https://help.dropbox.com/installs/dropbox-for-macos-support
 id = "dropbox"
+file_provider = true
 category = "sync"
 name = "Dropbox"
 action = "quit"
@@ -32,7 +36,9 @@ executables = []
 # Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/o/onedrive.rb
 # Public identity: com.microsoft.OneDrive, OneDrive
 [[rules]]
+# File Provider source: https://support.microsoft.com/en-us/onedrive/save-disk-space-with-onedrive-files-on-demand-for-mac
 id = "onedrive"
+file_provider = true
 category = "sync"
 name = "OneDrive"
 action = "quit"
@@ -44,7 +50,10 @@ executables = []
 # Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/b/box-drive.rb
 # Public identity: com.box.desktop, Box
 [[rules]]
+# File Provider source: https://support.box.com/hc/en-us/articles/4407737091219
+# Supported macOS uses only FPE: https://support.box.com/hc/en-us/articles/14738950848787
 id = "box"
+file_provider = true
 category = "sync"
 name = "Box Drive"
 action = "quit"
@@ -68,6 +77,9 @@ executables = []
 # Source: https://github.com/Homebrew/homebrew-cask/blob/master/Casks/n/nextcloud.rb
 # Public identity: com.nextcloud.desktopclient, com.nextcloud.desktopclient, Nextcloud
 [[rules]]
+# File Provider is a per-account option, not inferable from this app identity.
+# File Provider configuration: https://docs.nextcloud.com/server/stable/user_manual/en/desktop/macosfileprovider.html
+# Keep the generic recommendation until an enabled domain can be identified reliably.
 id = "nextcloud"
 category = "sync"
 name = "Nextcloud"

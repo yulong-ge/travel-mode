@@ -119,8 +119,8 @@ async def test_tui_power_selection_uses_actual_key_and_override(monkeypatch):
     config = Config(power_overrides={"lowpowermode": "0"})
     monkeypatch.setattr(config_api, "load_config", lambda: config)
     app = SimpleNamespace(
-        query_one=lambda *args: Box(),
-        query=lambda *args: [],
+        main_query_one=lambda *args: Box(),
+        main_query=lambda *args: [],
         profile_values={},
         scenario="away",
         _update_power_btn=lambda: None,

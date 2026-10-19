@@ -20,6 +20,10 @@ class ProcessRunner:
 
     def __call__(self, cmd, timeout=None, interactive=False):
         self.calls.append(tuple(cmd))
+        if cmd == ["lsappinfo", "front"]:
+            return CmdResult("ASN:0x0-0x1:", "", 0)
+        if cmd[:2] == ["lsappinfo", "info"]:
+            return CmdResult("pid = 900000", "", 0)
         if cmd[0] == "ps":
             return CmdResult(
                 "\n".join(

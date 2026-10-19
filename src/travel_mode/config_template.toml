@@ -1,12 +1,14 @@
 # travel-mode 配置模板
 [apps]
-default = "ask"
+policy = "adaptive"
+setup_completed = false
+default = "freeze"
 watch = ["Google Chrome", "Slack"]
 ignore = []
-quit = ["Spotify"]
-freeze = ["WeChat"]
-skip = ["Raycast"]
-ask = ["Visual Studio Code"]
+quit = []
+freeze = []
+skip = []
+ask = []
 
 [[apps.with_daemon]]
 name = "Remote Support"
@@ -46,3 +48,15 @@ scenario = "ask"
 on_battery = "notify"
 on_ac = "notify"
 retain = 50
+
+[apps.work]
+freeze = []
+quit = []
+ask = []
+skip = []
+
+[apps.away]
+freeze = []
+quit = []
+ask = []
+skip = []

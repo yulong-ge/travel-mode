@@ -126,7 +126,7 @@ def test_cli_interface_entry_runs_scripted_prompts(
         monkeypatch.setenv("TRAVEL_MODE_INTERFACE", "cli")
     monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
-    answers = iter(["away", *["n"] * 64])
+    answers = iter(["away", *(["s"] if source == "environment" else []), *["n"] * 64])
     prompts = []
 
     def answer(prompt):
@@ -136,6 +136,7 @@ def test_cli_interface_entry_runs_scripted_prompts(
     monkeypatch.setattr("builtins.input", answer)
     assert main([*command, "--lang", language]) == 0
     assert prompts and any("[Y/n]" in prompt for prompt in prompts)
+    assert (t("setup.begin") in prompts) == (source == "environment")
     assert capsys.readouterr().out.splitlines()[0] == t("scenario.prompt")
     assert ("pmset", "-g", "custom") in fake_runner.calls
     assert not any(call[:2] == ("sudo", "pmset") for call in fake_runner.calls)
