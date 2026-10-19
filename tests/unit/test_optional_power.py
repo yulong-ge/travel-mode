@@ -91,7 +91,8 @@ def test_unavailable_sleep_switch_in_check_and_json(fake_runner, capsys):
     install_vm_outputs(fake_runner)
     assert mode_check() == 0
     output = capsys.readouterr().out
-    assert t("health.unavailable") in output and t("power.sleep_switch_reason") in output
+    assert t("health.unavailable") in output and t("health_view.capability_unavailable") in output
+    assert "SleepDisabled" not in output
     result = check_data()
     assert "audit_error" not in result
     sleep = next(row for row in result["health"]["checks"] if row["id"] == "sleep_disabled")

@@ -62,33 +62,34 @@ class PowerPage:
         await box.remove_children()
         self.pw_boxes = []
         w = []
-        from travel_mode.system.platform import map_pmset_key
 
         w.append(Label(t("power.profile_intro"), classes="hint"))
-        overrides = config_api.load_config().power_overrides
-        for key, _desc, rec in pmset.POWER_KEYS:
-            if self.scenario == "work" and key != "lowpowermode":
-                continue
-            rec = overrides.get(key, rec)
-            actual = map_pmset_key(key, supported)
-            observed = pmset.pmget(actual, "b", profs) if actual else None
-            cur = observed if observed is not None else t("power.unsupported")
-            title = f"{actual or key}: {cur} → {rec}"
-            detail = "\n".join(
-                "  "
-                + t(
-                    "power.detail_line",
-                    heading=t(f"power.heading.{part}"),
-                    detail=t(f"power.{key}.{part}"),
-                )
-                for part in ("desc", "values", "effect")
+        self.power_view = pmset.power_preview(
+            profs, scenario=self.scenario, supported=supported, config=config_api.load_config()
+        )
+        for row in self.power_view["changes"]:
+            key = row["key"]
+            title = f"{row['name']}: {row['current']} → {row['target']}"
+            heading = Checkbox(title, True, id=f"pw-{'lowpowermode' if key == 'powermode' else key}")
+            self.pw_boxes.append((key, row["target"], heading))
+            w.append(
+                Vertical(heading, Static(row["explanation"], classes="power-detail"), classes="power-item")
             )
-            if actual is None or observed is None or cur == rec:
-                heading = Label(title, classes="power-title")
-            else:
-                heading = Checkbox(title, True, id=f"pw-{key}")
-                self.pw_boxes.append((actual, rec, heading))
-            w.append(Vertical(heading, Static(detail, classes="power-detail"), classes="power-item"))
+        if self.power_view["satisfied"]:
+            w.append(
+                Label(
+                    t("preview.satisfied", names=", ".join(self.power_view["satisfied"])),
+                    classes="power-title",
+                )
+            )
+        if self.power_view["unavailable"]:
+            w.append(
+                Label(
+                    t("preview.unavailable", names=", ".join(self.power_view["unavailable"])), classes="hint"
+                )
+            )
+        for row in self.power_view["ac_changes"]:
+            w.append(Static(row["explanation"], classes="power-detail"))
         await box.mount(*w)
         self._update_power_btn()
 

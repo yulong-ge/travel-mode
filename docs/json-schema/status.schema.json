@@ -103,6 +103,32 @@
             "not charging",
             "finishing charge"
           ]
+        },
+        "system_remaining_minutes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "average_watts": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "estimate_source": {
+          "enum": [
+            null,
+            "session_telemetry"
+          ]
+        },
+        "estimate_error": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     }

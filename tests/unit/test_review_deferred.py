@@ -278,8 +278,13 @@ def test_service_cpu_query_failure_is_explicit(tmp_paths, fake_runner):
     plist.write_bytes(plistlib.dumps({"Label": "com.example.demo"}))
     fake_runner.responses[("launchctl", "list")] = CmdResult("777 0 com.example.demo\n", "", 0)
     fake_runner.responses[("ps", "-p", "777")] = CmdResult("", "denied", 2)
-    with pytest.raises(RuntimeError, match=r"ps -p 777.*exit 2.*denied"):
-        launchd.svc_scan(directories=(tmp_paths,))
+    scan = launchd.svc_scan(directories=(tmp_paths,))
+    assert scan["recognized"][0]["cpu"] == ""
+    assert "denied" in scan["recognized"][0]["cpu_error"]
+    assert any("denied" in message for message in launchd.service_information(scan))
+    from travel_mode.failures import log_path
+
+    assert "denied" in log_path().read_text()
 
 
 async def test_tui_caffeinate_failure_never_logs_success(action_ui, fake_runner):
@@ -332,6 +337,7 @@ async def test_tui_transaction_disables_mutations_across_recompose(
     app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
         await settled(app, pilot)
+        app._session_admitted = True  # This fixture isolates the transaction after explicit consent.
         task = asyncio.create_task(app.on_button_pressed(Button.Pressed(app.query_one(f"#{first}"))))
         switch = None
         try:

@@ -43,7 +43,7 @@ def test_check_lists_configured_services_and_single_power_explanation(fake_runne
     # item 4: the meaning/values/cost block is rendered once per key, not twice
     # (rich wraps long lines, so compare on whitespace-normalized output)
     normalized = " ".join(output.split())
-    assert normalized.count(t("power.sleep.desc")) == 1
+    assert normalized.count(t("preview.sleep")) == 1
 
 
 def test_check_and_tui_share_one_service_renderer(fake_runner, tmp_path):

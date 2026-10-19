@@ -24,26 +24,17 @@ def test_blockers_lines_explains_daemon_match_and_lists_all_holders(monkeypatch)
     monkeypatch.setattr(
         pmset,
         "configured_sleep_blocking_assertions",
-        lambda: [
-            {
-                "type": "PreventSystemSleep",
-                "named": "Remote Support",
-                "process": "daemon",
-                "line": "x",
-                "daemon_app": True,
-            },
-            {
-                "type": "PreventUserIdleSystemSleep",
-                "named": "Other",
-                "process": "other",
-                "line": "y",
-                "daemon_app": False,
-            },
-        ],
+        lambda: sleep_blocking_assertions(
+            [
+                'pid 42(Remote Support): PreventSystemSleep named: "Remote Support"',
+                'pid 43(Other): PreventUserIdleSystemSleep named: "other"',
+            ],
+            [type("Spec", (), {"name": "Remote Support"})()],
+        ),
     )
     monkeypatch.setattr(pmset, "audio_assertion", lambda: "")
 
     lines = flow_check.blockers_lines()
     messages = [message for _, message in lines]
-    assert any("该 app 由守护拉活，需走退出流程" in message for message in messages)
+    assert any("Remote Support" in message and "系统睡眠" in message for message in messages)
     assert any("Other" in message for message in messages)

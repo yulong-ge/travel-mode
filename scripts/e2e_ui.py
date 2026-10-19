@@ -326,15 +326,13 @@ def answers(scenario="away", *, battery_measure=False):
         "n",
     )
     profiles = pmset.pmset_custom()
-    recommendations = pmset.power_recommendations()
-    if scenario == "work":
-        recommendations = [r for r in recommendations if r[0] in {"lowpowermode", "powermode"}]
-    for k, desc, rec in recommendations:
+    for row in pmset.power_preview(profiles, scenario=scenario)["changes"]:
+        k, desc, rec = row["key"], row["name"], row["target"]
         prompt = t(
             "impl.set_current_recommended",
             v0=k,
             v1=rec,
-            v2=profiles.get("b", {}).get(k, "(unset)"),
+            v2=row["current"],
             v3=rec,
             v4=desc,
         )

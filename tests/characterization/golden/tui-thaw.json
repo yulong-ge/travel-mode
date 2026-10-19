@@ -2,11 +2,6 @@
   "active": "p-apps",
   "commands": [
     [
-      "pmset",
-      "-g",
-      "assertions"
-    ],
-    [
       "ioreg",
       "-rn",
       "AppleSmartBattery"
@@ -28,13 +23,8 @@
     ],
     [
       "kill",
-      "-STOP",
-      "910004"
-    ],
-    [
-      "ps",
-      "-axo",
-      "pid=,ppid=,stat=,lstart=,comm="
+      "-CONT",
+      "910002"
     ]
   ],
   "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
@@ -42,21 +32,21 @@
   "labels": [
     "Default actions come from config.toml",
     "Choose app actions for each scenario.",
-    "Other configured items",
+    "Other apps and services",
     "Quit Demo [dim]CPU 1.0% · default quit[/]",
-    "[green]✔ Ask Demo frozen (1 processes; off resumes them)[/]",
-    "Freeze Demo [dim]CPU 1.0% · default freeze · [cyan]❄ Frozen[/][/]",
+    "Ask Demo [dim]CPU 1.0% · default ask[/]",
+    "[cyan]○ Freeze Demo thawed (off will no longer restore it)[/]",
     "○ Skip Demo [dim](Skip)[/]",
     "○ Remote Demo [dim](Skip)[/]"
   ],
   "log": [
     [
       "dim",
-      "Executing: Freeze"
+      "Executing: Thaw"
     ],
     [
       "ok",
-      "Ask Demo frozen (1 processes stopped; off resumes them with CONT)"
+      "Freeze Demo thawed"
     ]
   ],
   "output": "",
@@ -67,24 +57,8 @@
     "batt_prof": "",
     "brightness": "",
     "bt_off": "",
-    "frozen_apps": [
-      "<ROOT>/Applications/Freeze Demo.app",
-      "<ROOT>/Applications/Ask Demo.app"
-    ],
-    "frozen_pids": [
-      {
-        "command": "<ROOT>/Applications/Freeze Demo.app/Contents/MacOS/Freeze Demo",
-        "path": "<ROOT>/Applications/Freeze Demo.app",
-        "pid": 910002,
-        "started": "Thu Oct 15 12:00:00 2026"
-      },
-      {
-        "command": "<ROOT>/Applications/Ask Demo.app/Contents/MacOS/Ask Demo",
-        "path": "<ROOT>/Applications/Ask Demo.app",
-        "pid": 910004,
-        "started": "Thu Oct 15 12:00:00 2026"
-      }
-    ],
+    "frozen_apps": [],
+    "frozen_pids": [],
     "pending_commands": [],
     "power_origin": {
       "ac_prof": "lowpowermode 0 sleep 0 displaysleep 0 powernap 1 tcpkeepalive 1 womp 1 standby 1 hibernatemode 3 ttyskeepawake 1 disksleep 10 networkoversleep 0",
@@ -94,7 +68,6 @@
     "profile": "",
     "quit_apps": [],
     "saved_at": "<TIME>",
-    "scenario": "away",
     "session": {
       "actions": {
         "attempted": 1,

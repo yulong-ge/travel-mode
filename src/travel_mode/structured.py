@@ -25,9 +25,9 @@ def read_command(command: list[str], timeout=30) -> str:
 
 def check_data() -> dict:
     report = collect()
-    from .health_view import display_checks
+    from .health_view import presentation
 
-    report["display_checks"] = display_checks(report)
+    report["display_checks"] = presentation(report, scenario=load_config().options.scenario)
     try:
         result = _audit_data()
     except ReadError as exc:

@@ -83,11 +83,14 @@ class QuitResult:
     stdout: str = ""
     stderr: str = ""
     command: list = field(default_factory=list)
+    helpers_remaining: bool = False
 
     def __bool__(self):
         return self.exited
 
     def explanation(self, name):
+        if self.helpers_remaining:
+            return t("failure.quit_helpers", name=name)
         if self.status == "not_running" and not self.exited:
             return t("failure.quit_disagrees", name=name)
         return t("failure.quit_" + self.status, name=name)
@@ -132,14 +135,28 @@ def _grace_quit(path, name):
             if re.search(r"\(-600\)", detail)
             else "error"
         )
-        return QuitResult(status, not app_running(path), result.rc, result.stdout, result.stderr, command)
+        if status not in {"refused", "timeout"}:
+            return QuitResult(status, not app_running(path), result.rc, result.stdout, result.stderr, command)
     if is_dry_run():
         return QuitResult("exited", True, command=command)
-    for _ in range(20):
-        if not app_running(path):
-            return QuitResult("exited", True, command=command)
-        time.sleep(0.5)
-    return QuitResult("timeout", False, result.rc, result.stdout, result.stderr, command)
+    # Apple Events can be cancelled while an Electron app is already cleaning up.
+    # Share the same finite ten-second verification window for all quit outcomes.
+    main_exited = False
+    for step in range(21):
+        main_exited = not app_running(path)
+        if main_exited and not bundle_alive(path):
+            return QuitResult("exited", True, result.rc, result.stdout, result.stderr, command)
+        if step < 20:
+            time.sleep(0.5)
+    return QuitResult(
+        "exited" if main_exited else "timeout" if status == "exited" else status,
+        main_exited,
+        result.rc,
+        result.stdout,
+        result.stderr,
+        command,
+        helpers_remaining=main_exited,
+    )
 
 
 def force_kill(path):

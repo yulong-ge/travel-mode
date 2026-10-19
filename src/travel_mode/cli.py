@@ -74,6 +74,8 @@ def _main(argv=None):
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--report", action="store_true")
     parser.add_argument("--yes", "-y", action="store_true")
+    parser.add_argument("--continue-session", action="store_true", help=t("conflict.continue_help"))
+    parser.add_argument("--verbose", action="store_true", help=t("health.verbose_help"))
     interface_flags = parser.add_mutually_exclusive_group()
     interface_flags.add_argument("--no-tui", dest="interface", action="store_const", const="cli")
     interface_flags.add_argument("--tui", dest="interface", action="store_const", const="tui")
@@ -398,7 +400,7 @@ def _main(argv=None):
 
             print(json.dumps(check_data(), ensure_ascii=False))
             return int(bool(reapply_failed))
-        return mode_check() or int(bool(reapply_failed))
+        return (mode_check(verbose=True) if args.verbose else mode_check()) or int(bool(reapply_failed))
     if args.cmd == "report" or args.report:
         if args.dry_run:
             from .actions.runtime import _prepare_dry_run
@@ -444,14 +446,22 @@ def _main(argv=None):
         with profile_scope(config, args.profile, aggressive=args.aggressive, scenario=scenario):
             if args.yes or args.interface == "cli":
                 return mode_apply(
-                    yes=args.yes, aggressive=args.aggressive, dry_run=args.dry_run, measure=args.measure
+                    yes=args.yes,
+                    aggressive=args.aggressive,
+                    dry_run=args.dry_run,
+                    measure=args.measure,
+                    continue_session=args.continue_session,
                 )
             if not sys.stdin.isatty() or not sys.stdout.isatty():
                 print(t("impl.non_interactive_terminal_running_check_use"), file=sys.stderr)
                 return mode_check()
             if interface == "cli":
                 return mode_apply(
-                    yes=False, aggressive=args.aggressive, dry_run=args.dry_run, measure=args.measure
+                    yes=False,
+                    aggressive=args.aggressive,
+                    dry_run=args.dry_run,
+                    measure=args.measure,
+                    continue_session=args.continue_session,
                 )
             if args.dry_run:
                 from .actions.runtime import _prepare_dry_run
@@ -542,7 +552,9 @@ def _handled_main(argv=None):
             if isinstance(exc, CommandError)
             else []
         )
-        row = failures.record(None, " ".join(arguments[:2]), str(exc), commands)
+        row = getattr(exc, "travel_failure", None) or failures.record(
+            None, " ".join(arguments[:2]), str(exc), commands
+        )
         print(failures.message(row), file=sys.stderr)
         return 1
     except (ConfigError, StateError) as exc:

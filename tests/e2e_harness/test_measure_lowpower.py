@@ -162,7 +162,7 @@ def test_active_snapshot_refuses_before_system_commands(tmp_path):
     target = tmp_path / "active.json"
     target.write_text('{"version": 1}')
     machine = Machine()
-    with pytest.raises(experiment.ExperimentError, match=r"快照|snapshot"):
+    with pytest.raises(experiment.ExperimentError, match=r"恢复记录|recovery record"):
         experiment.run_experiment(tmp_path / "evidence", runner=machine, state_path=target)
     assert machine.calls == []
 

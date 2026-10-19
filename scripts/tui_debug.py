@@ -618,7 +618,7 @@ def run_group(output: Path, cols: int, rows: int, language: str, args, results: 
         session.wait_started()
         if read_layout(session.root / "layout.json")["active"] == "scenario":
             session.keys("w")
-        session.wait_text("SleepDisabled")
+        session.wait_complete()
         if args.wait_text:
             session.wait_text(args.wait_text)
         if args.keys:

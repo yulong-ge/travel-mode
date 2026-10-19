@@ -117,7 +117,14 @@ class Executor:
             )
             recovered = (
                 [r for r in commands if r["rc"] and r["command"][:1] == ["osascript"]]
-                if ok and not hasattr(result, "exited")
+                if ok
+                and not hasattr(result, "exited")
+                and any(
+                    not row["rc"]
+                    and [p for p in row["command"] if p not in {"sudo", "-n"}][:2]
+                    in (["kill", "-TERM"], ["kill", "-KILL"])
+                    for row in commands
+                )
                 else []
             )
             # An exhausted quit strategy is one failed action with both causes.
@@ -141,12 +148,14 @@ class Executor:
             failures.result(ok, label)
             for _ in range(extra_steps):
                 failures.result(True, label)
-            if ok and (getattr(result, "forced", False) or recovered):
+            if ok and (
+                getattr(result, "forced", False) or getattr(result, "helpers_remaining", False) or recovered
+            ):
                 from pathlib import Path
 
                 warning = (
                     result.explanation(getattr(action, "name", ""))
-                    if getattr(result, "forced", False)
+                    if getattr(result, "forced", False) or getattr(result, "helpers_remaining", False)
                     else t(
                         "failure.forced_refused"
                         if "(-128)" in recovered[-1]["stderr"] + recovered[-1]["stdout"]
@@ -169,7 +178,16 @@ class Executor:
                             rc=bad["rc"],
                             detail=bad["stderr"] or bad["stdout"],
                         )
-                row = failures.record(ctx.state, label, reason, commands, target=target)
+                if type(action).__name__ == "UnloadAgent":
+                    from pathlib import Path
+
+                    reason = t(
+                        "services.unload_failed", name=Path(target).stem, reason=" ".join(reason.split())
+                    )
+                quit_status = getattr(getattr(result, "normal", result), "status", None)
+                row = failures.record(
+                    ctx.state, label, reason, commands, target=target, quit_status=quit_status
+                )
                 if ctx.state is not None:
                     (ctx.save or save_state)(ctx.state)
                 failures.notify("bad", failures.message(row))

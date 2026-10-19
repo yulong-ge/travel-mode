@@ -455,9 +455,27 @@
                       "minimum": 0
                     }
                   }
+                },
+                "quit_status": {
+                  "enum": [
+                    "refused",
+                    "timeout",
+                    "not_running",
+                    "error"
+                  ]
                 }
               }
             }
+          },
+          "appended_scenarios": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "work",
+                "away"
+              ]
+            },
+            "uniqueItems": true
           }
         },
         "additionalProperties": false

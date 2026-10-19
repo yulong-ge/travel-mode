@@ -25,13 +25,13 @@ async def test_restore_report_and_history_share_scrollable_view(
         await click_after_layout(pilot, "#b-off")
         await app.wait_for_idle()
         text = str(app.screen.query_one("#session-text", Static).content)
-        assert t("session.heading", scenario="work") in text
+        assert t("session.heading", scenario=t("scenario.work")) in text
         assert not state._path().exists() and len(sessions.read_history()) == 1
         await pilot.press("escape")
         await app.screen.wait_for_refresh()
         calls = list(fake_runner.calls)
         await click_after_layout(pilot, "#b-history")
-        assert t("session.heading", scenario="work") in str(
+        assert t("session.heading", scenario=t("scenario.work")) in str(
             app.screen.query_one("#session-text", Static).content
         )
         assert fake_runner.calls == calls
@@ -48,7 +48,8 @@ async def test_overview_has_one_status_health_region_and_one_sleep_fact(fake_run
         assert len(app.query("#overview-health.card")) == 1
         assert not app.query("#dash-status.card") and not app.query("#dash-health.card")
         text = "\n".join(str(w.content) for w in app.query("#overview-health Static"))
-        assert text.count("SleepDisabled=1") == 1
+        assert text.count(t("health_view.sleep_disabled_hit")) == 1
+        assert "SleepDisabled=1" not in text
 
 
 @pytest.mark.parametrize("scenario", ["work", "away"])

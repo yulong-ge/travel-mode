@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 import shutil
 
 from travel_mode import config as config_api
@@ -75,7 +74,7 @@ def ask_qf(prompt, default_act, yes=False, *, aggressive=False):
 
 
 @runtime._sudo_lifecycle
-def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
+def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None, continue_session=False):
     runtime._prepare_dry_run(dry_run)
     from ..profiles import active_values
 
@@ -102,24 +101,26 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
         mark = {"ok": "[green]✓[/]", "warn": "[yellow]![/]", "bad": "[red]✗[/]", "dim": "[dim]·[/]"}[kind]
         c.print(f"{mark} {msg}")
 
+    from ..session_conflict import choose_cli
+
     st, merged = snapshots.snapshot_origin()
+    if merged:
+        if not choose_cli(st, config.options.scenario, yes=yes, continue_session=continue_session, emit=emit):
+            runtime._finish_dry_run()
+            return 1
+        if snapshots.load_state() is None:  # Explicit restoration completed.
+            st, merged = snapshots.snapshot_origin()
     from .. import measurement
 
     before = measurement.begin(
         config.options.scenario, measure, config.measurement, lambda msg: emit("dim", escape(msg))
     )
-    if config.options.scenario != "ask":
+    if not merged and config.options.scenario != "ask":
         st["scenario"] = config.options.scenario
     from ..actions.journal import mutation_scope
     from ..failures import batch, reporter
 
     with mutation_scope(st), reporter(emit), batch(emit):
-        if merged:
-            age = snapshots.anchor_age_hours(st)
-            age_s = t("impl.hours_ago", v0=age) if age is not None else ""
-            emit("warn", t("impl.existing_snapshot_keeping_original_values_and", v0=age_s))
-            if age is not None and age > 24:
-                emit("warn", t("impl.old_snapshot_off_rolls_back_to"))
         if system_apps.ensure_conf() and not yes:
             emit("dim", t("impl.created_default_action_configuration_editable", v0=common.CONF_PATH))
 
@@ -141,7 +142,7 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
                 else:
                     emit("warn", t("impl.keeping_sleep_disabled"))
             else:
-                emit("ok", "SleepDisabled=0")
+                emit("ok", t("health_view.sleep_disabled_clear"))
             for target in processes.caffeinate_procs():
                 emit("warn", t("impl.caffeinate_prevents_sleep_2", v0=target.describe()))
                 if ask(
@@ -157,7 +158,16 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
                         t("impl.terminated") if terminated_rc == 0 else t("failure.incomplete"),
                     )
             rows = pmset.configured_sleep_blocking_assertions()
-            if rows:
+            from ..health_view import assertion_context, assertion_text
+            from ..system.health import SYSTEM_OWNERS
+
+            for holder in rows:
+                if holder["pid"] and holder["scope"] == "idle" and holder["process"] not in SYSTEM_OWNERS:
+                    emit(
+                        "dim",
+                        assertion_text(holder, scenario=config.options.scenario, **assertion_context(st)),
+                    )
+            if any(r["pid"] and r["scope"] == "system" and r["process"] not in SYSTEM_OWNERS for r in rows):
                 emit("warn", t("impl.system_sleep_blocking_assertions_found"))
                 if ask(t("impl.quit_the_configured_daemon_app"), yes=yes):
                     _, okq, msg = execute(QuitConfiguredDaemons(st))
@@ -176,12 +186,15 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
             emit("dim", t("power.battery_unavailable"))
         chg = []
         power_applied = False
-        for key, desc, rec in pmset.power_recommendations(profs):
-            cur = pmset.pmget(key, "b", profs) or "(unset)"
-            if cur == rec:
-                emit("ok", t("impl.is_already", v0=key, v1=cur, v2=desc))
-                continue
-            if ask(t("impl.set_current_recommended", v0=key, v1=rec, v2=cur, v3=rec, v4=desc), yes=yes):
+        preview = pmset.power_preview(profs, scenario=config.options.scenario)
+        if preview["satisfied"]:
+            emit("dim", t("preview.satisfied", names=", ".join(preview["satisfied"])))
+        for row in preview["changes"]:
+            key, rec, cur = row["key"], row["target"], row["current"]
+            emit("dim", row["explanation"])
+            if ask(
+                t("impl.set_current_recommended", v0=key, v1=rec, v2=cur, v3=rec, v4=row["name"]), yes=yes
+            ):
                 chg += [key, rec]
         if (
             not work
@@ -255,12 +268,17 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
         ac_available = all(key in profs.get("a", {}) for key in ("powernap", "womp"))
         if not work and not ac_available:
             emit("dim", t("power.ac_unavailable"))
+        if not work:
+            for row in preview["ac_changes"]:
+                emit("dim", row["explanation"])
         if (
             not work
             and ac_available
+            and preview["ac_changes"]
             and ask(t("impl.reduce_ac_activity_too_disable_powernap"), default="n", yes=yes)
         ):
-            _, rc = execute(SetPowerProfile(["powernap", "0", "womp", "0"], "-c"))
+            values = [part for row in preview["ac_changes"] for part in (row["key"], row["target"])]
+            _, rc = execute(SetPowerProfile(values, "-c"))
             ac_applied = rc == 0
             emit(
                 "ok" if rc == 0 else "warn",
@@ -275,6 +293,8 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
             emit("ok", t("impl.no_listed_high_energy_apps_are"))
         for app in scan["running"]:
             name, path = app["name"], app["path"]
+            if path in st.get("frozen_apps", []):
+                continue
             cpu = app["cpu"] or "?"
             if app["defact"] == "skip":
                 emit("dim", t("impl.keeping_skip", v0=name))
@@ -297,7 +317,7 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
                 )
                 result = execute(QuitApp(path, name, fallback=fallback))
                 if result:
-                    if not getattr(result, "forced", False):
+                    if not (getattr(result, "forced", False) or getattr(result, "helpers_remaining", False)):
                         emit("ok", t("impl.quit", v0=name))
                     state_api.save_state(st)
                     if not yes:
@@ -388,7 +408,7 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
                     continue
                 result = execute(QuitApp(p, name, fallback=True))
                 if result:
-                    if not getattr(result, "forced", False):
+                    if not (getattr(result, "forced", False) or getattr(result, "helpers_remaining", False)):
                         emit("ok", t("impl.quit", v0=name))
                     state_api.save_state(st)
                 else:
@@ -437,9 +457,14 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None):
 
         if not work:
             c.rule(t("impl.final_assertion_audit"))
-            for line in pmset.pmset_assertions():
-                if re.search(r"PreventUserIdle(System|Display)Sleep.*named", line):
-                    c.print(f"  {line.strip()}", highlight=False)
+            from ..health_view import assertion_context, assertion_text
+
+            for holder in pmset.sleep_blocking_assertions():
+                if holder["pid"] and holder["process"] not in SYSTEM_OWNERS:
+                    emit(
+                        "dim" if holder["scope"] == "idle" else "warn",
+                        assertion_text(holder, scenario=config.options.scenario, **assertion_context(st)),
+                    )
             sd = pmset.sleep_disabled()
             emit(
                 "dim" if sd is None else "ok" if sd != "1" else "bad",

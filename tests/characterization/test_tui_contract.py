@@ -8,7 +8,6 @@ not obscure the complete ordered command trace of the admitted action.
 import pytest
 from textual.widgets import Checkbox, TabbedContent
 
-import travel_mode.flows.check as flow_check
 import travel_mode.snapshots as snapshots
 from travel_mode import state
 from travel_mode.tui.app import tui
@@ -19,7 +18,7 @@ from .conftest import artifact, assert_golden
 CASES = [
     ("fixsleep", "1", "b-fixsleep"),
     ("caffeinate", "1", "b-killcaff-919999"),
-    ("daemon", "1", "b-quituu"),
+    ("daemon", "1", "b-health-assertions-0"),
     ("spotlight", "1", "b-spot"),
     ("power", "2", "b-power"),
     ("quit", "3", "btn-0-q"),
@@ -44,17 +43,6 @@ CASES = [
 
 @pytest.mark.parametrize("case,page,button", CASES, ids=[item[0] for item in CASES])
 async def test_tui_action_contract(case, page, button, machine, monkeypatch, capsys):
-    if case == "daemon":
-        # The existing UI exposes this button only for a diagnostic containing
-        # the literal legacy label. Exercise that reachable display branch too.
-        original = flow_check.blockers_lines
-
-        def with_daemon():
-            lines = original()
-            lines.append(("warn", "daemon app Remote Demo"))
-            return lines
-
-        monkeypatch.setattr(flow_check, "blockers_lines", with_daemon)
     if case in {"off", "thaw"}:
         snapshot, _ = snapshots.snapshot_origin()
         snapshot["wifi_off"] = "en0" if case == "off" else ""
@@ -77,6 +65,12 @@ async def test_tui_action_contract(case, page, button, machine, monkeypatch, cap
     app = tui(return_class=True)(scenario="away")
     async with app.run_test(size=(140, 55)) as pilot:
         await app.wait_for_idle()
+        if case == "thaw":
+            # Consent is covered by test_real_use_tui; this contract isolates
+            # the existing session's thaw Action rather than the new decision.
+            app._session_admitted = True
+            index = next(i for i, row in app.app_rows.items() if row["name"] == "Freeze Demo")
+            button = f"btn-{index}-f"
         await pilot.pause()
         await pilot.press(page)
         await pilot.pause()

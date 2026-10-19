@@ -6,7 +6,7 @@
   "labels": [
     "Default actions come from config.toml",
     "Choose app actions for each scenario.",
-    "Other configured items",
+    "Other apps and services",
     "Quit Demo [dim]CPU 1.0% · default quit[/]",
     "Ask Demo [dim]CPU 1.0% · default ask[/]",
     "[dim]○ Freeze Demo skipped[/]",

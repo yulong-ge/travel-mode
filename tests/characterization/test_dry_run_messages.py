@@ -21,9 +21,9 @@ def test_cli_dry_run_freeze_count_and_projected_power_are_plans(language, machin
         "将冻结 Freeze Demo（1 个进程）" if language == "zh" else "Would freeze Freeze Demo (1 processes)"
     ) in output
     assert (
-        "计划 battery profile: lowpowermode 1"
+        "计划用电池时的设置: lowpowermode 1"
         if language == "zh"
-        else "Planned battery profile: lowpowermode 1"
+        else "Planned battery power settings: lowpowermode 1"
     ) in output
     assert ("将卸载 org.demo.worker" if language == "zh" else "Would unload org.demo.worker") in output
     assert ("将退出 Quit Demo" if language == "zh" else "Would quit Quit Demo") in output

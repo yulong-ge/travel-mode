@@ -395,11 +395,27 @@ def collect(config=None, *, clock=None):
             row.update(status="unavailable", evidence=[str(exc)], actions=[])
         except ObservationError as exc:
             row.update(status="unknown", error=str(exc))
+            from ..failures import record
+
+            record(None, row["title"], str(exc), kind="observation", store=False)
         row["elapsed_seconds"] = round(clock() - started, 4)
         checks.append(row)
-    return dict(
+    result = dict(
         checks=checks,
         elapsed_seconds=round(clock() - s.started, 4),
         budget_seconds=BUDGET,
         limitations=[t("health.omitted"), t("health.cpu_method")],
     )
+    from ..health_view import assertion_context
+    from ..state import load_state
+
+    raw_source = s.cache.get(("pmset", "-g", "ps"))
+    external = None
+    if isinstance(raw_source, str):
+        external = True if "AC Power" in raw_source else False if "Battery Power" in raw_source else None
+    snapshot = load_state()
+    context = assertion_context(snapshot, external=external)
+    if context:
+        context["scenario"] = snapshot.get("scenario") or None
+        result["assertion_context"] = context
+    return result

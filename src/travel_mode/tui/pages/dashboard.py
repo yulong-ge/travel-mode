@@ -29,7 +29,7 @@ from travel_mode.presentation import action_message as t
 from travel_mode.system import apps as system_apps
 from travel_mode.system import launchd, pmset, spotlight
 from travel_mode.system import network as system_network
-from travel_mode.tui.widgets import Button, _ellip, status_row
+from travel_mode.tui.widgets import Button, status_row
 
 
 class DashboardPage:
@@ -104,42 +104,36 @@ class DashboardPage:
         from travel_mode.flows.doctor import action_label
 
         box = self.main_query_one("#dash-health", Vertical)
-        widgets = [
-            Static(t("health.timing", seconds=report["elapsed_seconds"], budget=report["budget_seconds"]))
-        ]
-        from travel_mode.health_view import display_checks
+        widgets = []
+        from travel_mode.health_view import presentation
 
         self.health_report = report
-        for row in display_checks(report):
-            if row["id"] == "sleep_disabled" and row["status"] in {"hit", "clear"}:
-                continue
-            if row["id"] == "keep_awake":
-                import re
+        import re
+        from copy import deepcopy
 
-                shown = getattr(self, "caffeinate_targets", {})
+        view_report = deepcopy(report)
+        for row in view_report["checks"]:
+            if row["id"] == "keep_awake":
                 row["evidence"] = [
                     line
                     for line in row["evidence"]
-                    if not any(re.search(rf"\bPID {pid}\b", line) for pid in shown)
+                    if not any(re.search(rf"\bPID {pid}\b", line) for pid in self.caffeinate_targets)
                 ]
                 row["actions"] = [
-                    d for d in row["actions"] if d["kind"] != "caffeinate" or d["process"]["pid"] not in shown
+                    d
+                    for d in row["actions"]
+                    if d["kind"] != "caffeinate" or d["process"]["pid"] not in self.caffeinate_targets
                 ]
-                if row["status"] == "hit" and not row["evidence"] and not row["actions"]:
-                    continue
-            widgets.append(Static(escape(f"{row['title']}: {t('health.' + row['status'])}")))
-            if row["error"]:
-                widgets.append(Static(escape(row["error"]), classes="health-detail"))
-            for reference in row["references"]:
-                widgets.append(Static(t("health.see", title=reference), classes="health-detail"))
-            for evidence in row["evidence"]:
-                widgets.append(Static(escape(evidence), classes="health-detail"))
-            if row["status"] == "hit":
-                for line in [row["impact"], row["manual"]]:
-                    widgets.append(Static(escape(line), classes="health-detail"))
-            for i, descriptor in enumerate(row["actions"]):
-                button = Button(action_label(descriptor), id=f"b-health-{row['id']}-{i}")
-                # Store the observation on the widget. A recomposed page cannot retarget a queued click.
+        self.health_rows = presentation(view_report, scenario=self.scenario)
+        for row in self.health_rows:
+            if row["id"] == "keep_awake" and row["status"] == "hit" and not row["evidence"]:
+                continue
+            widgets.append(Static(escape(row["summary"])))
+            if row["action_hint"]:
+                widgets.append(Static(escape(row["action_hint"]), classes="health-detail"))
+            for i, descriptor in enumerate(row["display_actions"]):
+                bid = "b-fixsleep" if descriptor["kind"] == "sleep" else f"b-health-{row['id']}-{i}"
+                button = Button(action_label(descriptor), id=bid)
                 button.health_descriptor = descriptor
                 widgets.append(Horizontal(Static("", classes="grow"), button, classes="health-action"))
             if (
@@ -154,7 +148,6 @@ class DashboardPage:
                         classes="health-action",
                     )
                 )
-        widgets.extend(Static(escape(line), classes="health-detail") for line in report["limitations"])
         await box.remove_children()
         await box.mount(*widgets)
 
@@ -179,48 +172,18 @@ class DashboardPage:
         box = self._dash_status
         await box.remove_children()
         source = t("impl.ac_power") if ac else t("impl.battery_power")
-        battery = escape(batt or t("impl.battery_status_unknown"))
+        import re
+
+        percent = re.search(r"(\d+)%", batt or "")
+        battery = (percent[1] + "%") if percent else t("impl.battery_status_unknown")
         w = [status_row(f"[dim]{battery} · {source}[/]", compact=True)]
         napps = len(self.scan["running"])
         nsvc = len(self.svc["unloadable"])
         self.caffeinate_targets = {target.process.pid: target for target in blocks.caffeinate_targets}
-        caff_messages = {
-            t("impl.caffeinate_prevents_sleep", v0=target.describe()): target
-            for target in self.caffeinate_targets.values()
-        }
-        for kind, msg in blocks:
-            if "SleepDisabled=1" in msg:
-                w.append(
-                    status_row(
-                        "SleepDisabled=1 · " + t("health.sleep_disabled.impact"),
-                        icon="[red]✘[/]",
-                        button=Button(t("impl.fix"), id="b-fixsleep", classes="btn"),
-                    )
-                )
-            elif msg in caff_messages:
-                w.append(
-                    status_row(
-                        t("health.keep_awake.title") + ": " + escape(msg),
-                        icon="[yellow]▲[/]",
-                        button=Button(
-                            t("impl.terminate"),
-                            id=f"b-killcaff-{caff_messages[msg].process.pid}",
-                            classes="btn",
-                        ),
-                    )
-                )
-            elif "daemon app" in msg and kind == "warn":
-                w.append(
-                    status_row(
-                        escape(msg),
-                        icon="[yellow]▲[/]",
-                        button=Button(t("impl.quit_2"), id="b-quituu", classes="btn"),
-                    )
-                )
-            elif t("impl.audio") in msg and kind != "ok":
-                w.append(status_row(escape(msg), icon="[yellow]▲[/]", compact=True))
-            elif "SleepDisabled" in msg and kind == "ok":
-                w.append(status_row(escape(msg), icon="[green]✔[/]", compact=True))
+        for target in self.caffeinate_targets.values():
+            button = Button(t("impl.terminate"), id=f"b-killcaff-{target.process.pid}", classes="btn")
+            button.caffeinate_target = target
+            w.append(status_row(t("health_view.caffeinate"), icon="[yellow]▲[/]", button=button))
         apps = (
             t("impl.high_energy_apps_running", v0=napps, v1="" if napps else t("impl.none"))
             if "p-apps" in self.pages_ready
@@ -281,10 +244,11 @@ class DashboardPage:
                 )
             if scope["power"]:
                 self.tlog("dim", t("impl.applying_recommended_power_settings"))
-                chg = []
-                recommendations = pmset.power_recommendations()
-                for k, _, rec in recommendations:
-                    chg += [k, rec]
+                preview = pmset.power_preview(pmset.pmset_custom(), scenario=self.scenario)
+                recommendations = preview["changes"]
+                chg = [part for row in recommendations for part in (row["key"], row["target"])]
+                if preview["satisfied"]:
+                    self.tlog("dim", t("preview.satisfied", names=", ".join(preview["satisfied"])))
                 if chg:
                     _, rc = self.execute(SetPowerProfile([*chg]))
                 else:
@@ -335,7 +299,10 @@ class DashboardPage:
                         if result:
                             self.save()
                             nq += 1
-                            if not getattr(result, "forced", False):
+                            if not (
+                                getattr(result, "forced", False)
+                                or getattr(result, "helpers_remaining", False)
+                            ):
                                 self.tlog("ok", t("impl.quit", v0=name))
                         else:
                             self.tlog("warn", t("impl.did_not_quit", v0=name))
@@ -406,7 +373,10 @@ class DashboardPage:
                         result = self.execute(QuitApp(p, name, fallback=self.scenario != "work"))
                         if result:
                             self.save()
-                            if not getattr(result, "forced", False):
+                            if not (
+                                getattr(result, "forced", False)
+                                or getattr(result, "helpers_remaining", False)
+                            ):
                                 self.tlog("ok", t("impl.quit", v0=name))
                         else:
                             self.tlog("warn", t("impl.did_not_quit", v0=name))
@@ -432,15 +402,10 @@ class DashboardPage:
                 "dim" if sd is None else "bad" if sd == "1" else "ok",
                 t("power.sleep_switch_unavailable")
                 if sd is None
-                else t(
-                    "impl.final_audit_sleepdisabled",
-                    v0=sd,
-                    v1="" if sd != "1" else t("impl.still_prevents_sleep"),
-                ),
+                else t("health_view.sleep_disabled_hit" if sd == "1" else "health_view.sleep_disabled_clear"),
             )
             for kind, msg in flow_check.blockers_lines():
-                if t("impl.audio") in msg or "daemon app" in msg:
-                    self.tlog(kind, t("impl.final_audit", v0=_ellip(msg, 70)))
+                self.tlog(kind, t("impl.final_audit", v0=msg))
             self.tlog("ok", t("impl.power_saving_actions_complete_snapshot_updated"))
             measurement.finish(
                 before,

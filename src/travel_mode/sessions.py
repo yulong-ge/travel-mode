@@ -170,6 +170,8 @@ def build_report(state, restored, failed):
         away=None,
         errors=list(end["errors"]),
     )
+    if active and active.get("appended_scenarios"):
+        report["appended_scenarios"] = list(active["appended_scenarios"])
     from .failures import session_receipts
 
     receipts = session_receipts(state)
@@ -270,7 +272,7 @@ def build_report(state, restored, failed):
 
 
 def validate_active(active):
-    if not isinstance(active, dict) or set(active) != {
+    if not isinstance(active, dict) or set(active) - {"appended_scenarios"} != {
         "id",
         "started_at",
         "start",
@@ -281,6 +283,11 @@ def validate_active(active):
         "resurrected",
     }:
         raise ValueError("session: invalid fields")
+    if "appended_scenarios" in active and (
+        not isinstance(active["appended_scenarios"], list)
+        or any(s not in {"work", "away"} for s in active["appended_scenarios"])
+    ):
+        raise ValueError("session.appended_scenarios: invalid scenarios")
     if not isinstance(active["id"], str) or not active["id"] or type(active["external_seen"]) is not bool:
         raise ValueError("session: invalid identity/source")
     timestamp(active["started_at"])
@@ -362,7 +369,7 @@ def validate_report(row):
     if (
         not isinstance(row, dict)
         or not required <= row.keys()
-        or row.keys() - required - {"average_source", "failures"}
+        or row.keys() - required - {"average_source", "failures", "appended_scenarios"}
         or row["version"] != 1
     ):
         raise ValueError("report: invalid fields/version")
@@ -370,6 +377,11 @@ def validate_report(row):
         from .failures import validate
 
         validate(row["failures"])
+    if "appended_scenarios" in row and (
+        not isinstance(row["appended_scenarios"], list)
+        or any(s not in {"work", "away"} for s in row["appended_scenarios"])
+    ):
+        raise ValueError("report.appended_scenarios: invalid scenarios")
     if row.get("average_source") not in (
         None,
         "PowerTelemetryData.SystemLoad",
@@ -540,7 +552,13 @@ def finish(state, restored, failed):
 
 def describe(report, peers=()):
     unknown = t("session.unknown")
-    yield t("session.heading", scenario=report["scenario"] or unknown)
+    yield t(
+        "session.heading", scenario=t("scenario." + report["scenario"]) if report["scenario"] else unknown
+    )
+    if report.get("appended_scenarios"):
+        yield t(
+            "conflict.appended", scenarios=", ".join(t("scenario." + s) for s in report["appended_scenarios"])
+        )
     yield t(
         "session.times",
         start=report["started_at"] or unknown,

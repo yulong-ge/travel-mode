@@ -92,7 +92,17 @@ def append_log(row, error=None):
 
 
 def record(
-    state, action, reason, commands=(), *, error=None, kind="action", target="", save=None, store=True
+    state,
+    action,
+    reason,
+    commands=(),
+    *,
+    error=None,
+    kind="action",
+    target="",
+    save=None,
+    store=True,
+    quit_status=None,
 ):
     from .sessions import utc_now
 
@@ -109,6 +119,8 @@ def record(
         stderr=short(failed.get("stderr", "")),
         kind=kind,
     )
+    if quit_status is not None:
+        row["quit_status"] = quit_status
     if state and "session" in state:
         row["session_id"] = state["session"]["id"]
         row["counts"] = dict(state["session"]["actions"])
@@ -132,7 +144,7 @@ def validate(rows):
         if (
             not isinstance(row, dict)
             or not keys <= row.keys()
-            or row.keys() - keys - {"recovered", "session_id", "counts"}
+            or row.keys() - keys - {"recovered", "session_id", "counts", "quit_status"}
             or row["scenario"] not in (None, "work", "away")
             or any(
                 not isinstance(row[k], str) or len(row[k]) > 2000
@@ -154,6 +166,8 @@ def validate(rows):
         ):
             raise ValueError("action_failures: invalid counts checkpoint")
         datetime.fromisoformat(row["at"])
+        if "quit_status" in row and row["quit_status"] not in {"refused", "timeout", "not_running", "error"}:
+            raise ValueError("action_failures.quit_status: invalid quit outcome")
 
 
 def message(row):

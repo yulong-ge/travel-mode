@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import plistlib
 from pathlib import Path
+from xml.parsers.expat import ExpatError
 
 from ..actions.journal import active_state, mutation_scope, persist, record_change
 from ..config import DaemonApp
@@ -12,10 +13,19 @@ from ..presentation import action_message as t
 from .apps import app_path, bundle_alive, force_kill, grace_quit
 from .launchd import _loaded
 from .process_control import force_kill as stop_bundle
-from .shell import SudoReadError, is_dry_run, record_unknown, run_rc
+from .shell import ReadError, SudoReadError, is_dry_run, record_unknown, run_rc
 
 
 def _configured_plist(value):
+    try:
+        return _read_configured_plist(value)
+    except PermissionError:
+        raise
+    except (OSError, ValueError, ExpatError, UnicodeError, TypeError) as exc:
+        raise ReadError(t("services.configured_invalid", path=value, reason=exc)) from exc
+
+
+def _read_configured_plist(value):
     path = Path(value)
     if not path.is_absolute():
         raise ValueError(t("safety.plist_absolute", path=repr(value)))
@@ -97,6 +107,9 @@ def quit_with_daemons(spec: DaemonApp, state: dict, save=None):
     if path and bundle_alive(path):
         record_change("quit_apps", path)
         result = grace_quit(path, spec.name)
+        if result and getattr(result, "helpers_remaining", False):
+            messages.append(result.explanation(spec.name))
+            return path, ok, "; ".join(messages)
         if is_dry_run() and result:
             # A planned Quit cannot change the live process table. Do not turn
             # that unchanged observation into a failure or extra force signals.
