@@ -6,6 +6,12 @@ All notable changes follow Keep a Changelog.
 
 ### Fixed
 
+- Apps that answer quit with -128 or time out but exit shortly afterwards are counted as quit; the main process is watched for up to 10 seconds and lingering helpers no longer cause a false failure.
+- Starting a scenario while a session is active no longer merges silently: choose restore and start, continue (`--continue-session`) or cancel; `--yes` cancels.
+- Health results read as ok / needs attention / cannot check in one sentence; idle-sleep assertions are explained as not blocking lid-close sleep; technical evidence moved to `check --verbose`, JSON and the log.
+- Power previews list only settings that change, each with a plain explanation, and fold unchanged ones into one line.
+- The menu bar no longer shows macOS's fluctuating remaining-time estimate; during a session it uses the session's average power.
+- App rows in a finished state no longer offer retry or force quit.
 - An app that cancels the quit request (AppleScript -128, for example a "quit anyway?" dialog) no longer crashes the TUI with a traceback. Quit results are classified; `away` falls back to force quit and reports one warning, `work` marks the item failed and keeps retry and force-quit controls. Other actions in the batch continue, state errors stop further changes, and unexpected errors keep the TUI open with one line and a log path (`TRAVEL_MODE_DEBUG=1` keeps the traceback).
 - Report power settings a Mac does not expose (for example `SleepDisabled` on a virtual machine) as unavailable in check, JSON (`unavailable` status) and the TUI instead of failing; e2e records such capabilities as SKIP.
 - Publish e2e harness telemetry atomically with a complete schema, including on Python 3.10.

@@ -123,7 +123,8 @@ measurement script.
 When `off` finishes, it prints a report for the session: scenario, duration, battery used, average
 power, actions taken and restore results. If the Mac was on AC power during the session, the
 report says the statistics are incomplete instead of estimating. `travel-mode history` lists past
-sessions and compares them with earlier sessions of the same scenario.
+sessions and compares them with earlier sessions of the same scenario. Starting a scenario while
+a session is still active asks whether to restore it first, continue it or cancel.
 
 ### Optional event automation
 
@@ -171,7 +172,7 @@ state file and `pmset -g ps`. SwiftBar itself stays running; travel-mode adds no
 | --- | --- |
 | `travel-mode` / `on` | Choose a scenario and apply actions |
 | `off` / `restore` | Restore recorded changes and print the session report |
-| `check` / `check --json` | Read-only audit and health check |
+| `check [--verbose] [--json]` | Read-only audit and health check (`--verbose` adds technical evidence) |
 | `check --reapply` | Pause again items that started running after being paused |
 | `power [--seconds N] [--json]` | Measure average battery power |
 | `history [--limit N] [--json]` | Past session reports |
