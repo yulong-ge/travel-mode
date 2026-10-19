@@ -117,6 +117,7 @@ Apple 对低电量模式的说明只有"降低能耗"（[Apple 支持](https://s
 
 `off` 完成后会输出本次会话的报告：场景、时长、消耗的电量、平均功耗、执行的动作和恢复结果。如果期间接过电源，
 报告会注明"统计不完整"，不会估算。`travel-mode history` 可以查看以往的会话，并和同场景的历史记录比较。
+会话还没恢复时再次开始某个场景，工具会先问你：先恢复、继续这次会话，还是取消。
 
 ### 事件自动触发（可选）
 
@@ -158,7 +159,7 @@ travel-mode 不会额外留下任何进程。
 | --- | --- |
 | `travel-mode` / `on` | 选择场景并执行动作 |
 | `off` / `restore` | 恢复记录的改动，并输出会话报告 |
-| `check` / `check --json` | 只读检查与体检 |
+| `check [--verbose] [--json]` | 只读检查与体检（`--verbose` 显示技术细节） |
 | `check --reapply` | 暂停之后又自己运行起来的项目，再处理一次 |
 | `power [--seconds N] [--json]` | 测量平均电池功耗 |
 | `history [--limit N] [--json]` | 查看以往的会话报告 |
@@ -166,6 +167,7 @@ travel-mode 不会额外留下任何进程。
 | `report [--json]` | 根据系统电源日志生成睡眠与 DarkWake 报告 |
 | `suggest [--write]` | 建议可以加入配置的 app、服务和类别 |
 | `thaw [--all]` | 列出所有处于停止状态的 app 进程，确认后恢复运行 |
+| `setup [--no-tui] [--yes]` | 设置每个 app 在 `work` 和 `away` 场景下的处理方式 |
 | `profiles` | 列出所有配置档 |
 | `config path\|init\|validate\|edit` | 管理配置文件 |
 | `config set-language en\|zh`、`config set-interface cli\|tui` | 保存偏好设置 |
@@ -181,6 +183,11 @@ travel-mode 不会额外留下任何进程。
 配置文件在 `~/.config/travel-mode/config.toml`（可用 `TRAVEL_MODE_CONFIG` 指定其它路径）。运行
 `travel-mode config init` 会生成带注释的模板，完整示例见 [examples/config.toml](examples/config.toml)。
 
+第一次运行时会打开设置页（之后也可以用 `travel-mode setup` 打开），列出你的 app，并按场景给出推荐动作：普通 app
+冻结；Google Drive、OneDrive、Dropbox 和 Box 退出，因为冻结云盘文件提供程序可能让访达卡住；会让 Mac 保持唤醒的 app
+在 `away` 场景下退出，因为冻结不会释放它们的防睡断言；浏览器和编辑器每次询问。改好后查看摘要再保存。会话中你改了某个
+app 的动作，工具会问是否下次也这样处理。
+
 ```toml
 [options]
 scenario = "ask"        # ask | work | away
@@ -189,6 +196,9 @@ interface = "tui"       # tui | cli
 [apps]
 freeze = ["Slack"]      # 冻结，off 时继续运行
 quit = ["Spotify"]      # 退出，off 时重新打开
+
+[apps.away]             # 只对某个场景生效的设置
+quit = ["Slack"]
 
 [services]
 unload = ["syncthing"]  # LaunchAgent 标签、文件名或匹配模式
@@ -199,7 +209,9 @@ pause = ["sync", "backup", "updater"]
 
 ## 手动恢复
 
-如果 `off` 没能全部完成，剩下的项目会保留在状态文件里；按提示解决问题后，再运行一次 `travel-mode off`。
+某个动作失败时，工具会显示一行原因，继续执行其它动作，并把命令、退出码和报错写入
+`~/.local/state/travel-mode/travel-mode.log` 和会话报告。如果 `off` 没能全部完成，剩下的项目会保留在状态文件里；
+按提示解决问题后，再运行一次 `travel-mode off`。
 `travel-mode thaw` 会列出所有处于停止状态的 app 进程，确认后恢复运行（`--all` 不再询问）。没有状态文件时，
 `travel-mode off` 会提供一次需要确认的操作：把电源设置恢复为 macOS 默认值（`sudo pmset restoredefaults`）。
 

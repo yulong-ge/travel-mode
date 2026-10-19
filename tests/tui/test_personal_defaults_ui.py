@@ -10,6 +10,7 @@ from travel_mode.config import load_config
 from travel_mode.i18n import set_language
 from travel_mode.tui.app import TravelApp
 from travel_mode.tui.setup import ConfirmRemember, SetupApp, SetupScreen
+from tui_interaction import modal_result
 
 
 def rows():
@@ -115,13 +116,15 @@ async def test_first_run_setup_after_scenario_and_skip_not_repeated(tmp_path, mo
     monkeypatch.setattr(app_policy, "discover", rows)
     app = TravelApp(first_run=True)
     async with app.run_test(size=(120, 36)) as pilot:
-        await pilot.press("w", "enter")
-        await pilot._wait_for_screen()
-        screen = await ready(app)
-        assert not app.origin_ready
-        await press(screen, "#setup-skip", screen.completed)
-        await pilot._wait_for_screen()
+        with modal_result(monkeypatch, app, SetupScreen) as finished:
+            await pilot.press("w", "enter")
+            await pilot._wait_for_screen()
+            screen = await ready(app)
+            assert not app.origin_ready
+            await press(screen, "#setup-skip", screen.completed)
+            await asyncio.wait_for(finished, 10)
         await app.wait_for_idle()
+        assert await app.screen.wait_for_refresh()
         assert app.origin_ready and app.refresh_complete
     assert load_config().apps.setup_completed
 
@@ -130,18 +133,22 @@ async def test_first_run_setup_after_scenario_and_skip_not_repeated(tmp_path, mo
 async def test_tui_remember_once_and_background_updates_with_modal(tmp_path, monkeypatch, accepted):
     (tmp_path / "config.toml").write_text("")
     app = TravelApp(scenario="work")
-    async with app.run_test(size=(120, 36)) as pilot:
+    async with app.run_test(size=(120, 36)):
         await app.wait_for_idle()
-        app.offer_remember("Google Chrome", "freeze", "ask")
-        await pilot._wait_for_screen()
-        assert isinstance(app.screen, ConfirmRemember)
-        # A modal must not divert the open-tool read workers away from the main UI.
-        app.refresh_battery()
-        await app.wait_for_idle()
-        app.logline("ok", "fixture")
-        app.screen.query_one("#remember-yes" if accepted else "#remember-no", Button).press()
-        await pilot._wait_for_screen()
+        with modal_result(monkeypatch, app, ConfirmRemember) as answered:
+            app.offer_remember("Google Chrome", "freeze", "ask")
+            assert isinstance(app.screen, ConfirmRemember)
+            assert await app.screen.wait_for_refresh()
+            # A modal must not divert the open-tool read workers away from the main UI.
+            app.refresh_battery()
+            await app.wait_for_idle()
+            app.logline("ok", "fixture")
+            app.screen.query_one("#remember-yes" if accepted else "#remember-no", Button).press()
+            assert await asyncio.wait_for(answered, 10) is accepted
+        assert await app.screen.wait_for_refresh()
         assert not isinstance(app.screen, ConfirmRemember)
+        assert app.config.apps.work == ({"Google Chrome": "freeze"} if accepted else {})
+        assert load_config().apps.work == app.config.apps.work
         app.offer_remember("Google Chrome", "freeze", "ask")
         assert not isinstance(app.screen, ConfirmRemember)
     assert load_config().apps.work == ({"Google Chrome": "freeze"} if accepted else {})
@@ -185,11 +192,15 @@ async def test_apps_page_remembers_only_successful_changed_action(tmp_path, monk
         await app.wait_for_idle()
         from tui_plan import apply_plan
 
-        await apply_plan(pilot, names={"Google Chrome"}, action="freeze")
-        assert isinstance(app.screen, ConfirmRemember) == succeeds
-        if succeeds:
-            app.screen.query_one("#remember-yes", Button).press()
-            await pilot._wait_for_screen()
+        with modal_result(monkeypatch, app, ConfirmRemember) as answered:
+            await apply_plan(pilot, names={"Google Chrome"}, action="freeze")
+            assert isinstance(app.screen, ConfirmRemember) == succeeds
+            if succeeds:
+                app.screen.query_one("#remember-yes", Button).press()
+                assert await asyncio.wait_for(answered, 10) is True
+                assert await app.screen.wait_for_refresh()
+                assert not isinstance(app.screen, ConfirmRemember)
+                assert app.config.apps.work == {"Google Chrome": "freeze"}
         assert app.st["session"]["actions"]["succeeded"] == int(succeeds)
         assert app.st["session"]["actions"]["failed"] == int(not succeeds)
     assert load_config().apps.work == ({"Google Chrome": "freeze"} if succeeds else {})

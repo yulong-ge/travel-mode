@@ -17,6 +17,8 @@ hardware observations name the machine they were made on.
 - [Passwordless sudo](#passwordless-sudo)
 - [Restore and recovery](#restore-and-recovery)
 - [Configuration and environment](#configuration-and-environment)
+- [Failed actions and the log](#failed-actions-and-the-log)
+- [App defaults and setup](#app-defaults-and-setup)
 - [Exit codes and errors](#exit-codes-and-errors)
 
 ## Scenarios and profiles
@@ -125,6 +127,20 @@ system-sleep assertions; online external displays; Spotlight CPU activity; a run
 backup; Low Power Mode off on battery; display brightness on battery; background CPU activity.
 Each finding has a status, evidence, an impact line and either an action or manual steps.
 
+The default view shows each check as one sentence with one of three marks: ✓ ok, ▲ needs
+attention, ? cannot check (with the reason), and at most one action label (for example
+"Set to 50%"). PIDs, assertion IDs, executable paths, raw `ps`/`pmset` output and thresholds are
+shown only by `check --verbose`, in `check --json` and in the log.
+
+Sleep assertions are reported by scope. `PreventUserIdleSystemSleep` only stops idle sleep: the
+Mac stays awake while the lid is open and unused, but closing the lid still sleeps it, so in
+`away` it is a note, not a problem. `PreventSystemSleep` and a global `SleepDisabled` can keep the
+Mac awake with the lid closed. Some apps change `SleepDisabled` themselves; for example a remote
+access app with a "prevent sleep while charging" option can set it to 1 on AC power and back to 0
+on battery through its own root helper, and may undo a manual repair. The check reports how long
+an assertion has been held; it says an assertion persisted across power changes only when the
+tool itself observed both power states.
+
 - Each probe has a 2-second command deadline within a 15-second total budget. A failed probe shows
   "cannot check" with the command and reason; the others continue.
 - Spotlight counts only when the combined CPU of `mds`, `mds_stores`, `mdworker` and
@@ -227,7 +243,13 @@ byte for byte.
 
 ## Session reports and history
 
-A session starts with its first action, not when the TUI opens. Start and end each take one ioreg
+A session starts with its first action, not when the TUI opens. If a session is already active
+when a scenario is started again, the CLI and TUI ask first, before any change: restore it and
+start a new one (default), continue it (`--continue-session`; the original scenario and start time
+are kept and the report lists the appended scenario as `appended_scenarios`), or cancel. With
+`--yes` and no `--continue-session` the command cancels and points to `travel-mode off`. Times are
+stored with their time zone and shown in local time.
+ Start and end each take one ioreg
 and one pmset reading; nothing is sampled in between.
 
 - Whole-session average power comes from the system-load accumulator at start and end
@@ -290,6 +312,15 @@ separately (`brew install --cask swiftbar`) and given a plugin folder.
 - `menubar status` shows the target path, whether the plugin is installed and executable, and
   whether the installed copy matches the version bundled with the current package.
 
+The battery line does not show macOS's instantaneous estimate, which jumps with the current load.
+During an active session that has not been seen on AC power, it divides the remaining energy by
+the session's average power (from the battery's accumulated telemetry: one extra `ioreg` read,
+2-second limit) and says so ("Battery 62% · about 3 h 40 min at this session's 9.8 W"). Without a
+session, or when the data is insufficient or AC power was seen, it shows only the percentage. The
+tool runs only when invoked, so a charge while it was not running cannot be detected; the estimate
+then reflects only what it observed. `status --json` adds `average_watts`, `estimate_source`,
+`estimate_error` and `system_remaining_minutes` (macOS's own estimate, for diagnosis).
+
 The `5m` in the file name sets the refresh interval. Each refresh runs `travel-mode status --json`,
 which reads the configured language, the local state file and one `pmset -g ps` (2-second limit);
 on the tested Mac a refresh takes about 0.1 s in total. Health check, power measurement and the
@@ -351,6 +382,47 @@ disable`.
 `suggest --write` asks for confirmation, keeps comments and validates before replacing the file.
 Pressing `L` in the TUI saves `options.language`, keeping comments. JSON schemas are in
 [json-schema/](json-schema/).
+
+## Failed actions and the log
+
+An action that fails (a command exits non-zero, an app refuses to quit, a service cannot be
+unloaded) is shown on one line with the reason; the other actions in the same batch continue and
+the batch ends with a summary such as "4 succeeded, 1 failed". A state file that cannot be read or
+written stops the remaining changes, because their recovery could not be recorded. An unexpected
+internal error keeps the TUI open and shows one line with the log path; set `TRAVEL_MODE_DEBUG=1`
+to see the traceback instead.
+
+Quitting an app uses AppleScript. After the request the tool watches the app's main process for
+up to 10 seconds, also when AppleScript reported -128 or a timeout: some apps reply "cancelled"
+and then quit on their own. Helper processes that stay for a moment after the main process exits
+are mentioned but do not count as a failure. If the main process is still running at the end (for
+example while the app shows a confirmation dialog), `away` force-quits it and reports a
+warning; `work` marks the item failed and offers retry and force quit, and never force-quits on
+its own.
+
+Failures are appended as JSON lines to `travel-mode.log` next to the state file (mode 0600,
+rotated once at 1 MiB): time, scenario, action, command, exit code, reason, and stdout/stderr
+excerpts, plus the traceback for internal errors. The session state, the report printed by `off`
+and `travel-mode history` list the failed actions.
+
+## App defaults and setup
+
+`travel-mode setup` (shown automatically on the first run without a configuration file) lists
+installed and running apps with a recommended action for `work` and `away` and a one-line reason:
+
+| App | work | away |
+| --- | --- | --- |
+| Ordinary app | freeze | freeze |
+| Cloud-file provider (`file_provider = true` in categories.toml: Google Drive, OneDrive, Dropbox, Box) | quit | quit |
+| Holds a sleep assertion | freeze, with a note | quit |
+| Browser, editor, terminal | ask | ask |
+
+Protected apps (the terminal running the tool and its ancestors, the frontmost app, protected
+Apple apps) are not listed. Explicit configuration always wins over a recommendation, and
+`[apps.work]` / `[apps.away]` override the scenario-independent `[apps]` lists. Configuration
+files written before this feature have no `apps.policy` key and keep the previous built-in
+defaults (`legacy`); new files and files saved by setup use `adaptive`. Setup writes atomically,
+keeps comments, and with `--dry-run` only prints what it would write.
 
 ## Exit codes and errors
 
