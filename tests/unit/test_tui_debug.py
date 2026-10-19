@@ -177,7 +177,7 @@ def test_write_report_persists_lint_json_even_for_failed_runs(debug_modules, tmp
     import json
 
     _, debug = debug_modules
-    results = [{"screenshot": "x/dashboard.png", "issues": [{"kind": "overflow", "detail": "81 > 80"}]}]
+    results = [{"screenshot": "x/plan.png", "issues": [{"kind": "overflow", "detail": "81 > 80"}]}]
 
     report = debug.write_report(
         tmp_path, results, "live-readonly", error="TimeoutError: TUI did not show '语言'"
@@ -224,25 +224,26 @@ async def test_debug_scroll_updates_widget_coordinates(debug_modules, tmp_path, 
         await pilot.pause()
         await app.wait_for_idle()
         await pilot.pause()
-        checkbox = app.query_one("#q-power")
+        app.query_one("#sleep-ready").styles.height = 40
+        assert await app.screen.wait_for_refresh()
+        app.write_layout()
+        checkbox = app.query_one("#q-measure")
         scroll = next(parent for parent in checkbox.ancestors if isinstance(parent, VerticalScroll))
         assert scroll.max_scroll_y > 0
-        before = next(row for row in json.loads(telemetry.read_text())["widgets"] if row["id"] == "q-power")
+        before = next(row for row in json.loads(telemetry.read_text())["widgets"] if row["id"] == "q-measure")
         scroll.scroll_to(y=scroll.max_scroll_y, animate=False, immediate=True)
         await pilot.pause()
-        after = next(row for row in json.loads(telemetry.read_text())["widgets"] if row["id"] == "q-power")
+        await app.wait_layout(
+            lambda layout: (
+                next(r for r in layout["widgets"] if r["id"] == "q-measure")["region"][1] == checkbox.region.y
+            )
+        )
+        after = next(row for row in json.loads(telemetry.read_text())["widgets"] if row["id"] == "q-measure")
         assert after["region"][1] == checkbox.region.y
         assert after["region"][1] != before["region"][1]
 
 
-@pytest.mark.parametrize(
-    "page, control, panel", [("p-dash", "dash-audit", "dash-status"), ("p-net", "off-info", "net-box")]
-)
-async def test_debug_scrolled_page_bottom_is_not_blank(
-    debug_modules, tmp_path, monkeypatch, page, control, panel
-):
-    import json
-
+async def test_debug_scrolled_plan_bottom_is_not_blank(debug_modules, tmp_path, monkeypatch):
     from textual.containers import VerticalScroll
 
     from travel_mode.paths import config_path
@@ -252,23 +253,20 @@ async def test_debug_scrolled_page_bottom_is_not_blank(
     monkeypatch.setattr(system_apps, "APP_DIRS", [])
     monkeypatch.setattr(system_apps, "scan_apps", lambda: {"running": [], "nobundle": []})
     monkeypatch.setattr(launchd, "svc_scan", lambda: {"unloadable": [], "kept": []})
-    telemetry = tmp_path / "layout.json"
-    app = debug.DebugApp(telemetry, scenario="away")
+    path = tmp_path / "layout.json"
+    app = debug.DebugApp(path, scenario="away")
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
         await app.wait_for_idle()
-        app.action_goto(page)
+        app.query_one("#sleep-ready").styles.height = 35
+        assert await app.screen.wait_for_refresh()
+        target = app.query_one("#q-measure")
         await pilot.pause()
-        if page == "p-dash":
-            app.query_one(f"#{panel}").styles.height = 35
-            await pilot.pause()
-        target = app.query_one(f"#{control}")
         scroll = next(parent for parent in target.ancestors if isinstance(parent, VerticalScroll))
         scroll.scroll_to(y=scroll.max_scroll_y, animate=False, immediate=True)
-        await pilot.pause()
-        assert not app.visible_region(app.query_one(f"#{panel}")).area
+        assert await app.screen.wait_for_refresh()
+        app.write_layout()
         assert app.visible_region(target).area
-        layout = json.loads(telemetry.read_text())
+        layout = debug.read_layout(path)
         assert layout["body_visible"] and layout["content_visible"]
 
 
@@ -308,3 +306,39 @@ async def test_setup_debug_telemetry_tracks_the_only_visible_screen(debug_module
         assert layout["focused_id"] == "setup-save"
         rows = [w for w in layout["widgets"] if w["id"] and w["id"].startswith("setup-app-")]
         assert len(rows) == len(setup_rows()) >= 25
+
+
+def test_live_debug_child_receives_only_its_explicit_config_copy(debug_modules, tmp_path, monkeypatch):
+    import shlex
+
+    _, debug = debug_modules
+    source = tmp_path / "source.toml"
+    source.write_text("# fixture\n")
+    root = tmp_path / "session"
+    observed = []
+    monkeypatch.setattr(debug.Session, "tmux", lambda self, *args: observed.append(args) or "")
+    monkeypatch.setattr(debug.shutil, "which", lambda name: "/fixture/bin/uv")
+    debug.Session(root, 120, 36, "en", True, source)
+    command = shlex.split(observed[0][-1])
+    assert command[command.index("--config") + 1] == str(root / "config.toml")
+    assert str(source) not in command
+    assert (root / "config.toml").read_bytes() == source.read_bytes()
+
+
+def test_debug_capture_waits_for_requested_screen_not_previous_ready_frame(
+    debug_modules, tmp_path, monkeypatch
+):
+    _, debug = debug_modules
+    frames = iter([dict(ready=True, active="plan"), dict(ready=True, active="result")])
+    reads, pauses = [], []
+
+    def read(path):
+        reads.append(path)
+        return next(frames)
+
+    monkeypatch.setattr(debug, "read_layout", read)
+    monkeypatch.setattr(debug.time, "sleep", pauses.append)
+    session = debug.Session.__new__(debug.Session)
+    session.root, session.timeout = tmp_path, 10
+    session.wait_complete(active="result")
+    assert len(reads) == 2 and pauses == [0.1]

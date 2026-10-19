@@ -31,25 +31,27 @@ async def test_health_overview_refresh_and_executor_button(language, fake_runner
     async with app.run_test(size=(120, 36)) as pilot:
         await app.wait_for_idle()
         assert app.refresh_complete and "health" in app.pages_ready
-        text = "\n".join(str(widget.content) for widget in app.query("#dash-health Static"))
-        summary = "\n".join(str(w.content) for w in app.query("#dash-status Label"))
+        text = "\n".join(
+            str(widget.content) for widget in app.query("#sleep-ready Static, #dash-health Static")
+        )
+        summary = "\n".join(str(w.content) for w in app.query("#screen-heading"))
         assert "SleepDisabled" not in summary
-        assert text.count(t("health_view.sleep_disabled_hit")) == 1
+        assert text.count(t("redesign.sleep_disabled")) == 1
         assert "SleepDisabled=1" not in text
-        assert len(app.query("#overview-health.card")) == 1
+        assert len(app.query("#sleep-ready")) == 1
         assert t("health.unknown") in text and "travel-mode.log" in text
-        assert len(app.query("#dash-health Button")) == 4
+        assert len(app.query("#dash-health Button")) == 2
         brightness_button = app.query_one("#b-health-brightness-0")
         assert str(brightness_button.label) == t("health.action.brightness", percent=50)
         assert brightness_button.health_descriptor["value"] == 0.5
         assert "0.5" not in text and "  " not in text
-        assert all(len(row["display_actions"]) <= 1 for row in app.health_rows)
+        assert all(len(row["display_actions"]) <= 1 for row in app.plan_data["attention"])
         native_reads = fake_runner.calls.count(tuple(health.native_command("displays")))
         await click_after_layout(pilot, "#b-doctor")
         await app.wait_for_idle()
         assert app.refresh_complete
         assert fake_runner.calls.count(tuple(health.native_command("displays"))) == native_reads + 1
-        await click_after_layout(pilot, "#b-fixsleep")
+        await click_after_layout(pilot, "#ready-0")
         await app.wait_for_idle()
         assert len(admitted) == 1 and isinstance(admitted[0], EnableSleep)
         assert app.merged and not app._mutation_lock.locked()
@@ -63,8 +65,10 @@ async def test_health_language_recomposition_replaces_descriptors_without_stale_
         await app.action_toggle_language()
         await app.wait_for_idle()
         assert app.refresh_complete and not old.is_attached
-        text = "\n".join(str(widget.content) for widget in app.query("#dash-health Static"))
-        assert t("health_view.low_power_hit") in text
+        text = "\n".join(
+            str(widget.content) for widget in app.query("#sleep-ready Static, #dash-health Static")
+        )
+        assert t("health_view.low_power_hit") not in text  # Selected power row already covers it.
         await click_after_layout(pilot, "#b-doctor")
         await app.wait_for_idle()
         assert app.refresh_complete
@@ -81,12 +85,16 @@ async def test_health_survives_shared_read_failure_and_blocks_mutation(fake_runn
     async with app.run_test(size=(120, 36)) as pilot:
         await app.wait_for_idle()
         assert app.refresh_complete and not app.origin_ready and app._origin_error
+        text = "\n".join(str(w.content) for w in app.query("#sleep-ready Static, #dash-health Static"))
+        assert "travel-mode.log" in text
+        assert t("health.backup.title") not in text  # Normal checks are folded.
+        await click_after_layout(pilot, "#b-normal")
         text = "\n".join(str(w.content) for w in app.query("#dash-health Static"))
-        assert t("health.backup.title") in text and "travel-mode.log" in text
+        assert t("health.backup.title") in text
         assert t("health.unknown") in text
         await click_after_layout(pilot, "#b-doctor")
         await app.wait_for_idle()
         assert app.refresh_complete
-        assert all(button.disabled for button in app.query("#dash-health Button"))
+        assert all(button.disabled for button in app.query("#dash-health Button") if button.id != "b-normal")
         assert app.query_one("#b-quick").disabled
         assert not (tmp_paths / "state.json").exists()

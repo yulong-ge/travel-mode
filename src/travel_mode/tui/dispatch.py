@@ -4,20 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from textual.widgets import TabbedContent
-
-from travel_mode.actions.apps import (
-    QuitConfiguredDaemons,
-)
-from travel_mode.actions.network import BluetoothOff, WifiOff
-from travel_mode.actions.power import (
-    EnableSleep,
-    KillCaffeinate,
-    StopSpotlight,
-)
 from travel_mode.presentation import action_message as t
-from travel_mode.system import network as system_network
-from travel_mode.system import spotlight
 from travel_mode.system.shell import is_dry_run
 from travel_mode.tui.widgets import Button
 
@@ -73,9 +60,6 @@ class Dispatch:
                 if not self._mutation_lock.locked():
                     self.action_refresh()
                 return
-            if ev.button.id in {"b-dash-apps", "b-dash-svc"}:
-                await self._dispatch_button(ev)
-                return
             if self._mutation_lock.locked() or ev.button.disabled:
                 return
             if getattr(ev, "travel_generation", self._mutation_generation) != self._mutation_generation:
@@ -89,7 +73,12 @@ class Dispatch:
                 self.st, self.merged, self._session_admitted = disk, True, False
             if self.merged and not _path().exists():
                 raise StateError(t("impl.snapshot_deleted_externally_possibly_by_off"))
-            if self.merged and not self._session_admitted and ev.button.id != "b-off":
+            if (
+                self.merged
+                and not self._session_admitted
+                and self.view_mode != "session"
+                and ev.button.id not in {"b-off", "b-reapply"}
+            ):
                 from travel_mode.tui.conflict import SessionConflict
 
                 def answered(choice):
@@ -139,6 +128,9 @@ class Dispatch:
                             if self._dry_run or is_dry_run()
                             else t("impl.travel_mode")
                         )
+            if getattr(self, "_refresh_after_action", False):
+                self._refresh_after_action = False
+                self.action_refresh()
 
     def action_authenticator(self):
         loop = asyncio.get_running_loop()
@@ -175,104 +167,3 @@ class Dispatch:
             await self._handle_button_pressed(event)
         finally:
             self.session_decision_complete.set()
-
-    async def _dispatch_button(self, ev):
-        bid = ev.button.id or ""
-        # 焦点立即离开 pane 内控件: 焦点滞留隐藏 pane 会把 active 弹回旧页 (TabPane.Focused)
-        self.main_query_one(TabbedContent).focus()
-        if bid == "b-quick":
-            await self.act_quick(ev.button)
-        elif bid.startswith("b-health-"):
-            await self.act_health(ev.button)
-        elif bid == "b-reapply":
-            from travel_mode.resurrection import reapply
-
-            await self.busy(ev.button, reapply, self.st, self.execute, self.save)
-            self.action_refresh()
-        elif bid == "b-fixsleep":
-            _, rc = await self.in_thread(self.execute, EnableSleep())
-            self.logline("ok" if rc == 0 else "warn", "disablesleep → 0" if rc == 0 else t("impl.fix_failed"))
-            if rc == 0:
-                self.save()
-            self.action_refresh()
-        elif bid.startswith("b-killcaff-"):
-            target = ev.button.caffeinate_target
-            _, rc = await self.in_thread(self.execute, KillCaffeinate(target))
-            self.logline(
-                "ok" if rc == 0 else "bad",
-                t("impl.caffeinate_terminated") if rc == 0 else t("failure.incomplete"),
-            )
-            self.action_refresh()
-        elif bid == "b-quituu":
-            _, okq, msg = await self.in_thread(self.execute, QuitConfiguredDaemons(self.st, self.save))
-            self.logline("ok" if okq else "warn", f"daemon app: {msg}")
-            self.action_refresh()
-        elif bid == "b-dash-apps":
-            self.action_goto("p-apps")
-        elif bid == "b-dash-svc":
-            self.action_goto("p-svc")
-        elif bid == "b-power":
-            await self.act_power()
-        elif bid == "b-apps-all":
-            await self.act_apps_all(ev.button)
-        elif bid in {"b-category-sync", "b-category-updater"}:
-            categories = {"sync", "backup"} if bid == "b-category-sync" else {"updater"}
-            await self.act_category(categories, ev.button)
-        elif bid == "b-svc-all":
-            await self.act_svc_all(ev.button)
-        elif bid.startswith("btn-"):
-            _, i, a = bid.split("-")
-            await self.act_app(int(i), a, ev.button)
-        elif bid.startswith("svc-"):
-            await self.act_svc(int(bid[4:]), ev.button)
-        elif bid in ("b-spot", "b-svc-spot"):
-            if not await self.in_thread(spotlight.spotlight_on):
-                self.logline("dim", t("impl.spotlight_indexing_already_disabled_no_action"))
-                ev.button.disabled = True
-                ev.button._mutation_done = True
-                return
-            _, rc = await self.in_thread(self.execute, StopSpotlight())
-            if rc == 0:
-                self.save()
-                self.logline("ok", t("impl.spotlight_indexing_disabled_off_restores_it"))
-                ev.button.disabled = True
-                ev.button._mutation_done = True
-            else:
-                self.logline("warn", t("impl.mdutil_failed"))
-        elif bid.startswith("netretry-"):
-            index = int(bid.removeprefix("netretry-"))
-            self.net_failures.pop(self.net_paths[index][1], None)
-            await self.act_net(index, ev.button)
-        elif bid.startswith("net-"):
-            await self.act_net(int(bid[4:]), ev.button)
-        elif bid == "b-wifi":
-            dev = system_network.wifi_dev()
-            if dev and not await self.in_thread(system_network.wifi_powered, dev):
-                self.logline("dim", t("impl.wi_fi_already_disabled_no_action"))
-                ev.button.disabled = True
-                ev.button._mutation_done = True
-            elif dev:
-                _, rc = await self.in_thread(self.execute, WifiOff(dev))
-                if rc == 0:
-                    self.save()
-                    self.logline("ok", t("impl.wi_fi_disabled_off_restores_it", v0=dev))
-                    ev.button.disabled = True
-                    ev.button._mutation_done = True
-                else:
-                    self.logline("warn", t("impl.disabling_wi_fi_failed"))
-        elif bid == "b-bt":
-            if not await self.in_thread(system_network.bt_powered):
-                self.logline("dim", t("impl.bluetooth_already_disabled_no_action_needed"))
-                ev.button.disabled = True
-                ev.button._mutation_done = True
-            else:
-                _, rc = await self.in_thread(self.execute, BluetoothOff())
-                if rc == 0:
-                    self.save()
-                    self.logline("ok", t("impl.bluetooth_disabled_off_restores_it"))
-                    ev.button.disabled = True
-                    ev.button._mutation_done = True
-                else:
-                    self.logline("warn", t("impl.blueutil_failed"))
-        elif bid == "b-off":
-            await self.act_off(ev.button)

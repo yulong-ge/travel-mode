@@ -132,7 +132,7 @@ def test_status_uses_one_session_accumulator_interval(fake_runner, monkeypatch):
 
 def test_power_preview_separates_unchanged_from_changes(fake_runner):
     view = pmset.power_preview(
-        {"b": {"lowpowermode": "1", "powernap": "1"}, "a": {"powernap": "1", "womp": "0"}}, scenario="work"
+        {"b": {"lowpowermode": "1", "powernap": "0"}, "a": {"powernap": "1", "womp": "0"}}, scenario="work"
     )
     assert not view["changes"]
     assert "低电量模式" in view["satisfied"]

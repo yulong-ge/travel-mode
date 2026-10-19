@@ -12,6 +12,7 @@ from travel_mode.system import battery
 from travel_mode.system.shell import CmdResult
 from travel_mode.tui.app import TravelApp
 from tui_interaction import click_after_layout
+from tui_plan import select_plan
 
 
 async def test_battery_timer_is_30_seconds_and_energy_is_button_only(tmp_paths, fake_runner, monkeypatch):
@@ -39,7 +40,7 @@ async def test_battery_timer_is_30_seconds_and_energy_is_button_only(tmp_paths, 
         return original(seconds, callback, **kwargs)
 
     monkeypatch.setattr(app, "set_interval", set_interval)
-    async with app.run_test(size=(120, 45)) as pilot:
+    async with app.run_test(size=(120, 45)):
         await app.wait_for_idle()
         assert app.refresh_complete
         assert observed["seconds"] == 30
@@ -50,7 +51,7 @@ async def test_battery_timer_is_30_seconds_and_energy_is_button_only(tmp_paths, 
         await app.wait_for_idle()
         assert fake_runner.calls == [tuple(battery.COMMAND)]
         assert len(parsed) == 1
-        await click_after_layout(pilot, "#b-energy")
+        await app.utility_action("b-energy")
         await app.wait_for_idle()
         assert sum(call[0] == "top" for call in fake_runner.calls) == 1
     assert observed["timer"].stopped
@@ -84,8 +85,8 @@ async def test_tui_work_comparison_uses_fake_clock_and_persists(tmp_paths, fake_
     async with app.run_test(size=(140, 55)) as pilot:
         await app.wait_for_idle()
         assert app.refresh_complete
-        for checkbox in app.query("#p-dash Checkbox"):
-            checkbox.value = checkbox.id in {"q-power", "q-measure"}
+        await select_plan(app, ids={r["id"] for r in app.plan_items if r["descriptor"]["kind"] == "power"})
+        app.query_one("#q-measure", Checkbox).value = True
         assert app.query_one("#q-measure", Checkbox).value
         await click_after_layout(pilot, "#b-quick")
         await app.wait_for_idle()
@@ -114,8 +115,8 @@ async def test_insufficient_fresh_updates_do_not_stop_tui_actions_or_fabricate_s
     app = TravelApp(scenario="work")
     async with app.run_test(size=(140, 55)) as pilot:
         await app.wait_for_idle()
-        for checkbox in app.query("#p-dash Checkbox"):
-            checkbox.value = checkbox.id in {"q-power", "q-measure"}
+        await select_plan(app, ids={r["id"] for r in app.plan_items if r["descriptor"]["kind"] == "power"})
+        app.query_one("#q-measure", Checkbox).value = True
         await click_after_layout(pilot, "#b-quick")
         await app.wait_for_idle()
         saved = state.load_state()
@@ -167,8 +168,8 @@ async def test_measurement_read_failure_keeps_tui_action_and_report_available(
     app = TravelApp(scenario="work")
     async with app.run_test(size=(140, 55)) as pilot:
         await app.wait_for_idle()
-        for checkbox in app.query("#p-dash Checkbox"):
-            checkbox.value = checkbox.id in {"q-power", "q-measure"}
+        await select_plan(app, ids={r["id"] for r in app.plan_items if r["descriptor"]["kind"] == "power"})
+        app.query_one("#q-measure", Checkbox).value = True
         await click_after_layout(pilot, "#b-quick")
         await app.wait_for_idle()
         assert any(c[:3] == ("sudo", "pmset", "-b") for c in fake_runner.calls)

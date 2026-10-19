@@ -76,7 +76,7 @@ def test_public_files_have_no_personal_identifiers():
     for directory, children, files in os.walk(ROOT):
         children[:] = [name for name in children if name not in excluded and not name.endswith(".egg-info")]
         for name in files:
-            if name == ".coverage":
+            if name == ".git" or name == ".coverage":
                 continue
             path = Path(directory) / name
             payload = path.read_bytes().lower()
@@ -111,3 +111,26 @@ def test_locales_name_no_specific_apps():
             if word in content:
                 offenders.append(f"{path.name}: {word}")
     assert offenders == []
+
+
+def test_worktree_git_file_is_excluded_without_reading_it(tmp_path, monkeypatch):
+    (tmp_path / ".git").write_text("gitdir: /fixture/private-worktree")
+    (tmp_path / "public.txt").write_text("Public fixture")
+    monkeypatch.setattr(__import__(__name__, fromlist=["ROOT"]), "ROOT", tmp_path)
+    read = Path.read_bytes
+
+    def checked_read(path):
+        assert path.name != ".git", "Git metadata must not be read by the public-file scanner"
+        return read(path)
+
+    monkeypatch.setattr(Path, "read_bytes", checked_read)
+    test_public_files_have_no_personal_identifiers()
+
+
+def test_privacy_scan_still_checks_other_hidden_files(tmp_path, monkeypatch):
+    import pytest
+
+    (tmp_path / ".private-note").write_bytes(base64.b64decode(PRIVATE_PATTERNS[0]))
+    monkeypatch.setattr(__import__(__name__, fromlist=["ROOT"]), "ROOT", tmp_path)
+    with pytest.raises(AssertionError, match="private-note"):
+        test_public_files_have_no_personal_identifiers()

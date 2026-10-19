@@ -49,17 +49,11 @@ def test_tui_dry_run_quit_freeze_and_unload_messages_are_plans(language, machine
         app.logline = log
         async with app.run_test(size=(140, 55)) as pilot:
             await app.wait_for_idle()
-            await pilot.press("3")
-            await pilot.pause()
-            freeze_row = next(index for index, row in app.app_rows.items() if row["name"] == "Freeze Demo")
-            await pilot.click(f"#btn-{freeze_row}-f")
-            await pilot.pause()
-            await pilot.click("#btn-0-q")
-            await pilot.pause()
-            await pilot.press("4")
-            await pilot.pause()
-            await pilot.click("#svc-0")
-            await pilot.pause()
+            from tui_plan import apply_plan
+
+            await apply_plan(pilot, names={"Freeze Demo"}, action="freeze")
+            await apply_plan(pilot, names={"Quit Demo"}, action="quit")
+            await apply_plan(pilot, group="services")
 
     command_lifecycle(["--dry-run"], lambda argv: asyncio.run(interact()))
     joined = "\n".join(logs)

@@ -185,22 +185,11 @@ def test_battery_plan_contains_read_only_power_commands_and_quick_selection(caps
     assert "saving >= 1.0 W" in output and "while :; do :; done" in output
     assert "240 s timeout" in output and "up to 48 polls" in output
     assert "sudo -n" not in output and "pmset -b" not in output
-    assert '"q-power": false' in output
-    assert QUICK_SELECTION == {
-        "q-measure": True,
-        "q-power": False,
-        "q-apps": True,
-        "q-svc": True,
-        "q-sync": False,
-        "q-updater": False,
-        "q-spot": False,
-        "q-net": False,
-    }
+    assert '"power": false' in output
+    assert QUICK_SELECTION == {"apps": True, "services": True, "power": False, "network": False}
 
 
 async def test_battery_tui_round_trip_uses_measured_fixture_only_quick_action(battery_sandbox):
-    from textual.widgets import Checkbox
-
     from travel_mode.tui.app import TravelApp
     from tui_interaction import click_after_layout
 
@@ -211,15 +200,15 @@ async def test_battery_tui_round_trip_uses_measured_fixture_only_quick_action(ba
     app = TravelApp(scenario="work")
     async with app.run_test(size=(160, 55)) as pilot:
         await app.wait_for_idle()
-        app.query_one("#q-power", Checkbox).value = False
-        await app.wait_for_idle()
-        for widget, value in QUICK_SELECTION.items():
-            assert app.query_one("#" + widget, Checkbox).value is value
+        from e2e_battery import select_fixture_plan
+
+        select_fixture_plan(app, measure=True)
+        await app.render_plan()
+        assert not any(r["selected"] for r in app.plan_items if r["group"] == "power")
         await click_after_layout(pilot, "#b-quick")
         await app.wait_for_idle()
         harness.assert_on()
-        await pilot.press("5")
-        await app.wait_for_idle()
+        await click_after_layout(pilot, "#b-complete")
         await click_after_layout(pilot, "#b-off")
         await app.wait_for_idle()
         harness.assert_off()

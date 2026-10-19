@@ -3,8 +3,8 @@
 Power saving is off
 On power · Fully charged
 ---
-Enter unplugged work | sfimage=leaf bash="/fixture/travel-mode" param1="--scenario" param2="work" terminal=true refresh=true
-Enter away / overnight | sfimage=moon bash="/fixture/travel-mode" param1="--scenario" param2="away" terminal=true refresh=true
+On the go | sfimage=leaf bash="/fixture/travel-mode" param1="--scenario" param2="work" terminal=true refresh=true
+Overnight & flight | sfimage=moon bash="/fixture/travel-mode" param1="--scenario" param2="away" terminal=true refresh=true
 ---
 Health check | sfimage=stethoscope bash="/fixture/travel-mode" param1="check" terminal=true refresh=true
 Measure power | sfimage=bolt bash="/fixture/travel-mode" param1="power" terminal=true refresh=true

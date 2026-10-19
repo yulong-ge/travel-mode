@@ -14,16 +14,15 @@ from travel_mode.system.shell import _read
 
 MIN_SAVING_WATTS = 1.0
 WARMUP_SECONDS = 5
-QUICK_SELECTION = {
-    "q-measure": True,
-    "q-power": False,
-    "q-apps": True,
-    "q-svc": True,
-    "q-sync": False,
-    "q-updater": False,
-    "q-spot": False,
-    "q-net": False,
-}
+QUICK_SELECTION = {"apps": True, "services": True, "power": False, "network": False}
+
+
+def select_fixture_plan(app, *, measure):
+    """Select the same owned-fixture actions in the canonical plan, never power."""
+    for row in app.plan_items:
+        row["selected"] = row["state"] == "planned" and row["descriptor"]["kind"] in {"app", "agent"}
+    app.main_query_one("#q-measure").value = measure
+    app.update_primary()
 
 
 def require_battery():
@@ -186,7 +185,7 @@ def print_plan():
                 if any(f"/TravelModeE2E-{name}.app/" in executable for name in ("Freeze", "Burn")):
                     guard(["kill", "-STOP", str(pid)])
             guard(["launchctl", "unload", str(guard.plist)])
-    print("Off: uv run travel-mode off --lang en; TUI: Network/Restore -> off.")
+    print("Off: uv run travel-mode off --lang en; TUI: Result -> Done -> Restore all (off).")
     for pid, (_, executable) in guard.owned.items():
         if any(f"/TravelModeE2E-{name}.app/" in executable for name in ("Freeze", "Burn")):
             guard(["kill", "-CONT", str(pid)])

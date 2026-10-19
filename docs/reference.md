@@ -27,17 +27,26 @@ for the fields it sets and defaults to away unless it sets `scenario = "work"`. 
 `--scenario` that conflicts with the profile's scenario is an error. `options.scenario = "ask"`
 (the default) shows the scenario picker.
 
-**work** enables battery Low Power Mode, selects the configured categories, unloads configured
-user LaunchAgents and applies explicit app quit/freeze settings. Display and system sleep timers,
-`hibernatemode`, AC settings, Wi-Fi, Bluetooth and brightness are unchanged; a profile can set a
-brightness target between 0 and 1. Work power recommendations ignore sleep, display-sleep and
-hibernation overrides. Spotlight indexing is optional and needs a selection or confirmation. The
-Power and Network pages still offer manual actions.
+The identifiers stay `work` and `away`; the TUI and messages call them **On the go** and
+**Overnight / flight**.
 
-**away** uses the sleep-oriented recommendations and can change battery settings, AC
-`powernap`/`womp`, global `disablesleep`, apps, launchd services, indexing, Wi-Fi, Bluetooth and
-brightness. `flight` also requests network disconnection, `hibernatemode 25`, lower brightness and
-stopped indexing.
+**work (On the go)** enables battery Low Power Mode, turns off Power Nap and wake for network
+access (`womp`) on battery and on AC power, selects the configured categories, unloads configured
+user LaunchAgents and applies app actions (freeze by default, see "App defaults and setup").
+Sleep and display-sleep timers, `hibernatemode`, Wi-Fi, Bluetooth and brightness are unchanged;
+brightness is an unselected option and a profile can set a target between 0 and 1. Power Nap and
+`womp` only act while the Mac sleeps, so applying them with the lid open does not affect work.
+Spotlight indexing is optional.
+
+**away (Overnight / flight)** also shortens the battery sleep and display-sleep timers, quits apps
+instead of freezing them, and offers `hibernatemode 25` ("deeper sleep") and Wi-Fi/Bluetooth off
+as unselected options with the warning that Find My may not locate the Mac. The `flight` profile
+selects deeper sleep, a 2-minute display sleep, Spotlight indexing off and 15% brightness, and
+keeps Wi-Fi and Bluetooth on.
+
+Neither scenario turns off `tcpkeepalive`; the plan shows it as a fixed line because Find My needs
+it. The plan lists only settings that change; settings already at the target are summarised per
+power source ("Already set on battery: …").
 
 A snapshot records the last applied scenario while keeping the first original values for recovery.
 
@@ -101,6 +110,12 @@ is never used, and a missing system tool is an error. Optional third-party tools
 `brightness`) are found on `PATH`; `check` shows the resolved paths (`tool_paths` in JSON).
 
 ## Health check
+
+The TUI shows a sleep-readiness block first: ✓ when closing the lid will sleep the Mac, ✗ when
+`SleepDisabled` is 1 or an app holds a system-sleep assertion (with the likely app and a repair
+button), ▲ for idle-sleep assertions. `status --json` reports it as `sleep_ready`, and the menu bar
+shows a warning icon while a ✗ item is present. Findings that a selected plan row already handles
+(for example Low Power Mode off when the plan turns it on) are not repeated.
 
 The health section in `check`, `check --json` (`health`) and the TUI overview runs once when the
 command or overview opens and on refresh. No timer or background process is involved.

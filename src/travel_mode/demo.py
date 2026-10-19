@@ -17,7 +17,7 @@ def _configure_demo() -> None:
     from .system.shell import CmdResult, set_runner
 
     fixture = Path(__file__).parent.parent.parent / "tests" / "fixtures"
-    demo_root = Path(tempfile.mkdtemp(prefix="travel-mode-demo-"))
+    demo_root = Path(tempfile.mkdtemp(prefix="travel-mode-demo-", dir="/tmp"))
     demo_state = demo_root / "state.json"
     demo_config = demo_root / "config.toml"
     demo_config.write_text(
@@ -182,32 +182,34 @@ def _configure_demo_views() -> None:
 
     apps.APP_DIRS = []
     apps.app_path = lambda name: f"/Demo/{name}.app" if name in {"Clash Party", "aTrust", "UURemote"} else ""
-    apps.scan_apps = lambda: {
-        "running": [
-            {
-                "name": "Google Drive",
-                "path": "/Demo/Google Drive.app",
-                "cpu": "1.2",
-                "defact": "quit",
-                "reason": "provider",
-                "category": "sync",
-                "rule_id": "google-drive",
-                "category_action": "quit",
-            },
-            {
-                "name": "Docker",
-                "path": "/Demo/Docker.app",
-                "cpu": "0.8",
-                "defact": "freeze",
-                "reason": "freeze",
-                "category": "vm",
-                "rule_id": "docker",
-                "category_action": "quit",
-            },
-            {"name": "Demo Editor", "path": "/Demo/Demo Editor.app", "cpu": "0.5", "defact": "ask"},
-        ],
-        "nobundle": [],
-    }
+
+    def scan():
+        from .config import load_config
+
+        scenario = load_config().options.scenario
+        data = [
+            dict(
+                name=row["name"],
+                path=row["path"],
+                cpu="0.5",
+                defact=row[scenario if scenario in {"work", "away"} else "work"],
+                reason=row["reason"],
+            )
+            for row in setup_rows()
+        ]
+        data.insert(
+            2,
+            dict(
+                name="Quit Refusal Demo",
+                path="/Demo/Quit Refusal Demo.app",
+                cpu="0.4",
+                defact="quit",
+                reason="provider",
+            ),
+        )
+        return dict(running=data, nobundle=["Unmatched Demo 1", "Unmatched Demo 2"])
+
+    apps.scan_apps = scan
     launchd.svc_scan = lambda config=None: {
         "unloadable": [
             {

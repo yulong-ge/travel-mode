@@ -1,20 +1,177 @@
 {
-  "active": "p-dash",
+  "active": "plan",
   "commands": [],
   "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
   "exit_code": null,
-  "labels": [
-    "",
-    "[dim]87% · 电池供电[/]",
-    "[yellow]▲[/]",
-    "caffeinate 正在保持唤醒，可结束这次防睡任务。",
-    "",
-    "高耗电应用: [b]5[/] 个运行中",
-    "",
-    "后台服务: [b]1[/] 个可卸载"
-  ],
   "log": [],
   "output": "",
   "refresh_requests": [],
+  "rows": [
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "低电量模式",
+      "operations": [
+        "select"
+      ],
+      "selected": true,
+      "state": "planned"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "空闲睡眠",
+      "operations": [
+        "select"
+      ],
+      "selected": true,
+      "state": "planned"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "关闭显示器",
+      "operations": [
+        "select"
+      ],
+      "selected": true,
+      "state": "planned"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Power Nap（接电时）",
+      "operations": [
+        "select"
+      ],
+      "selected": true,
+      "state": "planned"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "网络唤醒（接电时）",
+      "operations": [
+        "select"
+      ],
+      "selected": true,
+      "state": "planned"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "更深的休眠",
+      "operations": [
+        "select"
+      ],
+      "selected": false,
+      "state": "planned"
+    },
+    {
+      "action": "quit",
+      "group": "apps",
+      "name": "Quit Demo",
+      "operations": [
+        "select",
+        "cycle"
+      ],
+      "selected": true,
+      "state": "planned"
+    },
+    {
+      "action": "freeze",
+      "group": "apps",
+      "name": "Freeze Demo",
+      "operations": [
+        "select",
+        "cycle"
+      ],
+      "selected": true,
+      "state": "planned"
+    },
+    {
+      "action": "ask",
+      "group": "apps",
+      "name": "Ask Demo",
+      "operations": [
+        "select",
+        "cycle"
+      ],
+      "selected": false,
+      "state": "planned"
+    },
+    {
+      "action": "quit",
+      "group": "network",
+      "name": "Network Demo",
+      "operations": [
+        "select",
+        "cycle"
+      ],
+      "selected": false,
+      "state": "planned"
+    },
+    {
+      "action": "quit",
+      "group": "network",
+      "name": "Remote Demo",
+      "operations": [
+        "select",
+        "cycle"
+      ],
+      "selected": false,
+      "state": "planned"
+    },
+    {
+      "action": "pause",
+      "group": "services",
+      "name": "org.demo.worker",
+      "operations": [
+        "select"
+      ],
+      "selected": true,
+      "state": "planned"
+    },
+    {
+      "action": "off_action",
+      "group": "network",
+      "name": "Wi-Fi",
+      "operations": [
+        "select"
+      ],
+      "selected": false,
+      "state": "planned"
+    },
+    {
+      "action": "off_action",
+      "group": "network",
+      "name": "Bluetooth",
+      "operations": [
+        "select"
+      ],
+      "selected": false,
+      "state": "planned"
+    },
+    {
+      "action": "pause",
+      "group": "services",
+      "name": "Spotlight",
+      "operations": [
+        "select"
+      ],
+      "selected": false,
+      "state": "planned"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "屏幕亮度",
+      "operations": [
+        "select"
+      ],
+      "selected": false,
+      "state": "planned"
+    }
+  ],
   "state": null
 }

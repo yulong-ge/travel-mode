@@ -1,11 +1,6 @@
 {
-  "active": "p-svc",
+  "active": "result",
   "commands": [
-    [
-      "mdutil",
-      "-s",
-      "/"
-    ],
     [
       "ioreg",
       "-rn",
@@ -35,25 +30,150 @@
   ],
   "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
   "exit_code": null,
-  "labels": [
-    "launchd is macOS's service manager for background agents. Unloaded LaunchAgents are restored by off",
-    "Other apps and services",
-    "org.demo.worker [dim]pid -[/]",
-    "Time Machine: unavailable",
-    "Managed by macOS; never unload it. Adjust it with tmutil or System Settings."
-  ],
   "log": [
     [
       "dim",
-      "Executing: Stop Spotlight indexing"
+      "Executing: Start saving power (1)"
     ],
     [
       "ok",
-      "Spotlight indexing disabled (off restores it)"
+      "Spotlight: Completed"
     ]
   ],
   "output": "",
-  "refresh_requests": [],
+  "refresh_requests": [
+    "refresh"
+  ],
+  "rows": [
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Low Power Mode",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Idle sleep",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Display sleep",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Power Nap (On power)",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Network wake (On power)",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Deeper sleep",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "quit",
+      "group": "apps",
+      "name": "Quit Demo",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "freeze",
+      "group": "apps",
+      "name": "Freeze Demo",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "ask",
+      "group": "apps",
+      "name": "Ask Demo",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "quit",
+      "group": "network",
+      "name": "Network Demo",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "quit",
+      "group": "network",
+      "name": "Remote Demo",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "pause",
+      "group": "services",
+      "name": "org.demo.worker",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "off_action",
+      "group": "network",
+      "name": "Wi-Fi",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "off_action",
+      "group": "network",
+      "name": "Bluetooth",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "pause",
+      "group": "services",
+      "name": "Spotlight",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Screen brightness",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    }
+  ],
   "state": {
     "ac_prof": "",
     "anchored_at": "<TIME>",

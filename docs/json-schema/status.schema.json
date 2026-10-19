@@ -15,7 +15,8 @@
     "swiftbar",
     "app_version",
     "duration_minutes",
-    "battery"
+    "battery",
+    "sleep_ready"
   ],
   "properties": {
     "version": {
@@ -125,6 +126,61 @@
           ]
         },
         "estimate_error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "sleep_ready": {
+      "type": "object",
+      "required": [
+        "state",
+        "ready",
+        "items",
+        "observed_at",
+        "assertions_observed_at"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "ready",
+            "idle",
+            "blocked",
+            "unknown"
+          ]
+        },
+        "ready": {
+          "type": "boolean"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "level",
+              "message"
+            ],
+            "properties": {
+              "level": {
+                "enum": [
+                  "red",
+                  "amber",
+                  "green",
+                  "unknown"
+                ]
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "observed_at": {
+          "type": "string"
+        },
+        "assertions_observed_at": {
           "type": [
             "string",
             "null"

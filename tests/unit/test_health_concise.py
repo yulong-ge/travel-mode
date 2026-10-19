@@ -91,11 +91,11 @@ def test_unavailable_capability_keys_only_appear_in_verbose(language):
 
 
 @pytest.mark.parametrize("language", ["en", "zh"])
-def test_unverified_caffeinate_has_one_manual_action_label(language):
+def test_unverified_caffeinate_has_one_manual_advice_sentence(language):
     set_language(language)
     raw = report(finding("keep_awake", evidence=["PID 42: /usr/bin/caffeinate; PPID 1: launchd"]))
     plain = list(doctor.lines(raw, scenario="away"))
-    assert len(plain) == 2 and plain[1].strip() == t("health.hint.caffeinate")
+    assert len(plain) == 1 and plain[0].endswith(t("health.advice.caffeinate"))
     assert "PID" not in "\n".join(plain)
 
 
@@ -159,3 +159,22 @@ def test_every_default_item_has_only_conclusion_and_one_action(language, key, st
     view = health_view.presentation(report(row))[0]
     assert len(view["display_actions"]) <= 1
     assert view["actions"] == row["actions"]
+
+
+@pytest.mark.parametrize("language", ["en", "zh"])
+@pytest.mark.parametrize("key", ["displays", "backup", "keep_awake", "high_cpu", "brightness"])
+def test_manual_advice_is_second_sentence_without_a_separate_label(language, key):
+    set_language(language)
+    evidence = ["brightness=0.87; threshold=0.7"] if key == "brightness" else []
+    raw = report(finding(key, evidence=evidence))
+    lines = list(doctor.lines(raw, scenario="away"))
+    assert len(lines) == 1
+    assert " · " not in lines[0]
+    assert not lines[0].endswith(t("health.hint." + key))
+    if key == "displays":
+        expected = (
+            "▲ 外接显示器已连接，会增加耗电。不用时可以断开。"
+            if language == "zh"
+            else "▲ External display connected; this increases energy use. Disconnect it when not needed."
+        )
+        assert lines[0] == expected

@@ -1,5 +1,5 @@
 {
-  "active": "p-dash",
+  "active": "plan",
   "commands": [
     [
       "ioreg",
@@ -29,29 +29,186 @@
   ],
   "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
   "exit_code": null,
-  "labels": [
-    "",
-    "[dim]87% · Battery power[/]",
-    "[yellow]▲[/]",
-    "caffeinate is keeping the Mac awake; this keep-awake task can be ended.",
-    "",
-    "High-energy apps: [b]5[/] running",
-    "",
-    "Background agents: [b]1[/] unloadable"
-  ],
   "log": [
     [
       "dim",
-      "Executing: Terminate"
+      "Executing: Stop caffeinate"
     ],
     [
       "ok",
-      "caffeinate terminated"
+      "Stop caffeinate: Completed"
     ]
   ],
   "output": "",
   "refresh_requests": [
     "refresh"
+  ],
+  "rows": [
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Low Power Mode",
+      "operations": [
+        "select"
+      ],
+      "selected": true,
+      "state": "planned"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Idle sleep",
+      "operations": [
+        "select"
+      ],
+      "selected": true,
+      "state": "planned"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Display sleep",
+      "operations": [
+        "select"
+      ],
+      "selected": true,
+      "state": "planned"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Power Nap (On power)",
+      "operations": [
+        "select"
+      ],
+      "selected": true,
+      "state": "planned"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Network wake (On power)",
+      "operations": [
+        "select"
+      ],
+      "selected": true,
+      "state": "planned"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Deeper sleep",
+      "operations": [
+        "select"
+      ],
+      "selected": false,
+      "state": "planned"
+    },
+    {
+      "action": "quit",
+      "group": "apps",
+      "name": "Quit Demo",
+      "operations": [
+        "select",
+        "cycle"
+      ],
+      "selected": true,
+      "state": "planned"
+    },
+    {
+      "action": "freeze",
+      "group": "apps",
+      "name": "Freeze Demo",
+      "operations": [
+        "select",
+        "cycle"
+      ],
+      "selected": true,
+      "state": "planned"
+    },
+    {
+      "action": "ask",
+      "group": "apps",
+      "name": "Ask Demo",
+      "operations": [
+        "select",
+        "cycle"
+      ],
+      "selected": false,
+      "state": "planned"
+    },
+    {
+      "action": "quit",
+      "group": "network",
+      "name": "Network Demo",
+      "operations": [
+        "select",
+        "cycle"
+      ],
+      "selected": false,
+      "state": "planned"
+    },
+    {
+      "action": "quit",
+      "group": "network",
+      "name": "Remote Demo",
+      "operations": [
+        "select",
+        "cycle"
+      ],
+      "selected": false,
+      "state": "planned"
+    },
+    {
+      "action": "pause",
+      "group": "services",
+      "name": "org.demo.worker",
+      "operations": [
+        "select"
+      ],
+      "selected": true,
+      "state": "planned"
+    },
+    {
+      "action": "off_action",
+      "group": "network",
+      "name": "Wi-Fi",
+      "operations": [
+        "select"
+      ],
+      "selected": false,
+      "state": "planned"
+    },
+    {
+      "action": "off_action",
+      "group": "network",
+      "name": "Bluetooth",
+      "operations": [
+        "select"
+      ],
+      "selected": false,
+      "state": "planned"
+    },
+    {
+      "action": "pause",
+      "group": "services",
+      "name": "Spotlight",
+      "operations": [
+        "select"
+      ],
+      "selected": false,
+      "state": "planned"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Screen brightness",
+      "operations": [
+        "select"
+      ],
+      "selected": false,
+      "state": "planned"
+    }
   ],
   "state": {
     "ac_prof": "",

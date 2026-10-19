@@ -71,6 +71,26 @@
       "custom"
     ],
     [
+      "sudo",
+      "-n",
+      "-l",
+      "pmset",
+      "-c",
+      "powernap",
+      "0",
+      "womp",
+      "0"
+    ],
+    [
+      "sudo",
+      "pmset",
+      "-c",
+      "powernap",
+      "0",
+      "womp",
+      "0"
+    ],
+    [
       "mdfind",
       "kMDItemContentType == \"com.apple.application-bundle\""
     ],
@@ -150,9 +170,9 @@
   ],
   "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
   "exit_code": 0,
-  "output": "· Battery telemetry usually updates every 20–60 s; allow about 1–3 min per window (timeout 180 s; 2 fresh updates). Use \n--no-measure to skip.\n· Measuring battery draw before applying actions\n· Fresh telemetry updates: 0/2\n· Not measurable: external power is connected\n───────────────────────────────────────────── 2. Power settings on battery ─────────────────────────────────────────────\n· Reduce energy use on battery; effects vary by Mac model.\n✓ lowpowermode → 1\n· Battery settings after update: lowpowermode 0 sleep 1 displaysleep 10 powernap 0 tcpkeepalive 1 womp 0 standby 1 \nhibernatemode 3 ttyskeepawake 1 disksleep 10 lessbright 1 networkoversleep 0\n─────────────────────────────────────────────── 3. High-energy GUI apps ────────────────────────────────────────────────\n✓ Quit Demo quit\n✓ Freeze Demo frozen (1 processes stopped; off resumes them with CONT)\n· Keeping Skip Demo (skip)\n· Ask Demo needs individual confirmation; skipped in the batch.\n· Keeping Remote Demo (skip)\n───────────────────────────────────────────────── 4. Background agents ─────────────────────────────────────────────────\n✓ org.demo.worker unloaded\n  -InternalBattery-0 (id=1) 87%;\n✓ Recovery record saved at \n<ROOT>/state\n.json (travel-mode off restores the original state)\n",
+  "output": "· Battery telemetry usually updates every 20–60 s; allow about 1–3 min per window (timeout 180 s; 2 fresh updates). Use \n--no-measure to skip.\n· Measuring battery draw before applying actions\n· Fresh telemetry updates: 0/2\n· Not measurable: external power is connected\n───────────────────────────────────────────── 2. Power settings on battery ─────────────────────────────────────────────\n· Already set: Power Nap, Network connections during sleep, Network wake\n· Reduce energy use on battery; effects vary by Mac model.\n✓ lowpowermode → 1\n· Battery settings after update: lowpowermode 0 sleep 1 displaysleep 10 powernap 0 tcpkeepalive 1 womp 0 standby 1 \nhibernatemode 3 ttyskeepawake 1 disksleep 10 lessbright 1 networkoversleep 0\n──────────────────────────────────────────────── 2b. Settings on power ─────────────────────────────────────────────────\n· Turn off Power Nap on power: the sleeping Mac will not wake periodically to sync Mail and iCloud.\n· Turn off network wake on power: other devices cannot wake this Mac over the network.\n✓ Power Nap and network wake are off on power\n─────────────────────────────────────────────── 3. High-energy GUI apps ────────────────────────────────────────────────\n✓ Quit Demo quit\n✓ Freeze Demo frozen (1 processes stopped; off resumes them with CONT)\n· Keeping Skip Demo (skip)\n· Ask Demo needs individual confirmation; skipped in the batch.\n· Keeping Remote Demo (skip)\n───────────────────────────────────────────────── 4. Background agents ─────────────────────────────────────────────────\n✓ org.demo.worker unloaded\n  -InternalBattery-0 (id=1) 87%;\n✓ Recovery record saved at \n<ROOT>/state\n.json (travel-mode off restores the original state)\n",
   "state": {
-    "ac_prof": "",
+    "ac_prof": "powernap 1 womp 1",
     "anchored_at": "<TIME>",
     "batt_prof": "lowpowermode 0",
     "brightness": "",
@@ -182,9 +202,9 @@
     "scenario": "work",
     "session": {
       "actions": {
-        "attempted": 4,
+        "attempted": 5,
         "failed": 0,
-        "succeeded": 4
+        "succeeded": 5
       },
       "external_seen": true,
       "id": "fixture-session",

@@ -8,7 +8,7 @@ from travel_mode.i18n import set_language, t
 
 
 @pytest.mark.parametrize("scenario", ["work", "away"])
-def test_tui_driver_selects_scenario_before_waiting_for_pages(scenario):
+def test_tui_driver_selects_scenario_before_waiting_for_pages(scenario, tmp_path, monkeypatch):
     from e2e_ui import drive_tui
 
     class SelectionComplete(Exception):
@@ -30,14 +30,21 @@ def test_tui_driver_selects_scenario_before_waiting_for_pages(scenario):
         def widget_click(self, selector):
             calls.append(selector)
 
+        root = tmp_path
+        timeout = 5
+
+        def keys(self, *keys):
+            calls.extend(keys)
+
         def wait_complete(self):
             raise SelectionComplete
 
+    monkeypatch.setattr("e2e_ui.read_layout", lambda path: {"active": "plan"})
     session = Session()
     session.scenario = scenario
     with pytest.raises(SelectionComplete):
         drive_tui(session)
-    assert calls == ["started", "prompt", "00-scenario", "scenario-" + scenario]
+    assert calls == ["started", "prompt", "00-scenario", "scenario-" + scenario, "Enter"]
 
 
 @pytest.mark.parametrize("language", ["en", "zh"])

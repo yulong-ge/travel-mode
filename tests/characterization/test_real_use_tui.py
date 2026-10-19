@@ -10,6 +10,7 @@ from travel_mode.system.shell import CmdResult
 from travel_mode.tui.app import TravelApp
 from travel_mode.tui.conflict import SessionConflict
 from tui_interaction import click_after_layout
+from tui_plan import app_item, apply_plan
 
 
 @pytest.mark.parametrize("choice", ["cancel", "continue", "restore"])
@@ -23,6 +24,8 @@ async def test_existing_session_decision_precedes_tui_mutations(machine, choice)
     async with app.run_test(size=(160, 65)) as pilot:
         await app.wait_for_idle()
         assert app.st["scenario"] == "away"
+        app.view_mode = "plan"
+        app.update_primary()
         await click_after_layout(pilot, "#b-quick")
         assert isinstance(app.screen, SessionConflict)
         assert not any(mutation(c) for c in machine["fake"].calls)
@@ -49,17 +52,14 @@ async def test_refused_row_terminal_success_hides_retry_and_force_after_refresh(
     app = TravelApp(scenario="work", measure=False)
     async with app.run_test(size=(160, 65)) as pilot:
         await app.wait_for_idle()
-        app.action_goto("p-apps")
-        index = next(i for i, r in app.app_rows.items() if r["name"] == "Quit Demo")
-        await click_after_layout(pilot, f"#btn-{index}-q")
-        assert app.app_rows[index]["view"]["state"] == "refused"
-        assert app.query_one(f"#btn-{index}-r").display
-        await click_after_layout(pilot, f"#btn-{index}-q")
-        row = app.app_rows[index]
-        assert row["view"]["state"] == "exited" and not row["kill"]
-        assert not row["view"]["operations"]
-        assert all(not b.display and b.disabled for b in row["btns"])
+        await apply_plan(pilot, names={"Quit Demo"}, action="quit")
+        row = app_item(app, "Quit Demo")
+        assert row["state"] == "failed" and row["operations"] == ["retry", "force"]
+        await click_after_layout(pilot, "#force-" + row["id"])
+        assert row["state"] == "done" and not row["operations"]
+        assert not app.query("#force-" + row["id"])
+        assert not app.query("#retry-" + row["id"])
         app.action_refresh()
         await app.wait_for_idle()
-        assert not any(v["name"] == "Quit Demo" and "force_quit" in v["operations"] for v in app.app_views)
+        assert not any(r["name"] == "Quit Demo" and r["operations"] for r in app.plan_items)
         assert "Traceback" not in "\n".join(str(line) for line in app.query_one("#log", RichLog).lines)

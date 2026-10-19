@@ -91,7 +91,7 @@ def app_action(name: str, rule: dict | None, config) -> str:
         if rule and (rule["action"] == "notice" or ignored(rule, config)):
             return "skip"
         recommendation = recommend(name, rule=rule)
-        if recommendation["reason"] == "freeze":
+        if recommendation["reason"] == "freeze" and config.options.scenario != "away":
             return config.apps.default
         return recommendation[
             config.options.scenario if config.options.scenario in {"work", "away"} else "work"

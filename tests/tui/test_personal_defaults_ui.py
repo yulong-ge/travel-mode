@@ -57,14 +57,15 @@ async def test_setup_tui_edits_columns_reviews_and_preserves_comments(tmp_path, 
         assert screen.selected["work"]["WeChat"] == "quit"
         screen.action_column("away")
         await press(screen, "#setup-app-0", screen.changed)
-        assert screen.selected["away"]["WeChat"] == "quit"
+        assert screen.selected["away"]["WeChat"] == "ask"
         assert screen.query_one("#setup-save", Button).disabled
         await press(screen, "#setup-review", screen.reviewed)
         assert str(path) in str(screen.query_one("#setup-status", Static).content)
         assert not screen.query_one("#setup-save", Button).disabled
         await press(screen, "#setup-save", screen.completed)
     config = load_config(path)
-    assert config.apps.work["WeChat"] == config.apps.away["WeChat"] == "quit"
+    assert config.apps.work["WeChat"] == "quit"
+    assert config.apps.away["WeChat"] == "ask"
     assert "# keep" in path.read_text() and "# comment" in path.read_text()
 
 
@@ -114,7 +115,7 @@ async def test_first_run_setup_after_scenario_and_skip_not_repeated(tmp_path, mo
     monkeypatch.setattr(app_policy, "discover", rows)
     app = TravelApp(first_run=True)
     async with app.run_test(size=(120, 36)) as pilot:
-        await pilot.press("w")
+        await pilot.press("w", "enter")
         await pilot._wait_for_screen()
         screen = await ready(app)
         assert not app.origin_ready
@@ -166,7 +167,6 @@ async def test_setup_space_cycles_once_and_review_is_invalidated(tmp_path, monke
 @pytest.mark.parametrize("succeeds", [False, True])
 async def test_apps_page_remembers_only_successful_changed_action(tmp_path, monkeypatch, succeeds):
     from travel_mode.system import apps
-    from tui_interaction import click_after_layout
 
     (tmp_path / "config.toml").write_text("")
     monkeypatch.setattr(
@@ -183,8 +183,9 @@ async def test_apps_page_remembers_only_successful_changed_action(tmp_path, monk
     app = TravelApp(scenario="work")
     async with app.run_test(size=(120, 36)) as pilot:
         await app.wait_for_idle()
-        app.action_goto("p-apps")
-        await click_after_layout(pilot, "#btn-0-f")
+        from tui_plan import apply_plan
+
+        await apply_plan(pilot, names={"Google Chrome"}, action="freeze")
         assert isinstance(app.screen, ConfirmRemember) == succeeds
         if succeeds:
             app.screen.query_one("#remember-yes", Button).press()

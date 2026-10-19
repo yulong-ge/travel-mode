@@ -1,20 +1,10 @@
 """Shared Textual widgets."""
 
 import asyncio
-import unicodedata
 
+from rich.text import Text
 from textual.widgets import Button as TextualButton
-from textual.widgets import TabbedContent
-
-
-def _ellip(s, limit=86):
-    """按显示宽度截断 (CJK 计 2)."""
-    w = 0
-    for i, ch in enumerate(s):
-        w += 2 if unicodedata.east_asian_width(ch) in "WF" else 1
-        if w > limit:
-            return s[:i] + "…"
-    return s
+from textual.widgets import Static
 
 
 class Button(TextualButton):
@@ -48,23 +38,21 @@ class Button(TextualButton):
         self.app._disable_mutation_button(self)
 
 
-class TravelTabs(TabbedContent):
-    def _on_tab_pane_focused(self, event):
-        # 挂载/移除控件会排队 Focused 消息。旧页面的消息不得切回该页。
-        event.prevent_default()
-        event.stop()
-        if event.tab_pane.id != self.active:
-            focused = self.app.focused
-            if focused is not None and event.tab_pane in focused.ancestors:
-                self.focus()
+class ActionFooter(Static):
+    """Keep the complete message; truncate only the single visible line."""
 
+    def full_text(self):
+        return self.content.copy() if isinstance(self.content, Text) else Text.from_markup(str(self.content))
 
-def status_row(text, *, icon="", button=None, compact=False):
-    """Reserve the same two cells for every status icon, including blank ones."""
-    from textual.containers import Horizontal
-    from textual.widgets import Label
+    @property
+    def truncated(self):
+        return self.full_text().cell_len > self.content_region.width
 
-    children = [Label(icon, classes="status-icon"), Label(text, classes="grow")]
-    if button is not None:
-        children.append(button)
-    return Horizontal(*children, classes="status-line" if compact else "row")
+    def render(self):
+        text = self.full_text()
+        text.truncate(self.content_region.width, overflow="ellipsis")
+        return text
+
+    def on_resize(self):
+        self.refresh()
+        self.app.refresh_detail_log()

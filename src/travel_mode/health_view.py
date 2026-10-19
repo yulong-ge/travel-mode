@@ -206,6 +206,12 @@ def presentation(report, *, scenario="away", session_seconds=None):
         icon = "?" if state == "unavailable" else "▲" if state == "action" or advisory else "✓"
         display_actions = row["actions"][:1] if state != "unavailable" else []
         hint_key = "caffeinate" if key == "keep_awake" and "caffeinate" in raw else key
+        if state == "action" and not display_actions:
+            conclusion = t(
+                "health_view.with_advice",
+                conclusion=conclusion.rstrip(".。"),
+                advice=t("health.advice." + hint_key),
+            )
         row.update(
             state=state,
             advisory=advisory,

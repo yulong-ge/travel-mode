@@ -49,12 +49,18 @@ def wait_for(predicate, message, timeout=30):
 class FixtureDebugApp(DebugApp):
     """Health remains read-only; only the dedicated fixture/power controls run Actions."""
 
-    async def build_health(self, report):
-        report = {**report, "checks": [{**row, "actions": []} for row in report["checks"]]}
-        await super().build_health(report)
-        # This includes the legacy manual Spotlight button, outside health.actions.
+    async def render_attention(self):
+        await super().render_attention()
         for button in self.query("#dash-health Button"):
-            await button.remove()
+            if hasattr(button, "health_descriptor"):
+                await button.remove()
+
+    async def render_readiness(self):
+        await super().render_readiness()
+        # Preserve the dedicated global sleep action only in the normal AC harness.
+        for button in self.query("#sleep-ready Button"):
+            if button.health_descriptor["kind"] != "sleep":
+                await button.remove()
 
 
 class InteractiveHarness(Harness):
@@ -201,13 +207,15 @@ class InteractiveHarness(Harness):
         self.check_profile(
             self.original_profiles.get("a", {}),
             profiles.get("a", {}),
-            {} if work or self.fixture_only_power else {"powernap": "0", "womp": "0"},
+            {} if self.battery_measure or self.fixture_only_power else {"powernap": "0", "womp": "0"},
             "UI AC",
         )
-        targets = {key: target for key, _, target in pmset.power_recommendations()}
-        if work:
-            targets = {key: value for key, value in targets.items() if key in {"lowpowermode", "powermode"}}
-        else:
+        from travel_mode.config import load_config
+        from travel_mode.profiles import profile_scope
+
+        with profile_scope(load_config(), None, scenario=self.scenario):
+            targets = {key: target for key, _, target in pmset.power_recommendations()}
+        if not work:
             targets["hibernatemode"] = "25"
         self.check_profile(
             self.original_profiles.get("b", {}),
@@ -689,6 +697,12 @@ def drive_tui(session):
     session.wait_text(t("scenario.prompt"))
     session.shot("00-scenario")
     session.widget_click("scenario-" + session.scenario)
+    session.keys("Enter")
+    wait_for(
+        lambda: read_layout(session.root / "layout.json")["active"] == "plan",
+        "Plan did not open",
+        session.timeout,
+    )
     session.wait_complete()
     session.shot("01-dashboard")
     if getattr(session, "battery_measure", False):
@@ -705,44 +719,42 @@ def drive_tui(session):
         mutate(session, "b-quick", "03-vm-fixture-applied")
         finish_tui(session)
         return
-    # Fix SleepDisabled through its real button. No unsafe diagnostic buttons.
+    # The plan is one list. Only the owned fixtures and explicit power controls are selected.
     if session.scenario == "away" and power_capabilities["sleep_switch"]:
-        mutate(session, "b-fixsleep", "02-fixsleep")
-    session.keys("2")
-    session.wait_complete()
-    if session.scenario == "away":
-        session.widget_click("cb-hib25")
-        session.widget_click("cb-ac")
-    session.shot("03-power-selection")
-    mutate(session, "b-power", "04-power-applied")
-    session.keys("3")
-    session.wait_complete()
-    session.shot("05-apps")
-    mutate(session, "b-apps-all", "06-apps-applied")
-    session.keys("4")
-    session.wait_complete()
-    session.shot("07-services")
-    mutate(session, "b-svc-all", "08-services-applied")
+        layout = read_layout(session.root / "layout.json")
+        sleep = next((w["id"] for w in layout["widgets"] if (w["id"] or "").startswith("ready-")), None)
+        if sleep:
+            mutate(session, sleep, "02-fixsleep")
+    set_plan_selection(session, fixture_only=False, measure=False)
+    session.shot("03-plan-selection")
+    mutate(session, "b-quick", "04-plan-applied")
     finish_tui(session)
 
 
-def select_battery_quick(session, *, measure=True):
+def set_plan_selection(session, *, fixture_only, measure):
     path = session.root / "layout.json"
+    layout = read_layout(path)
+    choices = {
+        w["id"]: (w.get("kind") in {"app", "agent"} or (not fixture_only and w.get("group") == "power"))
+        for w in layout["widgets"]
+        if (w["id"] or "").startswith("select-")
+    }
+    choices["q-measure"] = measure
+    for widget, value in choices.items():
 
-    def selected(widget, value):
-        layout = read_layout(path)
-        return layout["ready"] and any(
-            row["id"] == widget and row["value"] is value for row in layout["widgets"]
-        )
-
-    for widget, value in {**e2e_battery.QUICK_SELECTION, "q-measure": measure}.items():
-        if not selected(widget, value):
-            session.widget_click(widget)
-            wait_for(
-                lambda widget=widget, value=value: selected(widget, value),
-                f"{widget} selection did not commit",
-                session.timeout,
+        def selected(widget=widget, value=value):
+            current = read_layout(path)
+            return current["ready"] and any(
+                w["id"] == widget and w["value"] is value for w in current["widgets"]
             )
+
+        if not selected():
+            session.widget_click(widget)
+            wait_for(selected, f"{widget} selection did not commit", session.timeout)
+
+
+def select_battery_quick(session, *, measure=True):
+    set_plan_selection(session, fixture_only=True, measure=measure)
 
 
 def finish_tui(session):
@@ -753,9 +765,13 @@ def finish_tui(session):
         lambda: acknowledged(session.root / "on.json"), "TUI on assertions did not finish", session.timeout
     )
     session.shot("09-on-verified")
-    session.keys("5")
-    session.wait_complete()
-    session.shot("10-network-restore")
+    session.widget_click("b-complete")
+    wait_for(
+        lambda: read_layout(session.root / "layout.json")["active"] == "session",
+        "Session did not open",
+        session.timeout,
+    )
+    session.shot("10-session-restore")
     mutate(session, "b-off", "11-off-restored")
     session.shot("12-session-report")
     session.keys("Escape")
@@ -807,8 +823,8 @@ def main(argv=None):
             "power/fixture actions; no all other prompts."
         )
         print(
-            "TUI: keyboard tabs; mouse fixsleep, hib25+AC, power apply, fixture "
-            "defaults, agent unload; Network/Restore off."
+            "TUI: scenario card -> canonical plan (owned fixtures + explicit power) "
+            "-> results -> session -> off."
         )
         print(
             "Every step: terminal_render PNG + text under /tmp/tui-e2e/<run-id>; "

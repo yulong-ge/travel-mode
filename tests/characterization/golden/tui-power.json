@@ -1,5 +1,5 @@
 {
-  "active": "p-power",
+  "active": "result",
   "commands": [
     [
       "ioreg",
@@ -65,53 +65,178 @@
     ],
     [
       "brightness",
-      "-l"
-    ],
-    [
-      "brightness",
-      "0.15"
+      "0.5"
     ]
   ],
   "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
   "exit_code": null,
-  "labels": [
-    "Battery settings: select the changes to apply.",
-    "Battery profile: these values apply to battery power. They do not change the current AC state until that power source is selected.",
-    "Already set: Power Nap, Network connections during sleep, Network wake, Deep standby, Hibernation mode, Stay awake for terminal activity, Disk sleep delay, Dim display on battery, Network activity during sleep"
-  ],
   "log": [
     [
       "dim",
-      "Executing: Apply selected (4)"
+      "Executing: Start saving power (7)"
     ],
     [
       "ok",
-      "lowpowermode → 1"
+      "Low Power Mode: Completed"
     ],
     [
       "ok",
-      "sleep → 5"
+      "Idle sleep: Completed"
     ],
     [
       "ok",
-      "displaysleep → 3"
+      "Display sleep: Completed"
     ],
     [
       "ok",
-      "hibernatemode → 25"
+      "Deeper sleep: Completed"
     ],
     [
       "ok",
-      "Power Nap and network wake are off on power"
+      "Power Nap (On power): Completed"
     ],
     [
       "ok",
-      "Brightness → 15% (was 0.8)"
+      "Network wake (On power): Completed"
+    ],
+    [
+      "ok",
+      "Screen brightness: Completed"
     ]
   ],
   "output": "",
   "refresh_requests": [
     "refresh"
+  ],
+  "rows": [
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Low Power Mode",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Idle sleep",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Display sleep",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Power Nap (On power)",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Network wake (On power)",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Deeper sleep",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "quit",
+      "group": "apps",
+      "name": "Quit Demo",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "freeze",
+      "group": "apps",
+      "name": "Freeze Demo",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "ask",
+      "group": "apps",
+      "name": "Ask Demo",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "quit",
+      "group": "network",
+      "name": "Network Demo",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "quit",
+      "group": "network",
+      "name": "Remote Demo",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "pause",
+      "group": "services",
+      "name": "org.demo.worker",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "off_action",
+      "group": "network",
+      "name": "Wi-Fi",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "off_action",
+      "group": "network",
+      "name": "Bluetooth",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "pause",
+      "group": "services",
+      "name": "Spotlight",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Screen brightness",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    }
   ],
   "state": {
     "ac_prof": "powernap 1 womp 1",

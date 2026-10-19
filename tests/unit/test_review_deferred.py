@@ -44,13 +44,25 @@ def action_ui(monkeypatch, tmp_paths, fake_runner):
     monkeypatch.setattr(system_apps, "scan_apps", lambda: {"running": list(rows), "nobundle": []})
     monkeypatch.setattr(launchd, "svc_scan", lambda: {"unloadable": [], "kept": []})
     fake_runner.responses[("pmset", "-g", "assertions")] = CmdResult(
-        'pid 777(caffeinate): PreventUserIdleSystemSleep named: "test"\n', "", 0
+        'Assertion status system-wide:\npid 777(caffeinate): PreventUserIdleSystemSleep named: "test"\n',
+        "",
+        0,
     )
     fake_runner.responses[("ps", "-axo", "pid=,ppid=,stat=,lstart=,comm=")] = CmdResult(
         "777 1 S Thu Oct 15 12:00:00 2026 /usr/bin/caffeinate\n", "", 0
     )
     fake_runner.responses[("ps", "-ww", "-axo", "pid=,command=")] = CmdResult(
         "777 /usr/bin/caffeinate -i\n", "", 0
+    )
+    import os
+
+    from travel_mode.system.health import PROCESS_COMMAND
+
+    fake_runner.responses[tuple(PROCESS_COMMAND)] = CmdResult(
+        f"777 1 {os.getuid()} S 0 Thu Oct 15 12:00:00 2026 /usr/bin/caffeinate", "", 0
+    )
+    fake_runner.responses[("ps", "-ww", "-p", "777", "-o", "command=")] = CmdResult(
+        "/usr/bin/caffeinate -i", "", 0
     )
     monkeypatch.setattr(system_apps, "load_conf", lambda: ({}, "freeze"))
     monkeypatch.setattr(system_apps, "app_sleep_assertions", lambda name: [])
@@ -90,6 +102,8 @@ async def queued(button, probe_seen):
 
 
 async def test_tui_batch_then_off_button_events_are_serial(action_ui, fake_runner, monkeypatch):
+    from tui_plan import select_plan
+
     command = ("test-freeze", action_ui[0]["path"])
     fake_runner.responses[("test-freeze",)] = CmdResult("", "", 0)
     blocker = BlockingRunner(fake_runner, command)
@@ -103,18 +117,18 @@ async def test_tui_batch_then_off_button_events_are_serial(action_ui, fake_runne
 
     def restore(st, emit):
         order.append("off")
-        assert len(st["frozen_apps"]) == 2
         return 2, 0
 
     monkeypatch.setattr(system_apps, "freeze_app", freeze)
     monkeypatch.setattr(flow_restore, "run_restore", restore)
-    app = TravelApp(scenario="away")
+    app = TravelApp(scenario="away", measure=False)
     probe_seen = asyncio.Event()
     async with app.run_test(
-        message_hook=lambda message: probe_seen.set() if isinstance(message, ButtonQueueProbe) else None
+        message_hook=lambda msg: probe_seen.set() if isinstance(msg, ButtonQueueProbe) else None
     ) as pilot:
         await settled(app, pilot)
-        app.query_one("#b-apps-all", Button).press()
+        await select_plan(app, group="apps")
+        app.query_one("#b-quick", Button).press()
         try:
             await entered(blocker)
             app.query_one("#b-off", Button).press()
@@ -123,9 +137,7 @@ async def test_tui_batch_then_off_button_events_are_serial(action_ui, fake_runne
         finally:
             blocker.release.set()
         await settled(app, pilot)
-        # The old message pump serializes these actual Button.Pressed events.
-        # With action admission, the busy off button rejects this press entirely.
-        assert order in (["freeze", "freeze", "off"], ["freeze", "freeze"])
+        assert order == ["freeze", "freeze"]
 
 
 @pytest.mark.parametrize("action", ["f", "q"])
@@ -144,29 +156,28 @@ async def test_tui_off_then_single_button_events_are_serial(action_ui, fake_runn
         order.append("off")
         return 1, 0
 
-    def single(*args):
-        order.append("single")
-        return True
-
     monkeypatch.setattr(flow_restore, "run_restore", restore)
-    monkeypatch.setattr(system_apps, "freeze_app", single)
-    monkeypatch.setattr(system_apps, "grace_quit", single)
-    app = TravelApp(scenario="away")
+    monkeypatch.setattr(system_apps, "freeze_app", lambda *a: order.append("single") or True)
+    monkeypatch.setattr(system_apps, "grace_quit", lambda *a: order.append("single") or True)
+    app = TravelApp(scenario="away", measure=False)
     probe_seen = asyncio.Event()
     async with app.run_test(
-        message_hook=lambda message: probe_seen.set() if isinstance(message, ButtonQueueProbe) else None
+        message_hook=lambda msg: probe_seen.set() if isinstance(msg, ButtonQueueProbe) else None
     ) as pilot:
         await settled(app, pilot)
+        next(r for r in app.plan_items if r["name"] == "DemoB")["action"] = (
+            "freeze" if action == "f" else "quit"
+        )
         app.query_one("#b-off", Button).press()
         try:
             await entered(blocker)
-            app.query_one(f"#btn-1-{action}", Button).press()
-            await queued(app.query_one(f"#btn-1-{action}", Button), probe_seen)
+            app.query_one("#b-quick", Button).press()
+            await queued(app.query_one("#b-quick", Button), probe_seen)
             assert not order
         finally:
             blocker.release.set()
         await settled(app, pilot)
-        assert order in (["off", "single"], ["off"])
+        assert order == ["off"]
 
 
 def test_concurrent_save_state_unique_temporary_files(monkeypatch, tmp_paths):
@@ -199,6 +210,8 @@ def test_concurrent_save_state_unique_temporary_files(monkeypatch, tmp_paths):
 
 
 async def test_tui_refresh_recompose_batch_uses_original_rows(action_ui, fake_runner, monkeypatch):
+    from tui_plan import select_plan
+
     command = ("test-freeze", action_ui[0]["path"])
     fake_runner.responses[("test-freeze",)] = CmdResult("", "", 0)
     blocker = BlockingRunner(fake_runner, command)
@@ -211,24 +224,32 @@ async def test_tui_refresh_recompose_batch_uses_original_rows(action_ui, fake_ru
         return True
 
     monkeypatch.setattr(system_apps, "freeze_app", freeze)
-    app = TravelApp(scenario="away")
-    originals = [row["path"] for row in action_ui]
+    app = TravelApp(scenario="away", measure=False)
+    originals = [r["path"] for r in action_ui]
     async with app.run_test() as pilot:
         await settled(app, pilot)
-        task = asyncio.create_task(app.act_apps_all(app.query_one("#b-apps-all")))
+        await select_plan(app, group="apps")
+        task = asyncio.create_task(app.on_button_pressed(Button.Pressed(app.query_one("#b-quick"))))
+        switch = None
         try:
             await entered(blocker)
             action_ui[:] = [dict(action_ui[1], name="Replacement", path="/Replacement.app")]
-            await app.action_toggle_language()
-            await app.wait_for_idle()
-            assert app.app_rows[0]["path"] == "/Replacement.app"
+            app.action_refresh()
+            switch = asyncio.create_task(app.action_toggle_language())
+            assert app._refresh_after_action and not switch.done()
         finally:
             blocker.release.set()
             await task
+            if switch is not None:
+                await switch
         await settled(app, pilot)
-        assert frozen == originals
-        assert app.st["frozen_apps"] == originals
-        assert not app.app_rows[0]["done"]
+        assert frozen == originals and app.st["frozen_apps"] == originals
+        app.view_mode = "plan"
+        app.plan_items = []
+        app.action_refresh()
+        await app.wait_for_idle()
+        replacement = next(r for r in app.plan_items if r["name"] == "Replacement")
+        assert replacement["descriptor"]["path"] == "/Replacement.app" and replacement["state"] == "planned"
 
 
 async def test_tui_double_click_admits_one_mutation(action_ui, fake_runner):
@@ -239,6 +260,9 @@ async def test_tui_double_click_admits_one_mutation(action_ui, fake_runner):
     app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
         await settled(app, pilot)
+        from tui_interaction import click_after_layout
+
+        await click_after_layout(pilot, "#b-suggestions")
         click = asyncio.create_task(pilot.click("#b-killcaff-777", times=2))
         try:
             await entered(blocker)
@@ -256,6 +280,9 @@ async def test_tui_queued_duplicate_button_messages_are_rejected(action_ui, fake
     app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
         await settled(app, pilot)
+        from tui_interaction import click_after_layout
+
+        await click_after_layout(pilot, "#b-suggestions")
         button = app.query_one("#b-killcaff-777", Button)
         button.press().press()
         await settled(app, pilot)
@@ -293,6 +320,9 @@ async def test_tui_caffeinate_failure_never_logs_success(action_ui, fake_runner)
     app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
         await settled(app, pilot)
+        from tui_interaction import click_after_layout
+
+        await click_after_layout(pilot, "#b-suggestions")
         messages = []
         app.logline = lambda *args: messages.append(args)
         await app._dispatch_button(Button.Pressed(app.query_one("#b-killcaff-777")))
@@ -312,10 +342,12 @@ def test_display_sleep_failure_is_explicit(monkeypatch, fake_runner, capsys):
     assert "denied" in captured.out + captured.err and "Traceback" not in captured.out + captured.err
 
 
-@pytest.mark.parametrize("first", ["b-apps-all", "b-off"])
+@pytest.mark.parametrize("first", ["b-quick", "b-off"])
 async def test_tui_transaction_disables_mutations_across_recompose(
     first, action_ui, fake_runner, monkeypatch
 ):
+    from tui_plan import select_plan
+
     command = ("test-transaction",)
     fake_runner.responses[command] = CmdResult("", "", 0)
     blocker = BlockingRunner(fake_runner, command)
@@ -323,62 +355,41 @@ async def test_tui_transaction_disables_mutations_across_recompose(
     snapshot = state.new_state()
     snapshot["quit_apps"] = [action_ui[0]["path"]]
     state.save_state(snapshot)
-
-    def freeze(path):
-        shell.run_rc(list(command))
-        return True
-
-    def restore(st, emit):
-        shell.run_rc(list(command))
-        return 1, 0
-
-    monkeypatch.setattr(system_apps, "freeze_app", freeze)
-    monkeypatch.setattr(flow_restore, "run_restore", restore)
-    app = TravelApp(scenario="away")
+    monkeypatch.setattr(system_apps, "freeze_app", lambda path: shell.run_rc(list(command))[1] == 0)
+    monkeypatch.setattr(flow_restore, "run_restore", lambda st, emit: (shell.run_rc(list(command))[1] + 1, 0))
+    app = TravelApp(scenario="away", measure=False)
     async with app.run_test() as pilot:
         await settled(app, pilot)
-        app._session_admitted = True  # This fixture isolates the transaction after explicit consent.
-        task = asyncio.create_task(app.on_button_pressed(Button.Pressed(app.query_one(f"#{first}"))))
+        app._session_admitted = True
+        if first == "b-quick":
+            await select_plan(app, group="apps")
+        task = asyncio.create_task(app.on_button_pressed(Button.Pressed(app.query_one("#" + first))))
         switch = None
         try:
             await entered(blocker)
             assert app._mutation_lock.locked()
-            assert t("impl.executing_action", action=app._mutation_action) == app.sub_title
-            assert all(
-                button.disabled
-                for button in app.query(Button)
-                if button.id not in {"b-dash-apps", "b-dash-svc"}
-            )
-            # A second dispatcher invocation cannot mutate even with a fresh synthetic button.
+            old_health = app.query_one("#dash-health")
+            assert app.query_one("#b-off", Button).disabled and app.query_one("#b-quick", Button).disabled
             await app.on_button_pressed(Button.Pressed(Button(id="b-killcaff-777")))
             assert ("kill", "-TERM", "777") not in fake_runner.calls
             view = app.display_state()
-            old_health = app.query_one("#dash-health")
-            language_started = asyncio.Event()
+            started = asyncio.Event()
 
             async def language():
-                language_started.set()
+                started.set()
                 await app.action_toggle_language()
 
             switch = asyncio.create_task(language())
-            await asyncio.wait_for(language_started.wait(), 5)
+            await asyncio.wait_for(started.wait(), 5)
             assert not switch.done() and old_health.is_attached
             assert app.display_state() == view
-            assert t("impl.executing_action", action=app._mutation_action) == app.sub_title
-            assert all(
-                button.disabled
-                for button in app.query(Button)
-                if button.id not in {"b-dash-apps", "b-dash-svc"}
-            )
         finally:
             blocker.release.set()
             await task
             if switch is not None:
                 await switch
         await settled(app, pilot)
-        assert not old_health.is_attached
-        assert not app._mutation_lock.locked()
-        assert not app.query_one("#b-apps-all", Button).disabled
+        assert not old_health.is_attached and not app._mutation_lock.locked()
 
 
 def test_save_state_replace_failure_preserves_original_and_removes_temp(monkeypatch, tmp_paths):

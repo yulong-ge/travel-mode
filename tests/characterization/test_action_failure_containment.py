@@ -3,12 +3,12 @@
 import json
 
 import pytest
-from textual.widgets import RichLog
 
 from travel_mode import cli, state
 from travel_mode.system.shell import CmdResult
 from travel_mode.tui.app import TravelApp
 from tui_interaction import click_after_layout
+from tui_plan import app_item, apply_plan, select_plan
 
 
 @pytest.mark.parametrize("scenario", ["work", "away"])
@@ -50,19 +50,17 @@ async def test_busy_error_keeps_interface_and_records_traceback(machine, monkeyp
             raise error
 
         monkeypatch.setattr(app.executor, "execute", fail)
-        await click_after_layout(pilot, "#b-fixsleep")
+        await click_after_layout(pilot, "#ready-0")
         assert app._exception is None and app.is_running
         log = machine["root"] / "travel-mode.log"
         assert str(error) in log.read_text() and "Traceback" in log.read_text()
-        assert any("travel-mode.log" in str(line) for line in app.query_one("#log", RichLog).lines)
+        assert "travel-mode.log" in str(app.query_one("#last-result").content)
 
 
 @pytest.mark.parametrize("after_mutation", [False, True])
 async def test_state_write_error_stops_remaining_modifications_without_exiting(
     machine, monkeypatch, after_mutation
 ):
-    from textual.widgets import Checkbox
-
     original = state.save_state
     modifications = []
     from travel_mode.system import shell
@@ -79,8 +77,7 @@ async def test_state_write_error_stops_remaining_modifications_without_exiting(
     app = TravelApp(scenario="away", measure=False)
     async with app.run_test(size=(140, 55)) as pilot:
         await app.wait_for_idle()
-        for key in ("spot", "net"):
-            app.query_one(f"#q-{key}", Checkbox).value = True
+        await select_plan(app)
 
         def broken(st, *args, **kwargs):
             if st.get("batt_prof") and (not after_mutation or modifications):
@@ -106,17 +103,14 @@ async def test_work_refusal_keeps_retry_force_controls_and_other_apps_continue(m
     app = TravelApp(scenario="work", measure=False)
     async with app.run_test(size=(160, 65)) as pilot:
         await app.wait_for_idle()
-        app.action_goto("p-apps")
-        await click_after_layout(pilot, "#b-apps-all")
-        row = next((index, row) for index, row in app.app_rows.items() if row["name"] == "Quit Demo")
-        index, data = row
-        assert data["kill"] and not data["done"]
-        assert app.query_one(f"#btn-{index}-r").is_attached
-        assert not app.query_one(f"#btn-{index}-q").disabled
+        await apply_plan(pilot, group="apps")
+        data = app_item(app, "Quit Demo")
+        assert data["state"] == "failed" and data["app_running"]
+        assert data["operations"] == ["retry", "force"]
         assert machine["processes"]["910002"][0] == "T"
-        await click_after_layout(pilot, f"#btn-{index}-r")
+        await click_after_layout(pilot, "#retry-" + data["id"])
         assert app.is_running and "910001" in machine["processes"]
-        await click_after_layout(pilot, f"#btn-{index}-q")
+        await click_after_layout(pilot, "#force-" + data["id"])
         assert app.is_running and "910001" not in machine["processes"]
 
 
@@ -133,7 +127,7 @@ async def test_unexpected_read_worker_error_is_logged_without_closing_interface(
         assert app.is_running and app._exception is None
         log = (machine["root"] / "travel-mode.log").read_text()
         assert "LookupError" in log and "Traceback" in log
-        assert any("travel-mode.log" in line.text for line in app.query_one("#log", RichLog).lines)
+        assert "travel-mode.log" in str(app.query_one("#last-result").content)
 
 
 def test_restore_agent_observation_failure_is_logged_and_other_items_continue(machine):

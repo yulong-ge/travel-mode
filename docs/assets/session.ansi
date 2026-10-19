@@ -1,0 +1,36 @@
+[48;2;30;30;30m [38;2;165;165;165m      [39m [38;2;165;165;165m                                      travel-mode[38;2;119;119;119m — Travel mode[38;2;165;165;165m                                       [39m
+
+ [1m[38;2;224;224;224mOn the go · 1 h 20 min[0m[48;2;30;30;30m
+ [38;2;165;165;165mBattery 64%[39m
+
+ [1m[38;2;224;224;224mSleep readiness[0m[48;2;30;30;30m
+ [38;2;185;60;91m✗ Lid sleep may be blocked: system sleep is disabled. UURemote may set this and may undo a[39m      [1m[38;2;224;224;224m Enable system sleep [0m[48;2;30;30;30m
+ [38;2;185;60;91mrepair.[39m
+
+ [38;2;224;224;224mBattery 80% → 64% (16% used)[39m
+ [38;2;224;224;224mAverage 9.8 W · about 3 h 40 min remaining at this rate[39m
+ [38;2;224;224;224mChanges: 3 power settings · 2 apps · 1 services[39m
+ [38;2;254;166;43m1 paused items are running again: Google Drive[39m                                                   [1m[38;2;224;224;224m Apply pauses again [0m[48;2;30;30;30m
+ [38;2;224;224;224m▲ External display connected; this increases energy use. Disconnect it when not needed.[39m
+ [38;2;224;224;224m▲ Screen brightness 85%, above the suggested 70%.[39m                                                        [1m[38;2;224;224;224m Set to 50% [0m[48;2;30;30;30m
+ [38;2;224;224;224m▲ High background CPU load: Docker[39m                                                                      [1m[38;2;224;224;224m Quit Docker [0m[48;2;30;30;30m
+  [1m[38;2;165;165;165m 3 other checks normal [0m[48;2;30;30;30m
+
+
+
+
+
+
+
+
+
+
+
+
+
+  [1m[38;2;224;224;224m More [0m[48;2;30;30;30m   [1m[38;2;224;224;224m Adjust defaults [0m[48;2;30;30;30m   [1m[38;2;224;224;224m Run health check [0m[48;2;30;30;30m
+                                                                                              [48;2;1;120;212m                         [48;2;30;30;30m
+                                                                                              [48;2;1;120;212m   [1m[38;2;221;237;249m Restore all (off) [0m[48;2;1;120;212m   [48;2;30;30;30m
+                                                                                              [48;2;1;120;212m                         [48;2;30;30;30m
+ [38;2;244;0;95m✘[38;2;165;165;165m Quit Refusal Demo refused to quit and may be showing a confirmation dialog. Resolve it and retry, or choose Force Q…[39m
+ [38;2;165;165;165mq Quit  l Language  r Refresh  d Details  ? Help[39m

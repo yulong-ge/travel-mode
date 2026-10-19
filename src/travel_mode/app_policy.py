@@ -63,7 +63,7 @@ def recommend(name, *, rule=None, bundle_id="", assertion=False):
         return dict(work="ask", away="ask", reason="interactive")
     if rule and rule["action"] == "notice":
         return dict(work="skip", away="skip", reason="notice")
-    return dict(work="freeze", away="freeze", reason="freeze")
+    return dict(work="freeze", away="quit", reason="freeze")
 
 
 def foreground_pid():
@@ -165,6 +165,12 @@ def choices(rows, config):
     }
 
 
+def explanation(row):
+    if row["reason"] == "freeze" and row["work"] == "freeze" and row["away"] == "quit":
+        return t("setup.reason_freeze_quit")
+    return t("setup.reason_" + row["reason"])
+
+
 def row_text(row, selected):
     name = t("setup.wechat") if row["name"] == "WeChat" else row["name"]
     name += " " * max(0, 18 - cell_len(name))
@@ -175,7 +181,7 @@ def row_text(row, selected):
         away_scenario=t("scenario.away"),
         work=t("action." + selected["work"][row["name"]]),
         away=t("action." + selected["away"][row["name"]]),
-        reason=t("setup.reason_" + row["reason"]),
+        reason=explanation(row),
     )
 
 

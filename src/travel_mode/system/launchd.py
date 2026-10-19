@@ -211,6 +211,8 @@ def svc_scan(config: Config | None = None, *, directories: tuple[Path, ...] | No
                 plist = plistlib.load(fh)
             if not isinstance(plist, dict):
                 raise ValueError(t("suggest.plist_not_dictionary"))
+            if not plist:
+                continue  # Empty updater placeholders do not describe a service.
             label = plist.get("Label")
             if not isinstance(label, str) or not label:
                 raise ValueError(t("launchd.missing_label"))

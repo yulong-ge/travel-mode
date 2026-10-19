@@ -44,7 +44,7 @@ async def test_click_waits_for_button_handler_not_worker_snapshot(fake_runner, m
             return result
 
         monkeypatch.setattr(pilot, "click", click)
-        interaction = asyncio.create_task(click_after_layout(pilot, "#b-fixsleep"))
+        interaction = asyncio.create_task(click_after_layout(pilot, "#ready-0"))
         try:
             await asyncio.wait_for(entered.wait(), 30)
             await asyncio.wait_for(mouse_returned.wait(), 30)
@@ -86,9 +86,9 @@ async def test_shutdown_drains_actions_before_unmounting_log(cancel_await, fake_
     async with app.run_test(size=(140, 55)):
         await app.wait_for_idle()
         if cancel_await:
-            action = asyncio.create_task(app.busy(app.query_one("#b-fixsleep"), app.execute, EnableSleep()))
+            action = asyncio.create_task(app.busy(app.query_one("#ready-0"), app.execute, EnableSleep()))
         else:
-            app.query_one("#b-fixsleep").press()
+            app.query_one("#ready-0").press()
         try:
             await asyncio.wait_for(entered.wait(), 30)
             if cancel_await:
@@ -128,8 +128,10 @@ async def test_measurement_queries_stay_on_ui_thread_and_language_waits(fake_run
     monkeypatch.setattr(measurement, "finish", lambda *args, **kwargs: None)
     async with app.run_test(size=(140, 55)) as pilot:
         await app.wait_for_idle()
-        for box in app.query("#p-dash Checkbox"):
-            box.value = box.id in {"q-power", "q-measure"}
+        from tui_plan import select_plan
+
+        await select_plan(app, ids={r["id"] for r in app.plan_items if r["descriptor"]["kind"] == "power"})
+        app.query_one("#q-measure").value = True
         action = asyncio.create_task(click_after_layout(pilot, "#b-quick"))
         language_started = asyncio.Event()
 

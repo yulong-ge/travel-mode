@@ -218,9 +218,14 @@ def power_recommendations(profiles=None):
         "networkoversleep": t("constants.network_during_sleep"),
         "powernap": "Power Nap",
     }
-    recommendations = [(key, desc, overrides.get(key, rec)) for key, desc, rec in POWER_KEYS]
+    recommendations = [
+        (key, desc, ("1" if key == "tcpkeepalive" else overrides.get(key, rec)))
+        for key, desc, rec in POWER_KEYS
+    ]
     if load_config().options.scenario == "work":
-        recommendations = [row for row in recommendations if row[0] == "lowpowermode"]
+        recommendations = [
+            row for row in recommendations if row[0] in {"lowpowermode", "powernap", "womp", "tcpkeepalive"}
+        ]
     current = (pmset_custom() if profiles is None else profiles).get("b", {})
     if not current:
         return []
@@ -238,24 +243,28 @@ def power_preview(profiles, *, scenario=None, supported=None, config=None):
     config = config or load_config()
     scenario = scenario or config.options.scenario
     supported = supported_pmset_keys() if supported is None else supported
-    result = dict(changes=[], satisfied=[], unavailable=[], ac_changes=[])
+    result = dict(changes=[], satisfied=[], satisfied_settings=[], unavailable=[], ac_changes=[])
     for key, _, default in POWER_KEYS:
-        if scenario == "work" and key != "lowpowermode":
+        if scenario == "work" and key not in {"lowpowermode", "powernap", "womp", "tcpkeepalive"}:
             continue
         actual = map_pmset_key(key, supported & profiles.get("b", {}).keys())
         name = t("preview.name." + key)
         current = profiles.get("b", {}).get(actual)
-        target = config.power_overrides.get(key, default)
+        target = "1" if key == "tcpkeepalive" else config.power_overrides.get(key, default)
         if current is None:
             result["unavailable"].append(name)
         elif current == target:
             result["satisfied"].append(name)
+            if key != "tcpkeepalive":
+                result["satisfied_settings"].append(dict(kind="power", domain="-b", values=[actual, target]))
         else:
             result["changes"].append(
                 dict(key=actual, name=name, current=current, target=target, explanation=t("preview." + key))
             )
     for key in ("powernap", "womp"):
         current = profiles.get("a", {}).get(key)
+        if current == "0":
+            result["satisfied_settings"].append(dict(kind="power", domain="-c", values=[key, "0"]))
         if current is not None and current != "0":
             result["ac_changes"].append(
                 dict(key=key, current=current, target="0", explanation=t("preview.ac_" + key))

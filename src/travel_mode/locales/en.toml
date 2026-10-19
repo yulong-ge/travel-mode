@@ -507,15 +507,15 @@
 
 "scenario.prompt" = "Choose a scenario"
 "scenario.input" = "  [work/away] "
-"scenario.work" = "Work on battery"
-"scenario.away" = "Away / overnight"
-"scenario.work_desc" = "Keep the screen and network available; pause background sync, backups and updaters."
-"scenario.away_desc" = "Prepare for lid-closed travel or overnight sleep with the existing power-saving actions."
+"scenario.work" = "On the go"
+"scenario.away" = "Overnight & flight"
+"scenario.work_desc" = "Work with the lid open and carry the Mac with it closed. Freeze unused apps, pause sync and prepare sleep."
+"scenario.away_desc" = "For a long break. Quit unused apps; deeper sleep is optional. Wi-Fi and Bluetooth stay on by default."
 "scenario.help" = "select work or away; skip the scenario picker"
 "scenario.invalid" = "expected ask, work or away (CLI: work or away)"
 "scenario.required" = "select --scenario work|away or --profile before applying"
 "scenario.conflict" = "the scenario conflicts with the profile scenario"
-"profiles.work" = "Work on battery; keep screen and network available"
+"profiles.work" = "On the go, with screen and network available and sleep prepared"
 "categories.invalid" = "expected categories sync, backup, updater, vm or keep-awake"
 "health.title" = "Health check"
 "health.legacy_failed" = "Cannot complete the existing audit: {reason}. Independent health checks are listed separately."
@@ -770,7 +770,7 @@
 "automation.action_failed" = "Automatic action failed: {action}"
 "automation.debounced" = "Ignored a repeated source event within 30 seconds."
 "automation.unchanged" = "Power source is unchanged; no action taken."
-"automation.battery_notice" = "Switched to battery power. Run travel-mode to enter unplugged work mode."
+"automation.battery_notice" = "Switched to battery power. Run travel-mode to start On the go."
 "automation.ac_notice" = "AC power is connected. Run travel-mode off to restore."
 "automation.restore_failed" = "Some restore actions failed. The recovery record is retained; run travel-mode off to finish."
 "automation.restored" = "Restored the active travel-mode recovery record."
@@ -833,8 +833,8 @@
 "menubar.source_ac" = "On power"
 "menubar.source_battery" = "Battery"
 "menubar.source_ups" = "UPS"
-"menubar.work" = "Enter unplugged work"
-"menubar.away" = "Enter away / overnight"
+"menubar.work" = "On the go"
+"menubar.away" = "Overnight & flight"
 "menubar.off" = "Restore (off)"
 "menubar.check" = "Health check"
 "menubar.power" = "Measure power"
@@ -852,8 +852,8 @@
 "health.unavailable" = "Unable to check"
 "menubar.duration" = "{hours} h {minutes} min"
 "menubar.session" = "{label} · {duration} elapsed"
-"menubar.session_work" = "Unplugged work active"
-"menubar.session_away" = "Away active"
+"menubar.session_work" = "On the go"
+"menubar.session_away" = "Overnight & flight"
 "menubar.session_unknown" = "Power saving is on"
 "menubar.remaining" = "About {duration} remaining"
 "menubar.charging_charging" = "Charging"
@@ -926,7 +926,7 @@
 "setup.invalid_policy" = "Must be legacy or adaptive"
 "setup.reason_freeze" = "Preserve running state; continue after resuming"
 "setup.reason_provider" = "Freezing may block access to cloud files"
-"setup.reason_assertion" = "Holds a sleep assertion; freezing still prevents Mac sleep"
+"setup.reason_assertion" = "Holds a sleep assertion; freezing does not release it"
 "setup.reason_interactive" = "You may be using this app"
 "setup.reason_notice" = "Identification only; no automatic action"
 "setup.group_freeze" = "Freeze"
@@ -994,7 +994,7 @@
 "health_view.high_cpu_clear" = "Background CPU load: no high-load apps found"
 "health_view.high_cpu_found" = "High background CPU load: {names}"
 "health_view.background_process" = "background processes"
-"health_view.displays_hit" = "External display: connected; this can increase power use"
+"health_view.displays_hit" = "External display connected; this increases energy use"
 "health_view.displays_clear" = "External display: none connected"
 "health_view.spotlight_hit" = "Spotlight: heavy indexing activity"
 "health_view.spotlight_clear" = "Spotlight: no heavy indexing activity"
@@ -1024,9 +1024,9 @@
 "services.log_hint" = "Details: {path}; fix the file permissions or format, then refresh."
 "preview.name.lowpowermode" = "Low Power Mode"
 "preview.lowpowermode" = "Reduce energy use on battery; effects vary by Mac model."
-"preview.name.sleep" = "Idle sleep delay"
+"preview.name.sleep" = "Idle sleep"
 "preview.sleep" = "Sleep after the configured idle minutes on battery; 0 disables automatic sleep."
-"preview.name.displaysleep" = "Display sleep delay"
+"preview.name.displaysleep" = "Display sleep"
 "preview.displaysleep" = "Turn off the display after the configured idle minutes on battery."
 "preview.name.powernap" = "Power Nap"
 "preview.powernap" = "Turn off Power Nap on battery: do not wake periodically to sync Mail and iCloud."
@@ -1038,7 +1038,7 @@
 "preview.standby" = "Allow a lower-power standby state after the Mac has slept for a while."
 "preview.name.hibernatemode" = "Hibernation mode"
 "preview.hibernatemode" = "Save memory to disk; deeper hibernation can take longer to resume."
-"preview.name.ttyskeepawake" = "Stay awake for terminal activity"
+"preview.name.ttyskeepawake" = "Keep active terminal tasks awake"
 "preview.ttyskeepawake" = "Prevent idle sleep during terminal activity; closing the lid still allows sleep."
 "preview.name.disksleep" = "Disk sleep delay"
 "preview.disksleep" = "Sleep idle disks after the configured minutes; the effect on SSDs is limited."
@@ -1050,9 +1050,195 @@
 "health_view.error_permission" = "Read denied; check permissions and retry. Details: {path}"
 "health_view.error_invalid" = "Invalid observation format; details: {path}"
 "health_view.error_read" = "Read failed; details: {path}"
-"conflict.scene_away" = "away / overnight"
-"conflict.scene_work" = "unplugged work"
+"conflict.scene_away" = "Overnight & flight"
+"conflict.scene_work" = "On the go"
 "services.configured_invalid" = "Cannot read the configured background service {path}: {reason}. Correct the path, permissions or plist format in the configuration, then retry."
 "health_view.pre_session" = "This assertion predates the session; it did not begin with this power-source change."
 "health_view.caffeinate" = "caffeinate is keeping the Mac awake; this keep-awake task can be ended."
 "services.ready" = "Can pause: {name}"
+
+"redesign.keepalive_locked" = "Network keep-alive during sleep stays on for Find My; this plan cannot disable it."
+"redesign.keepalive" = "Keep network connections during sleep (fixed): Find My needs them to locate this Mac. This can briefly wake the sleeping Mac."
+"redesign.findmy_warning" = "Turning this off may prevent Find My from locating this Mac."
+"redesign.picker_hint" = "1 / 2 select · Enter confirm"
+"redesign.plan" = "Plan"
+"redesign.result" = "Results"
+"redesign.session" = "Session"
+"redesign.attention" = "Sleep readiness"
+"redesign.ready" = "Closing the lid allows normal sleep."
+"redesign.sleep_disabled" = "Lid sleep may be blocked: system sleep is disabled."
+"redesign.system_holder" = "{name} prevents system sleep; closing the lid may not allow sleep."
+"redesign.idle_holder" = "{name} prevents idle sleep while the lid is open; closing the lid still allows sleep."
+"redesign.remote_source" = "{name} may set this and may undo a repair."
+"redesign.readiness_unknown" = "Sleep readiness could not be checked: {reason}"
+"redesign.all" = "All"
+"redesign.power" = "Power"
+"redesign.apps" = "Apps"
+"redesign.services" = "Services"
+"redesign.network" = "Network"
+"redesign.selected" = "{n} selected"
+"redesign.apply" = "Start saving power ({n})"
+"redesign.done" = "Done"
+"redesign.new_plan" = "New plan"
+"redesign.off" = "Restore all (off)"
+"redesign.more" = "More"
+"redesign.help" = "Help"
+"redesign.details" = "Details"
+"redesign.footer" = "q Quit  l Language  r Refresh  d Details  ? Help"
+"redesign.no_result" = "No actions performed."
+"redesign.no_details" = "Focus a row to view its evidence."
+"redesign.noise" = "{apps} unmatched app settings · {services} unreadable service files · {network} unavailable network apps · d details"
+"redesign.normal" = "{n} other checks normal"
+"redesign.satisfied" = "Already set: {names}"
+"redesign.pause" = "Pause"
+"redesign.freeze" = "Freeze"
+"redesign.quit" = "Quit"
+"redesign.ask" = "Ask"
+"redesign.skip" = "Skip"
+"redesign.off_action" = "Turn off"
+"redesign.apply_action" = "Apply"
+"redesign.service_reason" = "Paused until restore, then loaded again"
+"redesign.network_reason" = "Keep connections unless selected"
+"redesign.spotlight_reason" = "Optional; stops indexing until restore"
+"redesign.brightness" = "Screen brightness"
+"redesign.brightness_reason" = "Optional; restore returns the original brightness"
+"redesign.hibernation" = "Deeper sleep"
+"redesign.hibernation_reason" = "Save memory to disk; sleep and wake take longer"
+"redesign.keep_network" = "Network stays connected unless you select an action."
+"redesign.result_summary" = "{ok} succeeded, {failed} failed. Details: {path}"
+"redesign.row_done" = "Completed"
+"redesign.row_skipped" = "Skipped"
+"redesign.row_running" = "Running"
+"redesign.session_title" = "{scenario} · {duration}"
+"redesign.session_changes" = "Changes: {power} power settings · {apps} apps · {services} services"
+"redesign.session_battery" = "Battery {start}% → {current}% ({delta}% used)"
+"redesign.session_power" = "Average {watts:.1f} W · about {duration} remaining at this rate"
+"redesign.session_incomplete" = "Power was connected or battery data is incomplete; no discharge estimate."
+"redesign.revived" = "{n} paused items are running again: {names}"
+"redesign.thaw" = "Resume one frozen app"
+"redesign.measure" = "Measure power"
+"redesign.energy" = "Sample energy ranking once"
+"redesign.help_text" = "Select rows, then start. Space cycles an app action. Filters only change visibility. d opens evidence; all changes can be restored with off."
+"redesign.drawer_heading" = "Evidence and results · {name}"
+"redesign.auto" = "Automatic events status"
+
+"redesign.language" = "Language"
+
+"setup.reason_freeze_quit" = "On the go: keep the running state; overnight: quit and reopen on restore."
+
+"redesign.failed_short" = "Failed"
+
+"redesign.forced_short" = "Forced"
+
+"redesign.refused_short" = "Could not quit; a confirmation dialog may be open."
+
+"redesign.failed_reason" = "This action failed; press d for details."
+
+"redesign.row_thawed" = "Resumed"
+
+"redesign.quit_reason" = "Quit the app; restore reopens it."
+
+"redesign.assertions_not_checked" = "Only the global sleep switch was checked; run check to inspect app assertions."
+
+"redesign.ac_powernap" = "Power Nap (On power)"
+"redesign.ac_womp" = "Network wake (On power)"
+"redesign.planned_short" = "Planned"
+
+"redesign.freeze_failed" = "Could not freeze; see details."
+"redesign.quit_timeout" = "No response before the quit deadline."
+
+"redesign.target_on" = "On"
+
+"redesign.target_off" = "Off"
+
+"redesign.target_minutes" = "{minutes} min"
+
+"redesign.target_never" = "Never"
+
+"redesign.target_deeper" = "Deeper"
+
+"redesign.target_standard" = "Standard"
+
+"redesign.scope_ac" = "On power"
+
+"redesign.scope_battery" = "On battery"
+
+"redesign.scoped_name" = "{name} ({scope})"
+
+"redesign.satisfied_setting" = "{scope}: {name} {target}"
+
+"redesign.work_assertion" = "Prevents idle sleep; lid sleep still works. Freezing keeps the assertion."
+
+"redesign.effect_lowpowermode" = "Reduce energy use; effects vary by Mac model."
+
+"redesign.effect_sleep" = "Allow the idle Mac to sleep automatically."
+
+"redesign.effect_displaysleep" = "Turn off the idle display to save energy."
+
+"redesign.effect_powernap" = "The sleeping Mac will not wake periodically to sync Mail and iCloud."
+
+"redesign.effect_womp" = "Other devices cannot wake this Mac over the network."
+
+"redesign.effect_tcpkeepalive" = "Keep Find My available during sleep."
+
+"redesign.effect_standby" = "Use less energy after the Mac has slept for a while."
+
+"redesign.effect_hibernatemode" = "Save memory to disk so it can be restored after power loss."
+
+"redesign.effect_ttyskeepawake" = "Allow active terminal tasks to finish before idle sleep."
+
+"redesign.effect_disksleep" = "Let idle disks rest; this has little effect on SSDs."
+
+"redesign.effect_lessbright" = "Allow macOS to dim the display on battery."
+
+"redesign.effect_networkoversleep" = "Reduce network activity during sleep; remote access may be affected."
+
+"redesign.suggestions" = "▲ {n} suggestions · {toggle}"
+
+"redesign.expand" = "Expand ▸"
+
+"redesign.collapse" = "Collapse ▾"
+
+"redesign.evidence_path" = "Location: {value}"
+
+"redesign.evidence_cpu" = "CPU: {value}%"
+
+"redesign.evidence_command" = "Command: {value}"
+
+"redesign.evidence_exit" = "Exit code {value}"
+
+"redesign.evidence_observation" = "Observation: {value}"
+
+"redesign.readiness_source" = "{message} {source}"
+
+"redesign.satisfied_battery" = "Already set on battery: {names}"
+
+"redesign.satisfied_ac" = "Already set on power: {names}"
+
+"redesign.satisfied_separator" = ", "
+
+"redesign.satisfied_value" = "{name} {target}"
+
+"redesign.satisfied_product_value" = "{name} {target}"
+
+"health_view.with_advice" = "{conclusion}. {advice}"
+
+"health.advice.displays" = "Disconnect it when not needed."
+
+"health.advice.sleep_disabled" = "Use Enable system sleep to restore sleep."
+
+"health.advice.keep_awake" = "End the keep-awake session in the app."
+
+"health.advice.caffeinate" = "End caffeinate in the terminal where it was started."
+
+"health.advice.assertions" = "Stop the active task in the app."
+
+"health.advice.spotlight" = "Wait for indexing to finish."
+
+"health.advice.backup" = "Choose Skip This Backup in the Time Machine menu."
+
+"health.advice.low_power" = "Enable Low Power Mode in Battery settings."
+
+"health.advice.brightness" = "Lower screen brightness manually."
+
+"health.advice.high_cpu" = "Inspect the task in Activity Monitor."

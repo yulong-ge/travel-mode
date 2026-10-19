@@ -1,49 +1,6 @@
 {
-  "active": "p-dash",
+  "active": "result",
   "commands": [
-    [
-      "pmset",
-      "-g",
-      "ps"
-    ],
-    [
-      "ioreg",
-      "-rn",
-      "AppleSmartBattery"
-    ],
-    [
-      "pmset",
-      "-g",
-      "batt"
-    ],
-    [
-      "launchctl",
-      "list"
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
-    ],
-    [
-      "ps",
-      "-axo",
-      "pid=,%cpu=,command="
-    ],
-    [
-      "pmset",
-      "-g",
-      "custom"
-    ],
-    [
-      "pmset",
-      "-g",
-      "custom"
-    ],
-    [
-      "pmset",
-      "-g",
-      "cap"
-    ],
     [
       "ioreg",
       "-rn",
@@ -65,7 +22,9 @@
       "sleep",
       "5",
       "displaysleep",
-      "3"
+      "3",
+      "hibernatemode",
+      "25"
     ],
     [
       "sudo",
@@ -76,16 +35,29 @@
       "sleep",
       "5",
       "displaysleep",
-      "3"
+      "3",
+      "hibernatemode",
+      "25"
     ],
     [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
+      "sudo",
+      "-n",
+      "-l",
+      "pmset",
+      "-c",
+      "powernap",
+      "0",
+      "womp",
+      "0"
     ],
     [
-      "ps",
-      "-axo",
-      "pid=,%cpu=,command="
+      "sudo",
+      "pmset",
+      "-c",
+      "powernap",
+      "0",
+      "womp",
+      "0"
     ],
     [
       "ps",
@@ -112,11 +84,6 @@
       "pid=,ppid=,stat=,lstart=,comm="
     ],
     [
-      "pmset",
-      "-g",
-      "assertions"
-    ],
-    [
       "ps",
       "-axo",
       "pid=,ppid=,stat=,lstart=,comm="
@@ -130,109 +97,6 @@
       "kill",
       "-STOP",
       "910002"
-    ],
-    [
-      "launchctl",
-      "list"
-    ],
-    [
-      "launchctl",
-      "unload",
-      "<ROOT>/Library/LaunchAgents/org.demo.worker.plist"
-    ],
-    [
-      "mdutil",
-      "-s",
-      "/"
-    ],
-    [
-      "sudo",
-      "-n",
-      "-l",
-      "mdutil",
-      "-i",
-      "off",
-      "/"
-    ],
-    [
-      "sudo",
-      "mdutil",
-      "-i",
-      "off",
-      "/"
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
-    ],
-    [
-      "ps",
-      "-axo",
-      "pid=,ppid=,stat=,lstart=,comm="
     ],
     [
       "ps",
@@ -252,15 +116,6 @@
       "ps",
       "-axo",
       "pid=,ppid=,stat=,lstart=,comm="
-    ],
-    [
-      "ps",
-      "-axo",
-      "pid=,ppid=,stat=,lstart=,comm="
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
     ],
     [
       "ps",
@@ -343,13 +198,9 @@
       "pid=,ppid=,stat=,lstart=,comm="
     ],
     [
-      "networksetup",
-      "-listallhardwareports"
-    ],
-    [
-      "networksetup",
-      "-getairportpower",
-      "en0"
+      "launchctl",
+      "unload",
+      "<ROOT>/Library/LaunchAgents/org.demo.worker.plist"
     ],
     [
       "sudo",
@@ -369,171 +220,241 @@
     ],
     [
       "blueutil",
-      "-p"
-    ],
-    [
-      "blueutil",
       "-p",
       "0"
     ],
     [
-      "pmset",
-      "-g"
+      "sudo",
+      "-n",
+      "-l",
+      "mdutil",
+      "-i",
+      "off",
+      "/"
     ],
     [
-      "pmset",
-      "-g",
-      "assertions"
+      "sudo",
+      "mdutil",
+      "-i",
+      "off",
+      "/"
     ],
     [
-      "ps",
-      "-axo",
-      "pid=,ppid=,stat=,lstart=,comm="
+      "brightness",
+      "-l"
     ],
     [
-      "ps",
-      "-ww",
-      "-axo",
-      "pid=,command="
-    ],
-    [
-      "pmset",
-      "-g"
-    ],
-    [
-      "pmset",
-      "-g",
-      "assertions"
-    ],
-    [
-      "pmset",
-      "-g",
-      "assertions"
+      "brightness",
+      "0.5"
     ]
   ],
   "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
   "exit_code": null,
-  "labels": [
-    "",
-    "[dim]87% · Battery power[/]",
-    "[yellow]▲[/]",
-    "caffeinate is keeping the Mac awake; this keep-awake task can be ended.",
-    "",
-    "High-energy apps: [b]5[/] running",
-    "",
-    "Background agents: [b]1[/] unloadable"
-  ],
   "log": [
     [
       "dim",
-      "Executing: Run selected actions"
-    ],
-    [
-      "dim",
-      "Battery telemetry usually updates every 20–60 s; allow about 1–3 min per window (timeout 180 s; 2 fresh updates). Use --no-measure to skip."
-    ],
-    [
-      "dim",
-      "Measuring battery draw before applying actions"
-    ],
-    [
-      "dim",
-      "Fresh telemetry updates: 0/2"
-    ],
-    [
-      "dim",
-      "Not measurable: external power is connected"
-    ],
-    [
-      "dim",
-      "Applying recommended power settings…"
-    ],
-    [
-      "dim",
-      "Already set: Power Nap, Network connections during sleep, Network wake, Deep standby, Hibernation mode, Stay awake for terminal activity, Disk sleep delay, Dim display on battery, Network activity during sleep"
+      "Executing: Start saving power (15)"
     ],
     [
       "ok",
-      "Updated 3 battery settings"
+      "Low Power Mode: Completed"
     ],
     [
       "ok",
-      "Quit Demo quit"
+      "Idle sleep: Completed"
     ],
     [
       "ok",
-      "Freeze Demo frozen"
-    ],
-    [
-      "dim",
-      "Ask Demo needs individual confirmation; skipped in the batch."
+      "Display sleep: Completed"
     ],
     [
       "ok",
-      "Apps complete: 1 quit / 1 frozen / awaiting individual confirmation: Ask Demo"
+      "Deeper sleep: Completed"
     ],
     [
       "ok",
-      "org.demo.worker unloaded"
-    ],
-    [
-      "dim",
-      "Agents unloaded: 1"
+      "Power Nap (On power): Completed"
     ],
     [
       "ok",
-      "Spotlight indexing disabled"
+      "Network wake (On power): Completed"
     ],
     [
       "ok",
-      "Network Demo quit"
+      "Quit Demo: Quit"
     ],
     [
       "ok",
-      "Remote Demo: System daemon unloaded: <ROOT>/org.demo.daemon.plist; Remote Demo quit (off restores it)"
+      "Freeze Demo: Frozen"
     ],
     [
       "ok",
-      "Wi-Fi (en0) disabled"
+      "Network Demo: Quit"
     ],
     [
       "ok",
-      "Bluetooth disabled"
-    ],
-    [
-      "bad",
-      "System sleep: globally disabled; closing the lid may not allow sleep"
-    ],
-    [
-      "bad",
-      "Final audit: System sleep: globally disabled; closing the lid may not allow sleep"
-    ],
-    [
-      "warn",
-      "Final audit: caffeinate prevents sleep: PID 919999: /usr/bin/caffeinate -d; parent PID 919997: /Applications/Terminal.app/Contents/MacOS/Terminal"
-    ],
-    [
-      "warn",
-      "Final audit: Remote Demo prevents system sleep; this may also affect sleep when the lid is closed."
-    ],
-    [
-      "warn",
-      "Final audit: Audio assertion: \"audio\" (quit the app playing audio to release it)"
+      "Remote Demo: Quit"
     ],
     [
       "ok",
-      "Power-saving actions complete — recovery record updated; travel-mode off restores it"
+      "org.demo.worker: Completed"
+    ],
+    [
+      "ok",
+      "Wi-Fi: Completed"
+    ],
+    [
+      "ok",
+      "Bluetooth: Completed"
+    ],
+    [
+      "ok",
+      "Spotlight: Completed"
+    ],
+    [
+      "ok",
+      "Screen brightness: Completed"
     ]
   ],
   "output": "",
   "refresh_requests": [
     "refresh"
   ],
+  "rows": [
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Low Power Mode",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Idle sleep",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Display sleep",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Power Nap (On power)",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Network wake (On power)",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Deeper sleep",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "quit",
+      "group": "apps",
+      "name": "Quit Demo",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "freeze",
+      "group": "apps",
+      "name": "Freeze Demo",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "ask",
+      "group": "apps",
+      "name": "Ask Demo",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "quit",
+      "group": "network",
+      "name": "Network Demo",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "quit",
+      "group": "network",
+      "name": "Remote Demo",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "pause",
+      "group": "services",
+      "name": "org.demo.worker",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "off_action",
+      "group": "network",
+      "name": "Wi-Fi",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "off_action",
+      "group": "network",
+      "name": "Bluetooth",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "pause",
+      "group": "services",
+      "name": "Spotlight",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Screen brightness",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    }
+  ],
   "state": {
-    "ac_prof": "",
+    "ac_prof": "powernap 1 womp 1",
     "anchored_at": "<TIME>",
-    "batt_prof": "lowpowermode 0 sleep 1 displaysleep 10",
-    "brightness": "",
+    "batt_prof": "lowpowermode 0 sleep 1 displaysleep 10 hibernatemode 3",
+    "brightness": "0.8",
     "bt_off": "1",
     "frozen_apps": [
       "<ROOT>/Applications/Freeze Demo.app"
@@ -562,9 +483,9 @@
     "scenario": "away",
     "session": {
       "actions": {
-        "attempted": 9,
+        "attempted": 11,
         "failed": 0,
-        "succeeded": 9
+        "succeeded": 11
       },
       "external_seen": true,
       "id": "fixture-session",

@@ -3,7 +3,7 @@
 from ..actions.apps import FreezeApp, QuitApp, QuitDaemonApp, configured_daemon
 from ..actions.power import EnableSleep, KillCaffeinate, SetBrightness, SetPowerProfile, StopSpotlight
 from ..i18n import t
-from ..system.health import collect
+from ..system.health import collect as health_collect
 from ..system.process_control import Process
 from ..system.processes import CaffeinateTarget
 
@@ -32,8 +32,6 @@ def lines(report, *, verbose=False, scenario=None):
                 yield f"  {row['manual']}"
             for action in row["actions"] if verbose else row["display_actions"]:
                 yield ("  " if verbose else " ") + action_label(action)
-            if not verbose and row["action_hint"]:
-                yield " " + row["action_hint"]
     if verbose:
         yield from report["limitations"]
 
@@ -86,3 +84,11 @@ def remediate(descriptor, execute, state, save):
 
 
 __all__ = ["collect", "lines", "make_action", "remediate"]
+
+
+def collect():
+    from ..sleep_readiness import from_report, store
+
+    report = health_collect()
+    store(from_report(report))
+    return report

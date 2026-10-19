@@ -78,8 +78,7 @@ def test_vm_cli_round_trip_skips_power_and_tcc_but_tests_fixture_actions(vm, mon
 
 @pytest.mark.parametrize("scenario", ["work", "away"])
 async def test_vm_tui_fixture_only_round_trip_waits_for_actions(vm, scenario):
-    from e2e_battery import QUICK_SELECTION
-    from textual.widgets import Checkbox
+    from e2e_battery import select_fixture_plan
 
     from travel_mode.i18n import t
     from travel_mode.tui.app import TravelApp
@@ -94,27 +93,18 @@ async def test_vm_tui_fixture_only_round_trip_waits_for_actions(vm, scenario):
     async with app.run_test(size=(160, 55)) as pilot:
         await app.wait_for_idle()
         assert app.origin_ready and app.refresh_complete
-        assert not app.query("#b-fixsleep")
-        assert not app.query("#b-health-sleep_disabled-0")
-        health_text = "\n".join(str(w.content) for w in app.query("#dash-health Static"))
+        assert not app.query("#ready-0 Button")
+        health_text = "\n".join(str(w.content) for w in app.query("#sleep-ready Static"))
         assert t("health_view.capability_unavailable") in health_text
-        assert "SleepDisabled" not in health_text
-        await pilot.press("2")
-        await app.wait_for_idle()
-        assert app.query_one("#cb-ac", Checkbox).disabled
-        assert not app.query("#cb-hib25") and not app.pw_boxes
-        await pilot.press("1")
-        await app.wait_for_idle()
-        for name, value in {**QUICK_SELECTION, "q-measure": False}.items():
-            app.query_one("#" + name, Checkbox).value = value
-        # Even an explicitly requested battery update must not send an empty pmset write.
-        app.query_one("#q-power", Checkbox).value = True
-        await app.wait_for_idle()
+        assert not any(
+            r["descriptor"]["kind"] == "power" and r["descriptor"]["domain"] == "-b" for r in app.plan_items
+        )
+        select_fixture_plan(app, measure=False)
+        await app.render_plan()
         await click_after_layout(pilot, "#b-quick")
         await app.wait_for_idle()
         harness.assert_on()
-        await pilot.press("5")
-        await app.wait_for_idle()
+        await click_after_layout(pilot, "#b-complete")
         await click_after_layout(pilot, "#b-off")
         await app.wait_for_idle()
         harness.assert_off()

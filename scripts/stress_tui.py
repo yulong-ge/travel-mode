@@ -13,20 +13,13 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-TARGETS = [
-    "tests/tui",
-    "tests/characterization/test_tui_contract.py",
-    "tests/characterization/test_resurrection_flow.py",
-    "tests/characterization/test_dry_run_messages.py",
-    "tests/characterization/test_work_flow.py",
-    "tests/e2e_harness/test_isolation.py",
-    "tests/unit/test_review_ui.py",
-    "tests/unit/test_review_deferred.py",
-    "tests/unit/test_tui_extra_app_dirs.py",
-    "tests/unit/test_caffeinate_hibernation.py",
-    "tests/unit/test_tui_debug.py",
-    "tests/unit/test_scenarios.py",
-    "tests/unit/test_config_write_boundaries.py",
+# Include every file with an asynchronous test, including characterization and
+# harness paths outside tests/tui. These are finite hermetic pytest children.
+TARGETS = ["tests/tui"] + [
+    str(path.relative_to(ROOT))
+    for path in sorted((ROOT / "tests").rglob("test_*.py"))
+    if path.parent != ROOT / "tests/tui"
+    and ("async def test_" in path.read_text() or ".run_test(" in path.read_text())
 ]
 
 

@@ -1,5 +1,5 @@
 {
-  "active": "p-net",
+  "active": "result",
   "commands": [
     [
       "ioreg",
@@ -89,39 +89,150 @@
   ],
   "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
   "exit_code": null,
-  "labels": [
-    "[dim]aTrust: app not found[/]",
-    "[dim]Sangfor: app not found[/]",
-    "[dim]EasyConnect: app not found[/]",
-    "[dim]Clash Party: app not found[/]",
-    "[dim]ClashX Meta: app not found[/]",
-    "[dim]Mihomo Party: app not found[/]",
-    "[dim]V2rayU: app not found[/]",
-    "[dim]Cloudflare WARP: app not found[/]",
-    "[dim]UURemote: app not found[/]",
-    "[dim]Tailscale: app not found[/]",
-    "[dim]ClashX: app not found[/]",
-    "[dim]ClashX Pro: app not found[/]",
-    "[dim]Clash Verge: app not found[/]",
-    "[dim]Surge: app not found[/]",
-    "[dim]Shadowrocket: app not found[/]",
-    "[dim]WireGuard: app not found[/]",
-    "Network Demo: running · CPU 1.0%",
-    "Remote Demo: running · CPU 1.0%",
-    "[dim]Unload configured LaunchAgents on the Background services tab to stop their background activity[/]"
-  ],
   "log": [
     [
       "dim",
-      "Executing: Quit"
+      "Executing: Start saving power (1)"
     ],
     [
       "ok",
-      "Remote Demo: System daemon unloaded: <ROOT>/org.demo.daemon.plist; Remote Demo quit (off restores it)"
+      "Remote Demo: Quit"
     ]
   ],
   "output": "",
-  "refresh_requests": [],
+  "refresh_requests": [
+    "refresh"
+  ],
+  "rows": [
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Low Power Mode",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Idle sleep",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Display sleep",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Power Nap (On power)",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Network wake (On power)",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Deeper sleep",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "quit",
+      "group": "apps",
+      "name": "Quit Demo",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "freeze",
+      "group": "apps",
+      "name": "Freeze Demo",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "ask",
+      "group": "apps",
+      "name": "Ask Demo",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "quit",
+      "group": "network",
+      "name": "Network Demo",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "quit",
+      "group": "network",
+      "name": "Remote Demo",
+      "operations": [],
+      "selected": true,
+      "state": "done"
+    },
+    {
+      "action": "pause",
+      "group": "services",
+      "name": "org.demo.worker",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "off_action",
+      "group": "network",
+      "name": "Wi-Fi",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "off_action",
+      "group": "network",
+      "name": "Bluetooth",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "pause",
+      "group": "services",
+      "name": "Spotlight",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    },
+    {
+      "action": "apply",
+      "group": "power",
+      "name": "Screen brightness",
+      "operations": [],
+      "selected": false,
+      "state": "skipped"
+    }
+  ],
   "state": {
     "ac_prof": "",
     "anchored_at": "<TIME>",

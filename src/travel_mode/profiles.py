@@ -23,9 +23,9 @@ def builtin_profiles() -> dict[str, Profile]:
                 "aggressive": True,
                 "power": {"battery": {"hibernatemode": 25, "displaysleep": 2}},
                 "apps": {"default": "quit"},
-                "network": {"disconnect": True},
-                "wifi": "off",
-                "bluetooth": "off",
+                "network": {"disconnect": False},
+                "wifi": "keep",
+                "bluetooth": "keep",
                 "spotlight": "off",
                 "brightness": 0.15,
             }
@@ -41,7 +41,7 @@ def builtin_profiles() -> dict[str, Profile]:
             {
                 "description": t("profiles.work"),
                 "scenario": "work",
-                "power": {"battery": {"lowpowermode": 1}},
+                "power": {"battery": {"lowpowermode": 1, "powernap": 0, "womp": 0, "tcpkeepalive": 1}},
                 "wifi": "keep",
                 "bluetooth": "keep",
             }

@@ -1,0 +1,36 @@
+                                              travel-mode — Travel mode
+
+ On the go · 1 h 20 min
+ Battery 64%
+
+ Sleep readiness
+ ✗ Lid sleep may be blocked: system sleep is disabled. UURemote may set this and may undo a       Enable system sleep
+ repair.
+
+ Battery 80% → 64% (16% used)
+ Average 9.8 W · about 3 h 40 min remaining at this rate
+ Changes: 3 power settings · 2 apps · 1 services
+ 1 paused items are running again: Google Drive                                                    Apply pauses again
+ ▲ External display connected; this increases energy use. Disconnect it when not needed.
+ ▲ Screen brightness 85%, above the suggested 70%.                                                         Set to 50%
+ ▲ High background CPU load: Docker                                                                       Quit Docker
+   3 other checks normal
+
+
+
+
+
+
+
+
+
+
+
+
+
+   More     Adjust defaults     Run health check
+
+                                                                                                  Restore all (off)
+
+ ✘ Quit Refusal Demo refused to quit and may be showing a confirmation dialog. Resolve it and retry, or choose Force Q…
+ q Quit  l Language  r Refresh  d Details  ? Help

@@ -7,7 +7,7 @@ import threading
 from types import SimpleNamespace
 
 import pytest
-from textual.widgets import Button, Checkbox
+from textual.widgets import Button
 
 import travel_mode.actions.runtime as runtime
 import travel_mode.config as config_api
@@ -78,28 +78,18 @@ def test_cli_dry_run_config_write_preserves_original(cli_platform):
 
 
 async def test_tui_failed_thaw_retains_receipt(fake_runner):
+    from travel_mode.tui.plan import item, operation
+
     path = "/Applications/Demo.app"
-    fake_runner.responses[("pkill",)] = CmdResult("", "not permitted", 2)
     fake_runner.responses[("kill",)] = CmdResult("", "not permitted", 2)
     fake_runner.responses[("ps", "-axo", "pid=,ppid=,stat=,lstart=,comm=")] = CmdResult(
         f"777 1 T Mon Oct 12 09:00:00 2026 {path}/Contents/MacOS/Demo\n", "", 0
     )
-    saved, messages, done = [], [], []
-    app = SimpleNamespace(
-        in_thread=asyncio.to_thread,
-        app_rows={0: {"name": "Demo", "path": path, "done": False, "kill": False, "frozen": True}},
-        st={"frozen_apps": [path]},
-        save=lambda *args: saved.append(True),
-        mark_row_done=lambda *args, **kwargs: done.append(args),
-        logline=lambda *args: messages.append(args),
-    )
-    app.execute = Executor(Context(app.st, app.save)).execute
-    await TravelApp.act_app(app, 0, "f", SimpleNamespace())
-    assert any(kind == "bad" for kind, _ in messages)
-    assert app.st["frozen_apps"] == [path]
-    assert not done
-    assert app.st["session"]["actions"]["failed"] == 1
-    assert not any(kind == "ok" for kind, _ in messages)
+    st = {"frozen_apps": [path]}
+    row = item("resume", "apps", "Demo", "thaw", "", dict(kind="app", name="Demo", path=path))
+    assert not Executor(Context(st, lambda *a: None)).execute(operation(row, "away", st, lambda *a: None))
+    assert st["frozen_apps"] == [path]
+    assert st["session"]["actions"]["failed"] == 1
 
 
 def test_tui_missing_merged_snapshot_raises_before_silent_save(tmp_paths):
@@ -109,109 +99,69 @@ def test_tui_missing_merged_snapshot_raises_before_silent_save(tmp_paths):
 
 
 async def test_tui_power_selection_uses_actual_key_and_override(monkeypatch):
-    class Box:
-        async def remove_children(self):
-            pass
-
-        async def mount(self, *widgets):
-            pass
+    from travel_mode.system.pmset import power_preview
 
     config = Config(power_overrides={"lowpowermode": "0"})
-    monkeypatch.setattr(config_api, "load_config", lambda: config)
-    app = SimpleNamespace(
-        main_query_one=lambda *args: Box(),
-        main_query=lambda *args: [],
-        profile_values={},
-        scenario="away",
-        _update_power_btn=lambda: None,
-    )
-    await TravelApp.build_power(app, {"b": {"powermode": "1"}}, frozenset({"powermode"}))
-    assert [(key, rec) for key, rec, _ in app.pw_boxes] == [("powermode", "0")]
+    preview = power_preview({"b": {"powermode": "1"}}, supported=frozenset({"powermode"}), config=config)
+    assert [(r["key"], r["target"]) for r in preview["changes"]] == [("powermode", "0")]
 
 
 async def test_tui_network_daemon_uses_actual_configured_name(monkeypatch):
+    from travel_mode.tui.plan import item, operation
+
     spec = DaemonApp("Remote Demo", system_daemons=("/tmp/remote.plist",))
     monkeypatch.setattr(config_api, "load_config", lambda: Config(apps=AppsConfig(with_daemon=(spec,))))
     calls = []
     monkeypatch.setattr(
         daemon_apps, "quit_with_daemons", lambda *args: calls.append(args) or ("/Demo.app", True, "ok")
     )
-    monkeypatch.setattr(system_apps, "grace_quit", lambda *args: pytest.fail("daemon app used generic quit"))
-
-    async def sudo():
-        return True
-
-    async def busy(btn, fn, *args):
-        return fn(*args)
-
-    app = SimpleNamespace(
-        net_paths={0: (spec.name, "/Demo.app")},
-        st={},
-        save=lambda *args: None,
-        tui_sudo=sudo,
-        busy=busy,
-        logline=lambda *args: None,
-    )
-    app.execute = Executor(Context(app.st, app.save)).execute
-    await TravelApp.act_net(app, 0, SimpleNamespace(disabled=False))
+    monkeypatch.setattr(system_apps, "grace_quit", lambda *a: pytest.fail("daemon used generic quit"))
+    st = {}
+    row = item("remote", "network", spec.name, "quit", "", dict(kind="app", name=spec.name, path="/Demo.app"))
+    Executor(Context(st, lambda *a: None)).execute(operation(row, "away", st, lambda *a: None))
     assert calls[0][0] == spec
 
 
 async def test_tui_batch_completion_does_not_mark_replacement_row(monkeypatch, tmp_paths):
+    from tui_plan import select_plan
+
     config_path().write_text("")
     entered, release = threading.Event(), threading.Event()
     path = str(tmp_paths / "DemoA.app")
-    rows = [{"name": "DemoA", "path": path, "cpu": "0", "defact": "freeze"}]
-    monkeypatch.setattr(system_apps, "APP_DIRS", [])
-    monkeypatch.setattr(system_apps, "scan_apps", lambda: {"running": list(rows), "nobundle": []})
-    monkeypatch.setattr(
-        launchd, "svc_scan", lambda: {"unloadable": [], "kept": [], "candidates": [], "invalid": []}
-    )
-    monkeypatch.setattr(flow_check, "blockers_lines", lambda: flow_check.BlockerLines([]))
-    monkeypatch.setattr(system_apps, "load_conf", lambda: ({"DemoA": "freeze", "DemoB": "freeze"}, "freeze"))
-    monkeypatch.setattr(system_apps, "app_sleep_assertions", lambda name: [])
+    rows = [dict(name="DemoA", path=path, cpu="0", defact="freeze")]
+    monkeypatch.setattr(system_apps, "scan_apps", lambda: dict(running=list(rows), nobundle=[]))
 
     def freeze(path):
         entered.set()
-        if not release.wait(5):
-            raise TimeoutError("test did not release frozen app operation")
+        assert release.wait(10)
         return True
 
     monkeypatch.setattr(system_apps, "freeze_app", freeze)
-    app = TravelApp(scenario="away")
-    async with app.run_test(size=(110, 30)) as pilot:
-        await pilot.pause()
+    app = TravelApp(scenario="away", measure=False)
+    async with app.run_test(size=(110, 30)):
         await app.wait_for_idle()
-        action = asyncio.create_task(app.act_apps_all(app.query_one("#b-apps-all")))
+        await select_plan(app, names={"DemoA"}, action="freeze")
+        task = asyncio.create_task(app.on_button_pressed(Button.Pressed(app.query_one("#b-quick"))))
         try:
             assert await asyncio.to_thread(entered.wait, 5)
-            rows[:] = [
-                {"name": "DemoB", "path": str(tmp_paths / "DemoB.app"), "cpu": "0", "defact": "freeze"}
-            ]
+            rows[:] = [dict(name="DemoB", path=str(tmp_paths / "DemoB.app"), cpu="0", defact="freeze")]
             app.action_refresh()
-            await app.wait_for_idle()
-            observed = []
-            original = app.mark_row_done
-
-            def mark(index, *args, **kwargs):
-                original(index, *args, **kwargs)
-                observed.append((app.app_rows[index]["name"], app.app_rows[index]["done"]))
-
-            app.mark_row_done = mark
-            release.set()
-            await action
-            await app.wait_for_idle()
-            await pilot.pause()
-            assert ("DemoB", True) not in observed
-            assert path in app.st["frozen_apps"]
-            assert path in json.loads(state_path().read_text())["frozen_apps"]
+            assert app._refresh_after_action
         finally:
             release.set()
-            if not action.done():
-                await action
+            await task
+        await app.wait_for_idle()
+        assert path in app.st["frozen_apps"]
+        assert path in json.loads(state_path().read_text())["frozen_apps"]
+        app.view_mode = "plan"
+        app.plan_items = []
+        app.action_refresh()
+        await app.wait_for_idle()
+        replacement = next(r for r in app.plan_items if r["name"] == "DemoB")
+        assert replacement["state"] == "planned"
 
 
-@pytest.mark.parametrize("button_id", ["b-bt", "b-off"])
+@pytest.mark.parametrize("button_id", ["b-quick", "b-off"])
 async def test_tui_removed_snapshot_preflight_prevents_mutation(
     button_id, monkeypatch, tmp_paths, fake_runner
 ):
@@ -278,13 +228,9 @@ async def test_tui_apps_daemon_batch_dispatches_configured_spec(quick, monkeypat
     async with app.run_test() as pilot:
         await pilot.pause()
         await app.wait_for_idle()
-        if quick:
-            for key in ("power", "svc", "spot", "net"):
-                app.query_one(f"#q-{key}", Checkbox).value = False
-            await app.act_quick(app.query_one("#b-quick"))
-        else:
-            await app.act_apps_all(app.query_one("#b-apps-all"))
-        await app.wait_for_idle()
+        from tui_plan import apply_plan
+
+        await apply_plan(pilot, group="apps" if quick else None, names=None if quick else {spec.name})
         assert calls == [spec]
 
 

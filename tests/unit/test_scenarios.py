@@ -3,7 +3,7 @@
 import json
 
 import pytest
-from textual.widgets import Checkbox, TabbedContent
+from textual.widgets import TabbedContent
 
 from travel_mode import cli, state
 from travel_mode.config import Config, ConfigError, load_config
@@ -20,17 +20,22 @@ async def test_picker_precedes_scans_and_work_selection(language, fake_runner):
     app = TravelApp()
     async with app.run_test(size=(80, 24)) as pilot:
         assert not app.query(TabbedContent)
-        assert str(app.query_one("#scenario-work").label) == t("scenario.work")
+        assert t("scenario.work") in str(app.query_one("#scenario-work").content)
         assert fake_runner.calls == []
         assert not state_path().exists()
         await pilot.click("#scenario-work")
+        await pilot.press("enter")
         await app.wait_for_idle()
         assert app.scenario == "work" and app.st["scenario"] == "work"
-        assert app.query_one("#q-sync", Checkbox).value
-        assert app.query_one("#q-updater", Checkbox).value
-        assert not app.query_one("#q-net", Checkbox).value
-        assert not app.query_one("#q-spot", Checkbox).value
-        assert [key for key, _, _ in app.pw_boxes] == ["lowpowermode"]
+        assert all(
+            not r["selected"]
+            for r in app.plan_items
+            if r["descriptor"]["kind"] in {"wifi", "bluetooth", "spotlight"}
+        )
+        assert all(
+            r["descriptor"].get("values", [""])[0] not in {"sleep", "displaysleep", "hibernatemode"}
+            for r in app.plan_items
+        )
     assert active_scenario() == "ask"
 
 
@@ -41,7 +46,7 @@ async def test_configured_scenario_skips_picker(scenario):
     async with app.run_test() as pilot:
         await app.wait_for_idle()
         assert not app.query("#scenario-work")
-        assert app.query_one(TabbedContent).active == "p-dash"
+        assert not app.query(TabbedContent) and app.view_mode == "plan"
         await pilot.pause()
 
 
@@ -49,7 +54,9 @@ def test_work_recommendations_ignore_sleep_hibernation_overrides():
     config = Config.defaults()
     config.power_overrides.update(sleep="1", displaysleep="1", hibernatemode="25")
     with profile_scope(config, "work"):
-        assert [(key, rec) for key, _, rec in pmset.power_recommendations()] == [("lowpowermode", "1")]
+        assert dict((key, rec) for key, _, rec in pmset.power_recommendations()) == dict(
+            lowpowermode="1", powernap="0", tcpkeepalive="1", womp="0"
+        )
     assert active_scenario() == "ask"
 
 

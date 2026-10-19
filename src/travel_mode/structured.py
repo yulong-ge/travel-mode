@@ -9,9 +9,9 @@ from travel_mode.system import launchd, pmset, processes, spotlight
 
 from . import __version__
 from .config import load_config
+from .flows.doctor import collect
 from .i18n import t
 from .state import load_state
-from .system.health import collect
 from .system.platform import map_pmset_key, supported_pmset_keys
 from .system.shell import ReadError, optional_tool_paths, run_rc
 

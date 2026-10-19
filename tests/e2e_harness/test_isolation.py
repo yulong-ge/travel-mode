@@ -135,7 +135,7 @@ def test_local_config_explicitly_disables_builtin_categories_and_defaults(dirty_
 @pytest.mark.parametrize("scenario", ["work", "away"])
 async def test_tui_fixture_plan_excludes_foreign_apps_and_health_controls(dirty_machine, scenario, tmp_path):
     from e2e_ui import FixtureDebugApp
-    from textual.widgets import Button, Checkbox
+    from textual.widgets import Button
 
     original, guard, _ = dirty_machine
     harness = InteractiveHarness(
@@ -149,11 +149,16 @@ async def test_tui_fixture_plan_excludes_foreign_apps_and_health_controls(dirty_
             async with app.run_test(size=(120, 45)):
                 await app.wait_for_idle()
                 assert app.refresh_complete
-                assert not app.caffeinate_targets
+                assert not any(
+                    getattr(b, "health_descriptor", {}).get("kind") == "caffeinate" for b in app.query(Button)
+                )
                 assert all(Path(row["path"]).is_relative_to(harness.root) for row in app.scan["running"])
-                assert not app.query_one("#q-sync", Checkbox).value
-                assert not app.query_one("#q-updater", Checkbox).value
-                assert not app.query("#dash-health Button")
+                assert all(
+                    Path(row["descriptor"]["path"]).is_relative_to(harness.root)
+                    for row in app.plan_items
+                    if row["descriptor"]["kind"] == "app"
+                )
+                assert not any(hasattr(b, "health_descriptor") for b in app.query("#dash-health Button"))
                 text = "\n".join(str(w.content) for w in app.query("#dash-health Static"))
                 assert all(name not in text for name in FOREIGN)
                 assert all(name not in str(b.label) for name in FOREIGN for b in app.query(Button))

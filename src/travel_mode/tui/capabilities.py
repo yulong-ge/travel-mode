@@ -1,0 +1,83 @@
+"""Secondary app preferences and restore reports, using shared flows."""
+
+from travel_mode import snapshots
+from travel_mode.flows import restore as flow_restore
+from travel_mode.i18n import t
+
+
+class Capabilities:
+    def offer_remember(self, name, action, default):
+        from travel_mode.flows import setup
+        from travel_mode.tui.setup import ConfirmRemember
+
+        if self._dry_run or not self.remember.offer(name, self.scenario, action, default):
+            return
+        scenario = self.scenario
+
+        def answered(accepted):
+            try:
+                text = self.remember.answer(name, scenario, action, accepted)
+                if text:
+                    self.logline("ok", text)
+                    from travel_mode.config import load_config
+                    from travel_mode.paths import config_path
+
+                    self.config = load_config(config_path())
+            except Exception as exc:  # noqa: BLE001 - UI boundary logs and explicitly presents every failure
+                self.logline("bad", setup.failure(exc))
+
+        self.push_screen(ConfirmRemember(self.remember.prompt(name, scenario, action)), answered)
+
+    async def act_off(self, btn):
+        age = snapshots.anchor_age_hours(self.st)
+        if age is not None and age > 24:
+            self.logline("warn", t("impl.snapshot_is_hours_old_restoring_the", v0=age))
+
+        def flow():
+            from travel_mode import sessions
+
+            n, fails = flow_restore.run_restore(self.st, lambda k, m: self.tlog(k, m))
+            if fails:
+                if "session" in self.st:
+                    self.st["session"]["restored"] += n
+                    self.st["session"]["restore_failures"] += fails
+                    self.save()
+                return n, fails, None
+            report = sessions.finish(self.st, n, 0)
+            from travel_mode.state import _path
+
+            _path().unlink(missing_ok=True)
+            return n, 0, report
+
+        res = await self.busy(btn, flow)
+        if not res:
+            self.action_refresh()
+            return
+        n, fails, report = res
+        if report is not None:
+            from travel_mode import sessions
+            from travel_mode.tui.session_screen import SessionScreen
+
+            await self.push_screen(
+                SessionScreen("\n".join(sessions.describe(report, sessions.read_history())))
+            )
+        if fails:
+            self.logline("bad", t("impl.restores_failed_snapshot_retained_resolve_failures", v0=fails))
+            self.notify(t("impl.restores_failed_snapshot_retained", v0=fails), severity="error")
+        else:
+            self.logline("ok", t("impl.restore_complete_items_state_file_cleared", v0=n))
+            self.notify(t("impl.original_state_restored_items", v0=n), severity="information")
+        self.st, self.merged = snapshots.snapshot_origin()
+        self._session_admitted = True
+        self._app_outcomes = {}
+        self.action_refresh()
+
+    async def show_history(self):
+
+        from travel_mode import sessions
+
+        rows = await self.in_thread(sessions.read_history)
+        text = "\n\n".join("\n".join(sessions.describe(row, rows)) for row in reversed(rows))
+        from travel_mode.tui.session_screen import SessionScreen
+
+        await self.push_screen(SessionScreen(text or t("session.history_empty")))

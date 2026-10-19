@@ -262,20 +262,18 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None, continu
         elif profile_brightness is not None:
             emit("warn", t("impl.brightness_is_not_installed_restore_brightness", v0=profile_brightness))
 
-        if not work:
-            c.rule(t("impl.b_ac_profile_also_applies_while"))
+        c.rule(t("impl.b_ac_profile_also_applies_while"))
         ac_applied = False
         ac_available = all(key in profs.get("a", {}) for key in ("powernap", "womp"))
-        if not work and not ac_available:
+        if not ac_available:
             emit("dim", t("power.ac_unavailable"))
-        if not work:
+        if preview["ac_changes"]:
             for row in preview["ac_changes"]:
                 emit("dim", row["explanation"])
         if (
-            not work
-            and ac_available
+            ac_available
             and preview["ac_changes"]
-            and ask(t("impl.reduce_ac_activity_too_disable_powernap"), default="n", yes=yes)
+            and ask(t("impl.reduce_ac_activity_too_disable_powernap"), default="y", yes=yes)
         ):
             values = [part for row in preview["ac_changes"] for part in (row["key"], row["target"])]
             _, rc = execute(SetPowerProfile(values, "-c"))

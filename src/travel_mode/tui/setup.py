@@ -207,7 +207,7 @@ class SetupScreen(ModalScreen):
         return line, width
 
     def row_label(self, row):
-        reason = t("setup.reason_" + row["reason"])
+        reason = app_policy.explanation(row)
         line, width = self.table_line(
             self.display_name(row),
             t("action." + self.selected["work"][row["name"]]),

@@ -40,8 +40,8 @@ def installed(tmp_path, fake_runner):
 @pytest.mark.parametrize(
     "name,assertion,expected",
     [
-        ("Ordinary App", False, ("freeze", "freeze", "freeze")),
-        ("WeChat", False, ("freeze", "freeze", "freeze")),
+        ("Ordinary App", False, ("freeze", "quit", "freeze")),
+        ("WeChat", False, ("freeze", "quit", "freeze")),
         ("UURemote", True, ("freeze", "quit", "assertion")),
         ("Google Drive", False, ("quit", "quit", "provider")),
         ("OneDrive", False, ("quit", "quit", "provider")),
@@ -67,7 +67,7 @@ def test_single_snapshot_maps_assertion_pid_and_adaptive_scan(tmp_path, fake_run
     installed(tmp_path, fake_runner)
     rows = app_policy.discover()
     assert {r["name"]: (r["work"], r["away"]) for r in rows} == {
-        "WeChat": ("freeze", "freeze"),
+        "WeChat": ("freeze", "quit"),
         "Google Drive": ("quit", "quit"),
         "UURemote": ("freeze", "quit"),
         "Google Chrome": ("ask", "ask"),
@@ -255,7 +255,7 @@ def test_cli_setup_accepts_recommendations_and_dry_run(tmp_path, fake_runner, ca
     assert setup.run(yes=True, dry_run=True) == 0
     assert not (tmp_path / "config.toml").exists()
     output = capsys.readouterr().out
-    assert 'policy = "adaptive"' in output and "Work on battery freeze 2, quit 1" in output
+    assert 'policy = "adaptive"' in output and "On the go freeze 2, quit 1" in output
     answers = iter(["", "", "", "", "", "", "", "", "", "y"])
     assert setup.run(input_fn=lambda prompt: next(answers)) == 0
     config = load_config()
@@ -433,9 +433,9 @@ def test_freeze_reason_preserves_state_without_message_guarantees(language):
 
     set_language(language)
     expected = (
-        "Preserve running state; continue after resuming"
+        "On the go: keep the running state; overnight: quit and reopen on restore."
         if language == "en"
-        else "保留运行状态，恢复后继续使用"
+        else "外出时保留运行状态；过夜时退出，恢复时重新打开。"
     )
     for name in ("Calculator", "Books", "Photos", "Preview", "WeChat"):
         row = dict(name=name, **app_policy.recommend(name))
@@ -453,7 +453,7 @@ def test_box_is_file_provider_and_nextcloud_mode_is_not_assumed():
     )
     assert not identify(name="Nextcloud").get("file_provider")
     assert app_policy.recommend("Nextcloud", rule=identify(name="Nextcloud")) == dict(
-        work="freeze", away="freeze", reason="freeze"
+        work="freeze", away="quit", reason="freeze"
     )
 
 

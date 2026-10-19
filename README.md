@@ -8,15 +8,21 @@
 settings, pauses background programs you choose (sync clients, backups, updaters, heavy apps,
 launchd agents) and records every change, so `travel-mode off` puts things back.
 
-![Overview](docs/assets/dashboard.png)
+![Plan screen](docs/assets/plan.png)
 
 ## What it is for
 
-- **Work on battery** (`work`): a meeting or venue without a charger. The screen and network
-  stay on. Sync, backup and update programs and the apps you list are paused. Battery Low Power
-  Mode is turned on; sleep timers, Wi-Fi, Bluetooth and brightness are left alone.
-- **Away / overnight** (`away`): the lid is closed for travel or overnight. Sleep-related power
-  settings are tuned, and apps, services and network can be stopped after you review them.
+- **On the go** (`work`): working away from a charger, opening and closing the lid as you
+  move. Apps you are not using are frozen, sync, backup and update programs are paused, and Low
+  Power Mode is turned on. Settings that only matter while the Mac sleeps are prepared too (Power
+  Nap and wake for network access off), and the tool checks that closing the lid really puts the
+  Mac to sleep. The screen, Wi-Fi and Bluetooth stay on.
+- **Overnight / flight** (`away`): long periods without use. Apps are quit instead of frozen,
+  sleep timers are shortened, and deeper hibernation is offered. Turning off Wi-Fi and Bluetooth
+  is offered but not selected, because Find My needs them.
+
+In both scenarios network keep-alive during sleep stays on: Find My relies on it. The cost is
+that a sleeping Mac wakes briefly from time to time.
 
 The tool only runs while you use it. It installs no background service unless you opt into
 [event automation](#optional-event-automation).
@@ -40,8 +46,13 @@ travel-mode                                        # choose a scenario, review, 
 travel-mode off                                    # restore what was changed
 ```
 
-`travel-mode` opens a terminal interface (TUI). It first asks for a scenario, then shows the
-actions grouped by page; nothing changes until you apply a selection.
+`travel-mode` opens a terminal interface (TUI). It first asks for a scenario, then shows one
+plan: a sleep-readiness check at the top, health findings, and every action as one row with a
+checkbox, the target and a one-line reason, filtered by All / Power / Apps / Services / Network.
+Nothing changes until you press "Start saving power"; the same list then shows each result, with
+retry and force quit for an app that refused to quit. While a session is active the TUI opens on
+the session screen (time, battery used, average power, changes, "Restore all"). Press `d` for the
+technical details of a row and `?` for help.
 
 ### Prefer plain prompts
 
@@ -76,10 +87,13 @@ paths, never from `PATH`. `--dry-run` prints the commands and writes nothing.
 
 ### Health check
 
-`travel-mode check` (and the TUI overview) looks for common causes of battery drain and offers a
-fix where one exists:
+`travel-mode check` (and the top of the TUI plan) looks for common causes of battery drain and
+offers a fix where one exists:
 
-- global sleep disabled, `caffeinate` and keep-awake apps, apps holding sleep assertions
+- whether closing the lid will put the Mac to sleep: global sleep disabled (some remote-access
+  apps switch this themselves while charging; the check names the likely app), apps that block
+  system sleep, and apps that only block idle sleep (closing the lid still sleeps)
+- `caffeinate` and keep-awake apps
 - Spotlight indexing using a lot of CPU, a Time Machine backup in progress
 - Low Power Mode off or high brightness while on battery
 - background processes using a lot of CPU, external displays
@@ -151,8 +165,9 @@ travel-mode menubar status
 travel-mode menubar uninstall
 ```
 
-After installing, refresh SwiftBar. The icon shows an outline leaf when power saving is off, and
-a filled leaf or a moon with the elapsed time while a work or away session is running. The menu
+After installing, refresh SwiftBar. The icon shows an outline leaf when power saving is off, a
+filled leaf or a moon with the elapsed time while a session is running, and a warning triangle
+when the last check found that closing the lid would not put the Mac to sleep. The menu
 shows the session and battery state and opens commands in a terminal when you click them. The
 plugin refreshes every 5 minutes with `travel-mode status --json`, which only reads the local
 state file and `pmset -g ps`. SwiftBar itself stays running; travel-mode adds no process of its own.

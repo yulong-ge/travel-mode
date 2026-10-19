@@ -18,14 +18,18 @@ def mutation_commands(machine):
     return result
 
 
-def test_work_apply_and_off_preserve_display_network_ac_and_restore_only_changed_key(machine, capsys):
+def test_work_prepares_sleep_preserves_active_display_network_and_restores_changed_keys(machine, capsys):
     with profile_scope(load_config(), "work"):
         assert mode_apply(yes=True, aggressive=True) == 0
-    assert mutation_commands(machine) == [("pmset", "-b", "lowpowermode", "1")]
+    assert mutation_commands(machine) == [
+        ("pmset", "-b", "lowpowermode", "1"),
+        ("pmset", "-c", "powernap", "0", "womp", "0"),
+    ]
     snapshot = state.load_state()
     assert snapshot["scenario"] == "work"
     assert snapshot["batt_prof"] == "lowpowermode 0"
-    for key in ("ac_prof", "brightness", "wifi_off", "bt_off", "spotlight_off", "sleepdisabled"):
+    assert snapshot["ac_prof"] == "powernap 1 womp 1"
+    for key in ("brightness", "wifi_off", "bt_off", "spotlight_off", "sleepdisabled"):
         assert not snapshot[key]
     assert not any(command[:2] == ("kill", "-TERM") for command in machine["fake"].calls)
     capsys.readouterr()
@@ -35,7 +39,10 @@ def test_work_apply_and_off_preserve_display_network_ac_and_restore_only_changed
     assert json.loads(capsys.readouterr().out)["scenario"] == "work"
     machine["fake"].calls.clear()
     assert mode_off() == 0
-    assert mutation_commands(machine) == [("pmset", "-b", "lowpowermode", "0")]
+    assert mutation_commands(machine) == [
+        ("pmset", "-b", "lowpowermode", "0"),
+        ("pmset", "-c", "powernap", "1", "womp", "1"),
+    ]
     assert not (machine["root"] / "state.json").exists()
 
 
@@ -58,12 +65,15 @@ async def test_category_button_journals_each_identity_once_and_off_restores(mach
     app = TravelApp(scenario="work")
     async with app.run_test(size=(140, 55)) as pilot:
         await app.wait_for_idle()
-        await pilot.press("4")
-        await pilot.pause()
+        from tui_interaction import click_after_layout
+        from tui_plan import select_plan
+
+        await select_plan(app, ids=set())
+        await app.utility_action("b-category-sync")
+        app.query_one("#q-measure").value = False
         machine["fake"].calls.clear()
-        await pilot.click("#b-category-sync")
+        await click_after_layout(pilot, "#b-quick")
         await app.wait_for_idle()
-        await pilot.pause()
         snapshot = state.load_state()
         assert snapshot["quit_apps"] == [machine["paths"]["Quit Demo"]]
         assert snapshot["unloaded_svcs"] == [str(machine["plist"])]
@@ -93,7 +103,10 @@ async def test_work_profile_brightness_is_opt_in_and_uses_configured_target(mach
         await pilot.pause()
         assert ("brightness", "0.42") in machine["fake"].calls
         assert state.load_state()["brightness"] == "0.8"
-        assert mutation_commands(machine) == [("pmset", "-b", "lowpowermode", "1")]
+        assert mutation_commands(machine) == [
+            ("pmset", "-b", "lowpowermode", "1"),
+            ("pmset", "-c", "powernap", "0", "womp", "0"),
+        ]
 
 
 def test_work_quit_failure_does_not_force_quit_or_report_success(machine, monkeypatch):

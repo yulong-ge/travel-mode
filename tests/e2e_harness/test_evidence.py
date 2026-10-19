@@ -1,5 +1,6 @@
 """Evidence readers must never observe a published partial layout schema."""
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -28,9 +29,21 @@ async def test_every_layout_publication_has_action_fields_even_before_ready(tmp_
     app = DebugApp(path, scenario=scenario)
     async with app.run_test(size=(120, 36)):
         await app.wait_for_idle()
-        app.write_layout()
-        app.refresh_complete = False
-        app.write_layout()
+        await app.wait_layout(lambda frame: frame["ready"])
+        entered, released = asyncio.Event(), asyncio.Event()
+
+        async def pending_layout():
+            entered.set()
+            await released.wait()
+
+        worker = app.run_worker(pending_layout(), group="filter")
+        try:
+            await asyncio.wait_for(entered.wait(), 10)
+            app.call_after_refresh(app.write_layout)
+            await app.wait_layout(lambda frame: not frame["ready"])
+        finally:
+            released.set()
+            await worker.wait()
     assert publications
     if scenario is not None:
         assert any(not layout["ready"] for layout in publications)

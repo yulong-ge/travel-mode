@@ -56,11 +56,17 @@ def data(*, clock=time.monotonic, now=None):
     started = clock()
     snapshot = load_state()
     power_source, battery = observation()
+    from .sleep_readiness import cached, menu_observation
+
+    sleep_ready = menu_observation(
+        _read(["pmset", "-g"], timeout=SOURCE_TIMEOUT), snapshot, observation=cached()
+    )
     # Keep pmset's volatile estimate for diagnostics, never use it in the menu.
     battery["system_remaining_minutes"] = battery["remaining_minutes"]
     battery.update(remaining_minutes=None, average_watts=None, estimate_source=None, estimate_error=None)
     result = dict(
         version=1,
+        sleep_ready=sleep_ready,
         app_version=__version__,
         active=snapshot is not None,
         scenario=(snapshot.get("scenario") or None) if snapshot else None,
@@ -191,6 +197,8 @@ def render(result):
     active = result["active"]
     scenario = result["scenario"]
     symbol = ("moon.fill" if scenario == "away" else "leaf.fill") if active else "leaf"
+    if result.get("sleep_ready", {}).get("state") == "blocked":
+        symbol = "exclamationmark.triangle"
     rows = [header(symbol, elapsed), "---"]
     if active:
         label = t("menubar.session_" + scenario) if scenario else t("menubar.session_unknown")

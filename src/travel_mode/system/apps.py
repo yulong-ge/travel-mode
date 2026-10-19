@@ -311,7 +311,11 @@ def scan_apps():
                         scenario = (
                             config.options.scenario if config.options.scenario in {"work", "away"} else "work"
                         )
-                        app["defact"] = config.apps.default if row["reason"] == "freeze" else row[scenario]
+                        app["defact"] = (
+                            config.apps.default
+                            if row["reason"] == "freeze" and scenario == "work"
+                            else row[scenario]
+                        )
         notices = []
         for process in snapshot.processes:
             rule = identify(executable=process.command)

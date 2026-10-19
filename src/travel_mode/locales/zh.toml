@@ -162,7 +162,7 @@
 "impl.fixing_disablesleep_failed" = "disablesleep 修复失败"
 "impl.force_quit" = "{v0} 已强制结束"
 "impl.force_quit_2" = "✘ {v0} 已强制结束"
-"impl.force_quit_3" = "强杀"
+"impl.force_quit_3" = "强制退出"
 "impl.force_quitting_failed" = "{v0} 强杀失败"
 "impl.freeze" = "冻结"
 "impl.freezing_failed" = "{v0} 冻结失败"
@@ -507,15 +507,15 @@
 
 "scenario.prompt" = "选择使用场景"
 "scenario.input" = "  [work/away] "
-"scenario.work" = "断电工作"
-"scenario.away" = "合盖外出 / 过夜"
-"scenario.work_desc" = "保留屏幕与网络，暂停后台同步、备份和更新程序。"
-"scenario.away_desc" = "使用现有省电动作，为合盖外出或过夜休眠做准备。"
+"scenario.work" = "外出"
+"scenario.away" = "过夜 / 飞行"
+"scenario.work_desc" = "随时开盖工作、随时合盖带走。冻结不用的应用，暂停同步和更新，准备合盖睡眠。"
+"scenario.away_desc" = "长时间不用。退出不用的应用，可选更深的休眠；Wi-Fi 和蓝牙默认保持。"
 "scenario.help" = "选择 work 或 away，跳过场景选择"
 "scenario.invalid" = "应为 ask、work 或 away（命令行仅 work 或 away）"
 "scenario.required" = "请先用 --scenario work|away 或 --profile 指定场景"
 "scenario.conflict" = "场景与配置档 所属场景冲突"
-"profiles.work" = "断电工作，保留屏幕与网络"
+"profiles.work" = "外出，保留屏幕和网络，准备合盖睡眠"
 "categories.invalid" = "类别应为 sync、backup、updater、vm 或 keep-awake"
 "health.title" = "体检"
 "health.legacy_failed" = "无法完成原有审计：{reason}。独立体检结果另行列出。"
@@ -770,7 +770,7 @@
 "automation.action_failed" = "自动动作失败：{action}"
 "automation.debounced" = "已忽略 30 秒内重复的电源来源事件。"
 "automation.unchanged" = "电源来源未变，未执行动作。"
-"automation.battery_notice" = "已切换到电池供电。运行 travel-mode 可进入断电工作模式。"
+"automation.battery_notice" = "已切换到电池供电。运行 travel-mode 可进入外出模式。"
 "automation.ac_notice" = "已接通电源。运行 travel-mode off 可恢复。"
 "automation.restore_failed" = "部分恢复动作失败。恢复记录已保留；请运行 travel-mode off 完成恢复。"
 "automation.restored" = "已恢复活动 travel-mode 恢复记录。"
@@ -833,8 +833,8 @@
 "menubar.source_ac" = "接电"
 "menubar.source_battery" = "电池"
 "menubar.source_ups" = "UPS"
-"menubar.work" = "进入断电工作"
-"menubar.away" = "合盖外出 / 过夜"
+"menubar.work" = "外出"
+"menubar.away" = "过夜 / 飞行"
 "menubar.off" = "恢复（off）"
 "menubar.check" = "体检"
 "menubar.power" = "测量功耗"
@@ -852,8 +852,8 @@
 "health.unavailable" = "无法检查"
 "menubar.duration" = "{hours} 小时 {minutes} 分"
 "menubar.session" = "{label} · 已 {duration}"
-"menubar.session_work" = "断电工作中"
-"menubar.session_away" = "合盖外出中"
+"menubar.session_work" = "外出中"
+"menubar.session_away" = "过夜 / 飞行中"
 "menubar.session_unknown" = "省电模式已开启"
 "menubar.remaining" = "预计剩余 {duration}"
 "menubar.charging_charging" = "充电中"
@@ -926,7 +926,7 @@
 "setup.invalid_policy" = "必须为 legacy 或 adaptive"
 "setup.reason_freeze" = "保留运行状态，恢复后继续使用"
 "setup.reason_provider" = "冻结后访问云盘文件可能卡住"
-"setup.reason_assertion" = "持有防睡断言，冻结后 Mac 仍无法睡眠"
+"setup.reason_assertion" = "持有防睡断言，冻结不会释放它"
 "setup.reason_interactive" = "你可能正在使用"
 "setup.reason_notice" = "仅识别，不自动处理"
 "setup.group_freeze" = "默认冻结"
@@ -955,7 +955,7 @@
 "setup.begin" = "回车设置 应用 默认动作，或输入 s 跳过（使用内置默认，下次不自动打开设置）："
 "setup.begin_invalid" = "请输入空行，或输入 s 跳过"
 "setup.assertions_error" = "无法读取睡眠断言：pmset 未报告断言状态标题"
-"setup.scenarios_hint" = "分别设置断电工作和合盖外出时的动作。"
+"setup.scenarios_hint" = "分别设置外出和过夜 / 飞行时的动作。"
 "setup.app" = "应用"
 "setup.reason" = "理由"
 "setup.short_freeze" = "保留状态，恢复后继续"
@@ -994,7 +994,7 @@
 "health_view.high_cpu_clear" = "后台处理器负载：未发现高负载应用"
 "health_view.high_cpu_found" = "后台处理器负载较高：{names}"
 "health_view.background_process" = "后台程序"
-"health_view.displays_hit" = "外接显示器：已连接，会增加供电负载"
+"health_view.displays_hit" = "外接显示器已连接，会增加耗电"
 "health_view.displays_clear" = "外接显示器：未连接"
 "health_view.spotlight_hit" = "Spotlight：正在大量索引"
 "health_view.spotlight_clear" = "Spotlight：未发现大量索引活动"
@@ -1024,9 +1024,9 @@
 "services.log_hint" = "详情见 {path}；修复文件权限或格式后刷新。"
 "preview.name.lowpowermode" = "低电量模式"
 "preview.lowpowermode" = "用电池时降低能耗；具体效果因机型而异。"
-"preview.name.sleep" = "空闲睡眠时间"
+"preview.name.sleep" = "空闲睡眠"
 "preview.sleep" = "用电池时空闲达到设定分钟数后睡眠；0 表示不自动睡眠。"
-"preview.name.displaysleep" = "屏幕关闭时间"
+"preview.name.displaysleep" = "关闭显示器"
 "preview.displaysleep" = "用电池时空闲达到设定分钟数后关闭屏幕。"
 "preview.name.powernap" = "Power Nap"
 "preview.powernap" = "用电池时关闭 Power Nap：睡眠时不定期醒来同步邮件和 iCloud。"
@@ -1038,7 +1038,7 @@
 "preview.standby" = "允许 Mac 睡眠一段时间后进入更省电的待机状态。"
 "preview.name.hibernatemode" = "休眠方式"
 "preview.hibernatemode" = "将内存保存到磁盘；更深的休眠会延长恢复时间。"
-"preview.name.ttyskeepawake" = "终端活动时保持唤醒"
+"preview.name.ttyskeepawake" = "终端任务运行时保持唤醒"
 "preview.ttyskeepawake" = "终端活动时阻止空闲睡眠，不阻止合盖睡眠。"
 "preview.name.disksleep" = "磁盘休眠时间"
 "preview.disksleep" = "磁盘空闲达到设定分钟数后休眠；固态硬盘的效果有限。"
@@ -1050,9 +1050,195 @@
 "health_view.error_permission" = "读取被拒绝；检查权限后重试。详情见 {path}"
 "health_view.error_invalid" = "读取结果格式异常；详情见 {path}"
 "health_view.error_read" = "读取失败；详情见 {path}"
-"conflict.scene_away" = "合盖外出"
-"conflict.scene_work" = "断电工作"
+"conflict.scene_away" = "过夜 / 飞行"
+"conflict.scene_work" = "外出"
 "services.configured_invalid" = "无法读取已配置的后台服务 {path}：{reason}。请在配置中修正路径、文件权限或 plist 格式后重试。"
 "health_view.pre_session" = "此断言早于本次会话，并非本次电源切换后才出现。"
 "health_view.caffeinate" = "caffeinate 正在保持唤醒，可结束这次防睡任务。"
 "services.ready" = "可暂停：{name}"
+
+"redesign.keepalive_locked" = "睡眠中的网络连接为「查找」保持开启，此计划不可关闭。"
+"redesign.keepalive" = "保持睡眠中的网络连接（不可关闭）：「查找」需要它来定位这台 Mac。代价是睡眠时会短暂醒来。"
+"redesign.findmy_warning" = "关闭后「查找」可能无法定位这台 Mac。"
+"redesign.picker_hint" = "1 / 2 选择 · 回车确认"
+"redesign.plan" = "计划"
+"redesign.result" = "结果"
+"redesign.session" = "会话"
+"redesign.attention" = "合盖睡眠就绪检查"
+"redesign.ready" = "合盖后会正常睡眠。"
+"redesign.sleep_disabled" = "合盖后可能不会睡眠：系统睡眠已被禁用。"
+"redesign.system_holder" = "{name} 正在阻止系统睡眠，合盖后可能不会睡眠。"
+"redesign.idle_holder" = "{name} 阻止空闲睡眠：开盖不操作时不会自动睡眠；合盖仍会睡眠。"
+"redesign.remote_source" = "可能来自 {name} 的防睡设置；恢复睡眠后，该应用可能再次改回。"
+"redesign.readiness_unknown" = "无法检查合盖睡眠状态：{reason}"
+"redesign.all" = "全部"
+"redesign.power" = "电源"
+"redesign.apps" = "应用"
+"redesign.services" = "后台服务"
+"redesign.network" = "网络"
+"redesign.selected" = "已选 {n} 项"
+"redesign.apply" = "开始省电（{n} 项）"
+"redesign.done" = "完成"
+"redesign.new_plan" = "新计划"
+"redesign.off" = "恢复全部（off）"
+"redesign.more" = "更多"
+"redesign.help" = "帮助"
+"redesign.details" = "详情"
+"redesign.footer" = "q 退出  l 语言  r 刷新  d 详情  ? 帮助"
+"redesign.no_result" = "尚未执行动作。"
+"redesign.no_details" = "聚焦一行以查看证据。"
+"redesign.noise" = "{apps} 个应用配置项无匹配 · {services} 个后台服务文件无法读取 · {network} 个网络应用不可用 · d 查看详情"
+"redesign.normal" = "其它 {n} 项正常"
+"redesign.satisfied" = "已符合：{names}"
+"redesign.pause" = "暂停"
+"redesign.freeze" = "冻结"
+"redesign.quit" = "退出"
+"redesign.ask" = "询问"
+"redesign.skip" = "跳过"
+"redesign.off_action" = "关闭"
+"redesign.apply_action" = "调整"
+"redesign.service_reason" = "暂停后台任务，恢复时重新加载"
+"redesign.network_reason" = "未选中时保持连接"
+"redesign.spotlight_reason" = "可选，停止索引，恢复时重新开启"
+"redesign.brightness" = "屏幕亮度"
+"redesign.brightness_reason" = "可选，恢复时还原原亮度"
+"redesign.hibernation" = "更深的休眠"
+"redesign.hibernation_reason" = "将内存保存到磁盘，睡眠和唤醒较慢"
+"redesign.keep_network" = "未选择关闭操作时，保持网络连接。"
+"redesign.result_summary" = "成功 {ok} 项，失败 {failed} 项。详情见 {path}"
+"redesign.row_done" = "已完成"
+"redesign.row_skipped" = "已跳过"
+"redesign.row_running" = "执行中"
+"redesign.session_title" = "{scenario} · 已 {duration}"
+"redesign.session_changes" = "改动：电源设置 {power} 项 · 应用 {apps} 个 · 后台服务 {services} 个"
+"redesign.session_battery" = "电量 {start}% → {current}%（消耗 {delta}%）"
+"redesign.session_power" = "平均 {watts:.1f} W · 按此约可用 {duration}"
+"redesign.session_incomplete" = "期间曾接电或电池数据不足，未估算掉电与可用时间。"
+"redesign.revived" = "{n} 个暂停项目又运行了：{names}"
+"redesign.thaw" = "恢复单个冻结应用"
+"redesign.measure" = "测量功耗"
+"redesign.energy" = "采样一次耗电排行"
+"redesign.help_text" = "选择项目后开始。空格切换应用动作。筛选只改变显示范围。d 打开证据；off 恢复已记录的改动。"
+"redesign.drawer_heading" = "证据与结果 · {name}"
+"redesign.auto" = "自动触发状态"
+
+"redesign.language" = "语言"
+
+"setup.reason_freeze_quit" = "外出时保留运行状态；过夜时退出，恢复时重新打开。"
+
+"redesign.failed_short" = "未完成"
+
+"redesign.forced_short" = "已强退"
+
+"redesign.refused_short" = "未能退出，可能正在显示确认框。"
+
+"redesign.failed_reason" = "此项执行失败；按 d 查看原因。"
+
+"redesign.row_thawed" = "已解冻"
+
+"redesign.quit_reason" = "退出应用，恢复时重新打开。"
+
+"redesign.assertions_not_checked" = "本次只检查系统睡眠开关；运行 check 可检查应用的防睡断言。"
+
+"redesign.ac_powernap" = "Power Nap（接电时）"
+"redesign.ac_womp" = "网络唤醒（接电时）"
+"redesign.planned_short" = "将执行"
+
+"redesign.freeze_failed" = "未能冻结，原因见详情。"
+"redesign.quit_timeout" = "等待退出超时。"
+
+"redesign.target_on" = "开启"
+
+"redesign.target_off" = "关闭"
+
+"redesign.target_minutes" = "{minutes} 分钟"
+
+"redesign.target_never" = "不自动"
+
+"redesign.target_deeper" = "更深休眠"
+
+"redesign.target_standard" = "标准休眠"
+
+"redesign.scope_ac" = "接电时"
+
+"redesign.scope_battery" = "用电池时"
+
+"redesign.scoped_name" = "{name}（{scope}）"
+
+"redesign.satisfied_setting" = "{scope} · {name}：{target}"
+
+"redesign.work_assertion" = "它阻止的是空闲睡眠，合盖仍会睡眠；冻结后断言仍在"
+
+"redesign.effect_lowpowermode" = "降低能耗；具体效果因机型而异。"
+
+"redesign.effect_sleep" = "闲置时自动睡眠，减少耗电。"
+
+"redesign.effect_displaysleep" = "闲置时关闭显示器，减少耗电。"
+
+"redesign.effect_powernap" = "Mac 睡眠时不会定期醒来同步邮件和 iCloud。"
+
+"redesign.effect_womp" = "其它设备无法通过网络唤醒这台 Mac。"
+
+"redesign.effect_tcpkeepalive" = "睡眠时保持「查找」可用。"
+
+"redesign.effect_standby" = "睡眠一段时间后进入更省电的待机状态。"
+
+"redesign.effect_hibernatemode" = "把内存保存到磁盘，断电后仍可恢复。"
+
+"redesign.effect_ttyskeepawake" = "让活跃的终端任务完成后再空闲睡眠。"
+
+"redesign.effect_disksleep" = "让闲置磁盘休息，对固态硬盘影响较小。"
+
+"redesign.effect_lessbright" = "允许 macOS 在用电池时调暗屏幕。"
+
+"redesign.effect_networkoversleep" = "减少睡眠期间的网络活动，可能影响远程访问。"
+
+"redesign.suggestions" = "▲ {n} 项建议处理 · {toggle}"
+
+"redesign.expand" = "展开 ▸"
+
+"redesign.collapse" = "收起 ▾"
+
+"redesign.evidence_path" = "位置：{value}"
+
+"redesign.evidence_cpu" = "CPU：{value}%"
+
+"redesign.evidence_command" = "命令：{value}"
+
+"redesign.evidence_exit" = "退出码 {value}"
+
+"redesign.evidence_observation" = "观察：{value}"
+
+"redesign.readiness_source" = "{message}{source}"
+
+"redesign.satisfied_battery" = "已符合（用电池时）：{names}"
+
+"redesign.satisfied_ac" = "已符合（接电时）：{names}"
+
+"redesign.satisfied_separator" = "、"
+
+"redesign.satisfied_value" = "{name}{target}"
+
+"redesign.satisfied_product_value" = "{name} {target}"
+
+"health_view.with_advice" = "{conclusion}。{advice}"
+
+"health.advice.displays" = "不用时可以断开。"
+
+"health.advice.sleep_disabled" = "可用「启用系统睡眠」恢复。"
+
+"health.advice.keep_awake" = "可在应用内结束防睡会话。"
+
+"health.advice.caffeinate" = "请在启动 caffeinate 的终端结束它。"
+
+"health.advice.assertions" = "可在应用内停止当前任务。"
+
+"health.advice.spotlight" = "可以等待索引完成。"
+
+"health.advice.backup" = "可在 Time Machine 菜单选择「跳过此次备份」。"
+
+"health.advice.low_power" = "可在电池设置中开启低电量模式。"
+
+"health.advice.brightness" = "可以手动降低屏幕亮度。"
+
+"health.advice.high_cpu" = "可在「活动监视器」查看该任务。"

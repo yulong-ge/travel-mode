@@ -4,6 +4,12 @@ All notable changes follow Keep a Changelog.
 
 ## [Unreleased]
 
+### Changed
+
+- Redesigned TUI: a plan screen (sleep readiness, health findings, one row per action with target and reason, filters instead of five tabs) that turns into a result screen, a session screen while a session is active, and a details drawer (`d`). Rows have exactly one state and only the controls that state allows; noise such as uninstalled network apps and unreadable plists is summarised in one dim line, and empty placeholder plists are ignored.
+- Scenarios are shown as "On the go" (`work`) and "Overnight / flight" (`away`). `work` now also turns off Power Nap and wake for network access, which only act during sleep; `away` quits apps instead of freezing them and offers Wi-Fi/Bluetooth off unselected. Network keep-alive during sleep is never turned off because Find My needs it.
+- Sleep readiness: `SleepDisabled` and system-sleep assertions are reported first with the likely source; `status --json` adds `sleep_ready` and the menu bar shows a warning icon.
+
 ### Fixed
 
 - Report power settings a Mac does not expose (for example `SleepDisabled` on a virtual machine) as unavailable in check, JSON (`unavailable` status) and the TUI instead of failing; e2e records such capabilities as SKIP.

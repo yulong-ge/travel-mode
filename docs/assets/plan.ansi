@@ -1,0 +1,36 @@
+[48;2;30;30;30m [38;2;165;165;165m      [39m [38;2;165;165;165m                                      travel-mode[38;2;119;119;119m — Travel mode[38;2;165;165;165m                                       [39m
+
+ [1m[38;2;224;224;224mOn the go · Plan[0m[48;2;30;30;30m
+ [38;2;165;165;165mBattery 80%[39m
+                                                                                                                     [7m[38;2;0;48;84m  [0m[48;2;30;30;30m
+ [1m[38;2;224;224;224mSleep readiness[0m[48;2;30;30;30m                                                                                                     [7m[38;2;0;48;84m  [0m[48;2;30;30;30m
+ [38;2;185;60;91m✗ Lid sleep may be blocked: system sleep is disabled. UURemote may set this and may undo a[39m    [1m[38;2;224;224;224m Enable system sleep [0m[48;2;30;30;30m [7m[38;2;0;48;84m  [0m[48;2;30;30;30m
+ [38;2;185;60;91mrepair.[39m                                                                                                             [7m[38;2;0;48;84m  [0m[48;2;30;30;30m
+ [38;2;224;224;224m▲ External display connected; this increases energy use. Disconnect it when not needed.[39m                             [7m[38;2;0;48;84m  [0m[48;2;30;30;30m
+ [38;2;224;224;224m▲ Screen brightness 85%, above the suggested 70%.[39m                                                      [1m[38;2;224;224;224m Set to 50% [0m[48;2;30;30;30m [7m[38;2;0;48;84m  [0m[48;2;30;30;30m
+ [38;2;224;224;224m▲ High background CPU load: Docker[39m                                                                    [1m[38;2;224;224;224m Quit Docker [0m[48;2;30;30;30m [7m[38;2;0;48;84m  [0m[48;2;30;30;30m
+  [1m[38;2;165;165;165m 3 other checks normal [0m[48;2;30;30;30m                                                                                            [7m[38;2;0;48;84m  [0m[48;2;30;30;30m
+                                                                                                                     [7m[38;2;0;48;84m  [0m[48;2;30;30;30m
+  [1;4m[38;2;1;120;212m All [0m[48;2;30;30;30m   [1m[38;2;224;224;224m Power [0m[48;2;30;30;30m   [1m[38;2;224;224;224m Apps [0m[48;2;30;30;30m   [1m[38;2;224;224;224m Services [0m[48;2;30;30;30m   [1m[38;2;224;224;224m Network [0m[48;2;30;30;30m                                                                  [7m[38;2;0;48;84m  [0m[48;2;30;30;30m
+                                                                                                                     [7m[38;2;0;48;84m[48;2;0;0;0m▇▇[0m[48;2;30;30;30m
+ [1m[38;2;224;224;224mPower[0m[48;2;30;30;30m                                                                                                               [38;2;224;224;224m[48;2;0;0;0m  [39m[48;2;30;30;30m
+ [38;2;224;224;224m[x][39m [38;2;224;224;224mLow Power Mode[39m           [38;2;224;224;224mOn[39m           [38;2;165;165;165mReduce energy use; effects vary by Mac model.[39m                             [38;2;224;224;224m[48;2;0;0;0m  [39m[48;2;30;30;30m
+ [38;2;224;224;224m[x][39m [38;2;224;224;224mPower Nap (On power)[39m     [38;2;224;224;224mOff[39m          [38;2;165;165;165mThe sleeping Mac will not wake periodically to sync Mail and iCloud.[39m      [38;2;224;224;224m[48;2;0;0;0m  [39m[48;2;30;30;30m
+ [38;2;224;224;224m[x][39m [38;2;224;224;224mNetwork wake (On power)[39m  [38;2;224;224;224mOff[39m          [38;2;165;165;165mOther devices cannot wake this Mac over the network.[39m                      [38;2;224;224;224m[48;2;0;0;0m  [39m[48;2;30;30;30m
+ [38;2;224;224;224m[ ][39m [38;2;224;224;224mScreen brightness[39m        [38;2;224;224;224mSet to 50%[39m   [38;2;165;165;165mOptional; restore returns the original brightness[39m                         [38;2;224;224;224m[48;2;0;0;0m  [39m[48;2;30;30;30m
+ [38;2;165;165;165mAlready set on battery: Power Nap off, network wake off[39m                                                             [38;2;224;224;224m[48;2;0;0;0m  [39m[48;2;30;30;30m
+                                                                                                                     [38;2;224;224;224m[48;2;0;0;0m  [39m[48;2;30;30;30m
+ [1m[38;2;224;224;224mApps[0m[48;2;30;30;30m                                                                                                                [38;2;224;224;224m[48;2;0;0;0m  [39m[48;2;30;30;30m
+ [38;2;224;224;224m[x][39m [38;2;224;224;224mAmphetamine[39m                [1m[38;2;224;224;224mFreeze ▾[0m[48;2;30;30;30m   [38;2;165;165;165mPrevents idle sleep; lid sleep still works. Freezing keeps the assertion.[39m [38;2;224;224;224m[48;2;0;0;0m  [39m[48;2;30;30;30m
+ [38;2;224;224;224m[x][39m [38;2;224;224;224mKeepingYouAwake[39m            [1m[38;2;224;224;224mFreeze ▾[0m[48;2;30;30;30m   [38;2;165;165;165mPrevents idle sleep; lid sleep still works. Freezing keeps the assertion.[39m [38;2;224;224;224m[48;2;0;0;0m  [39m[48;2;30;30;30m
+ [38;2;224;224;224m[x][39m [38;2;224;224;224mQuit Refusal Demo[39m           [1m[38;2;224;224;224mQuit ▾[0m[48;2;30;30;30m    [38;2;165;165;165mFreezing may block access to cloud files[39m                                  [38;2;224;224;224m[48;2;0;0;0m  [39m[48;2;30;30;30m
+ [38;2;224;224;224m[x][39m [38;2;224;224;224mUURemote[39m                   [1m[38;2;224;224;224mFreeze ▾[0m[48;2;30;30;30m   [38;2;165;165;165mPrevents idle sleep; lid sleep still works. Freezing keeps the assertion.[39m [38;2;224;224;224m[48;2;0;0;0m  [39m[48;2;30;30;30m
+ [38;2;224;224;224m[x][39m [38;2;224;224;224mAnki[39m                       [1m[38;2;224;224;224mFreeze ▾[0m[48;2;30;30;30m   [38;2;165;165;165mPreserve running state; continue after resuming[39m                           [38;2;224;224;224m[48;2;0;0;0m  [39m[48;2;30;30;30m
+ [38;2;224;224;224m[x][39m [38;2;224;224;224mAudacity[39m                   [1m[38;2;224;224;224mFreeze ▾[0m[48;2;30;30;30m   [38;2;165;165;165mPreserve running state; continue after resuming[39m                           [38;2;224;224;224m[48;2;0;0;0m  [39m[48;2;30;30;30m
+
+  [1m[38;2;224;224;224m More [0m[48;2;30;30;30m   [1m[38;2;224;224;224m Adjust defaults [0m[48;2;30;30;30m   [1m[38;2;224;224;224m Run health check [0m[48;2;30;30;30m
+                                                                                        [48;2;1;120;212m                               [48;2;30;30;30m
+                                                                                        [48;2;1;120;212m   [1m[38;2;221;237;249m Start saving power (30) [0m[48;2;1;120;212m   [48;2;30;30;30m
+                                                                                        [48;2;1;120;212m                               [48;2;30;30;30m
+ [38;2;165;165;165mNo actions performed.[39m
+ [38;2;165;165;165mq Quit  l Language  r Refresh  d Details  ? Help[39m

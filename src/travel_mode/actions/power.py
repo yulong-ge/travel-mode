@@ -22,6 +22,11 @@ class SetPowerProfile(Command):
     sudo = True
 
     def command(self):
+        from ..i18n import t
+
+        for key, value in zip(self.values[::2], self.values[1::2], strict=True):
+            if key == "tcpkeepalive" and str(value) != "1":
+                raise ValueError(t("redesign.keepalive_locked"))
         return ["pmset", self.domain, *self.values]
 
 

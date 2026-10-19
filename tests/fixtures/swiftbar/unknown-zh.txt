@@ -3,8 +3,8 @@
 省电模式未开启
 电池 82%
 ---
-进入断电工作 | sfimage=leaf bash="/fixture/travel-mode" param1="--scenario" param2="work" terminal=true refresh=true
-合盖外出 / 过夜 | sfimage=moon bash="/fixture/travel-mode" param1="--scenario" param2="away" terminal=true refresh=true
+外出 | sfimage=leaf bash="/fixture/travel-mode" param1="--scenario" param2="work" terminal=true refresh=true
+过夜 / 飞行 | sfimage=moon bash="/fixture/travel-mode" param1="--scenario" param2="away" terminal=true refresh=true
 ---
 体检 | sfimage=stethoscope bash="/fixture/travel-mode" param1="check" terminal=true refresh=true
 测量功耗 | sfimage=bolt bash="/fixture/travel-mode" param1="power" terminal=true refresh=true

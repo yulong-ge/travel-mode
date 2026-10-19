@@ -5,13 +5,13 @@ import json
 from types import SimpleNamespace
 
 import pytest
-from textual.widgets import Checkbox, RichLog
+from textual.widgets import RichLog
 
 from travel_mode import cli, state
 from travel_mode.system import apps, process_control, shell
 from travel_mode.system.shell import CmdResult
 from travel_mode.tui.app import TravelApp
-from tui_interaction import click_after_layout
+from tui_plan import apply_plan
 
 
 def mutation(command):
@@ -145,20 +145,7 @@ async def run_ui(scenario, page):
     app = TravelApp(scenario=scenario, measure=False)
     async with app.run_test(size=(160, 65)) as pilot:
         await app.wait_for_idle()
-        if page == "quick":
-            for key in ("spot", "net"):
-                app.query_one(f"#q-{key}", Checkbox).value = True
-            await click_after_layout(pilot, "#b-quick")
-        else:
-            tab = {"apps": "p-apps", "services": "p-svc", "network": "p-net"}[page]
-            app.action_goto(tab)
-            if page == "network":
-                # Network has per-app controls, not a separate batch button.
-                # Exercise every row and subsequent independent row after failure.
-                for index in tuple(app.net_paths):
-                    await click_after_layout(pilot, f"#net-{index}")
-            else:
-                await click_after_layout(pilot, "#b-apps-all" if page == "apps" else "#b-svc-all")
+        await apply_plan(pilot, group=None if page == "quick" else page)
         assert app._exception is None and app.is_running
         text = "\n".join(str(line) for line in app.query_one("#log", RichLog).lines)
         assert "Traceback" not in text

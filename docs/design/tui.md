@@ -85,12 +85,14 @@ Shown first on the plan and session screens, and drives the menu bar icon:
 Some remote-access apps switch the global setting themselves; for example a "prevent sleep
 while charging" option can run `pmset disablesleep 1` on AC power and `0` on battery through a
 root helper. When `SleepDisabled` is 1 and such an app is running, the line names it as the
-likely source ("可能来自 UURemote 的「接电时防止休眠」设置；用电池时它会自动恢复") and warns that
-restoring sleep may be undone by that app. The tool states this as likely, not certain.
+likely source ("可能来自 UURemote 的防睡设置；恢复睡眠后，该应用可能再次改回") and warns that
+restoring sleep may be undone by that app. It does not promise that the app will restore the
+setting on battery; that depends on the app's own options. The tool states this as likely, not certain.
 
 Only `SleepDisabled` and system-sleep assertions (PreventSystemSleep and similar) are red;
 idle-sleep assertions are amber and say that closing the lid still sleeps. The menu bar shows the
-warning icon while any red item is present.
+warning icon while any red item is present; it reflects the most recent check, whose time is
+shown in the menu.
 
 ### Network keep-alive
 
@@ -98,8 +100,7 @@ warning icon while any red item is present.
 The plan shows it as a fixed, explained line, not a checkbox:
 
 ```
-     保持睡眠中的网络连接（不可关闭）：「查找」需要它来定位这台 Mac。代价是睡眠时每隔几分钟
-     短暂唤醒一次，实测 5 小时约耗电 2%。
+     保持睡眠中的网络连接（不可关闭）：「查找」需要它来定位这台 Mac。代价是睡眠时会短暂醒来。
 ```
 
 ### Plan screen

@@ -1,0 +1,36 @@
+                                              travel-mode — Travel mode
+
+ On the go · Results
+ Battery 80%
+
+ Power
+ ✓   Low Power Mode           Completed    Reduce energy use; effects vary by Mac model.
+ ✓   Power Nap (On power)     Completed    The sleeping Mac will not wake periodically to sync Mail and iCloud.
+ ✓   Network wake (On power)  Completed    Other devices cannot wake this Mac over the network.
+
+ Apps
+ ✗   Quit Refusal Demo        Failed       Could not quit; a confirmation dialog may be open.   Retry    Force quit
+ ▲   Google Drive             Forced       refused normal Quit (it may have been showing a confirmation dialog);
+ ✓   Amphetamine              Frozen       Prevents idle sleep; lid sleep still works. Freezing keeps the assertion.
+ ✓   KeepingYouAwake          Frozen       Prevents idle sleep; lid sleep still works. Freezing keeps the assertion.
+ ✓   UURemote                 Frozen       Prevents idle sleep; lid sleep still works. Freezing keeps the assertion.
+ ✓   Anki                     Frozen       Preserve running state; continue after resuming
+ ✓   Audacity                 Frozen       Preserve running state; continue after resuming
+ ✓   Calibre                  Frozen       Preserve running state; continue after resuming
+ ✓   Discord                  Frozen       Preserve running state; continue after resuming
+ ✓   HandBrake                Frozen       Preserve running state; continue after resuming
+ ✓   IINA                     Frozen       Preserve running state; continue after resuming
+ ✓   KeePassXC                Frozen       Preserve running state; continue after resuming
+ ✓   Maccy                    Frozen       Preserve running state; continue after resuming
+ ✓   Nextcloud                Frozen       Preserve running state; continue after resuming
+ ✓   Rectangle                Frozen       Preserve running state; continue after resuming
+ ✓   Signal                   Frozen       Preserve running state; continue after resuming
+ ✓   Slack                    Frozen       Preserve running state; continue after resuming
+
+ 29 succeeded, 1 failed. Details: /tmp/travel-mode-demo/travel-mode.log
+   More     Adjust defaults     Run health check
+
+                                                                                                            Done
+
+ ✘ Quit Refusal Demo refused to quit and may be showing a confirmation dialog. Resolve it and retry, or choose Force Q…
+ q Quit  l Language  r Refresh  d Details  ? Help

@@ -1,7 +1,8 @@
 """Exact assertion owners and independent hibernation selection regressions."""
 
+import os
+
 import pytest
-from textual.widgets import Checkbox
 
 from travel_mode.actions.executor import Executor
 from travel_mode.actions.power import KillCaffeinate, SetPowerProfile
@@ -15,10 +16,26 @@ BIRTH = "Thu Oct 15 12:00:00 2026"
 
 
 def caffeinate_fixture(fake_runner):
+    from travel_mode.system.health import PROCESS_COMMAND
+
+    fake_runner.responses[tuple(PROCESS_COMMAND)] = CmdResult(
+        f"101 50 {os.getuid()} S 0 {BIRTH} /usr/bin/caffeinate\n"
+        f"102 50 {os.getuid()} S 0 {BIRTH} /usr/bin/caffeinate\n"
+        f"50 1 {os.getuid()} S 0 {BIRTH} /Applications/Terminal.app/Contents/MacOS/Terminal",
+        "",
+        0,
+    )
+    for pid, args in [(101, "-i -t 90"), (102, "-d")]:
+        fake_runner.responses[("ps", "-ww", "-p", str(pid), "-o", "command=")] = CmdResult(
+            "/usr/bin/caffeinate " + args, "", 0
+        )
     fake_runner.responses.update(
         {
             ("pmset", "-g", "assertions"): CmdResult(
-                'pid 101(caffeinate): PreventUserIdleSystemSleep named: "test"\n', "", 0
+                "Assertion status system-wide:\n"
+                'pid 101(caffeinate): PreventUserIdleSystemSleep named: "test"\n',
+                "",
+                0,
             ),
             QUERY: CmdResult(
                 f"101 50 S {BIRTH} /usr/bin/caffeinate\n"
@@ -64,17 +81,15 @@ def test_caffeinate_pid_reuse_refuses_signal(fake_runner, replacement):
 
 async def test_hib25_alone_when_original_equals_recommendation(monkeypatch):
     app = TravelApp(scenario="away")
-    async with app.run_test() as pilot:
+    async with app.run_test():
         await app.wait_for_idle()
-        for _, _, checkbox in app.pw_boxes:
-            checkbox.value = False
-        app.query_one("#cb-hib25", Checkbox).value = True
+        from tui_plan import select_plan
+
+        await select_plan(app, ids={"deep-sleep"})
         calls = []
         monkeypatch.setattr(app, "execute", lambda action: calls.append(action) or ("", 0))
         monkeypatch.setattr(app, "save", lambda: None)
-        monkeypatch.setattr(app, "action_refresh", lambda: None)
-        await app.act_power()
-        await pilot.pause()
+        await app.run_plan(app.query_one("#b-quick"))
         assert len(calls) == 1 and isinstance(calls[0], SetPowerProfile)
         assert calls[0].values == ["hibernatemode", "25"]
 
@@ -91,13 +106,13 @@ async def test_hib25_hidden_when_key_unsupported(fake_runner):
     async with app.run_test() as pilot:
         await app.wait_for_idle()
         await pilot.pause()
-        assert not list(app.query("#cb-hib25"))
+        assert not list(app.query("#select-deep-sleep"))
 
 
 def two_assertion_holders(fake_runner):
     caffeinate_fixture(fake_runner)
     fake_runner.responses[("pmset", "-g", "assertions")] = CmdResult(
-        'pid 101(caffeinate): PreventUserIdleSystemSleep named: "first"\n'
+        'Assertion status system-wide:\npid 101(caffeinate): PreventUserIdleSystemSleep named: "first"\n'
         'pid 102(caffeinate): PreventUserIdleDisplaySleep named: "second"\n',
         "",
         0,
@@ -156,7 +171,9 @@ async def test_tui_has_one_button_per_holder_and_terminates_only_selected(fake_r
     app = TravelApp(scenario="away")
     async with app.run_test() as pilot:
         await app.wait_for_idle()
-        await pilot.pause()
+        from tui_interaction import click_after_layout
+
+        await click_after_layout(pilot, "#b-suggestions")
         assert {b.id for b in app.query("Button") if b.id and b.id.startswith("b-killcaff-")} == {
             "b-killcaff-101",
             "b-killcaff-102",

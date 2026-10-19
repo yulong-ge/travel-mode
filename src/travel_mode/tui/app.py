@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import shutil
 from pathlib import Path
 from typing import ClassVar
 
@@ -12,36 +11,26 @@ from textual import work
 from textual.app import App
 from textual.binding import Binding
 from textual.compose import compose
-from textual.containers import VerticalScroll
-from textual.widgets import RichLog, Static, TabbedContent
+from textual.widgets import RichLog, Static
 
 from travel_mode import snapshots
 from travel_mode import state as state_api
 from travel_mode.actions.base import Context
 from travel_mode.actions.executor import Executor
 from travel_mode.config import load_config
-from travel_mode.flows import check as flow_check
 from travel_mode.flows import common
 from travel_mode.presentation import action_message as t
 from travel_mode.profiles import active_name, active_scenario, active_values, profile_scope
 from travel_mode.system import apps as system_apps
-from travel_mode.system import launchd, pmset, spotlight
-from travel_mode.system import network as system_network
 from travel_mode.system.shell import is_dry_run
 
+from .capabilities import Capabilities
 from .dispatch import Dispatch
-from .layout import Layout
 from .lifecycle import Lifecycle
-from .pages.apps import AppsPage
-from .pages.dashboard import DashboardPage
-from .pages.network import NetworkPage
-from .pages.power import PowerPage
-from .pages.services import ServicesPage
+from .workflow import Workflow
 
 
-class TravelApp(
-    Lifecycle, Layout, Dispatch, DashboardPage, PowerPage, AppsPage, ServicesPage, NetworkPage, App
-):
+class TravelApp(Workflow, Lifecycle, Dispatch, Capabilities, App):
     TITLE = "travel-mode"
 
     SUB_TITLE = t("impl.travel_mode_dry_run") if is_dry_run() else t("impl.travel_mode")
@@ -52,8 +41,10 @@ class TravelApp(
         Binding("w", "select_scenario('work')", "", show=False),
         Binding("a", "select_scenario('away')", "", show=False),
         Binding("q", "quit", t("impl.quit_2")),
-        Binding("l", "toggle_language", t("language.current")),
+        Binding("l", "toggle_language", t("redesign.language")),
         Binding("r", "refresh", t("impl.refresh")),
+        Binding("d", "details", t("redesign.details")),
+        Binding("question_mark", "help", t("redesign.help")),
         Binding("1", "goto('p-dash')", t("impl.overview"), show=False),
         Binding("2", "goto('p-power')", t("impl.power"), show=False),
         Binding("3", "goto('p-apps')", "Apps", show=False),
@@ -86,6 +77,11 @@ class TravelApp(
         self.scenario = scenario or active_scenario()
         self.config = load_config()
         self.profile_name = active_name() or None
+        if self.scenario == "ask":
+            existing = state_api.load_state()
+            if existing and existing.get("scenario") in {"work", "away"}:
+                self.scenario = existing["scenario"]
+                self._setup_first_run = False
         if self.scenario != "ask":
             with self.scenario_scope():
                 self.profile_values = active_values()
@@ -99,11 +95,6 @@ class TravelApp(
         self._origin_error = None
         self.scan = {"running": [], "nobundle": []}
         self.svc = {"unloadable": [], "kept": []}
-        self.caffeinate_targets = {}
-        self.pw_boxes = []  # (key, rec, checkbox)
-        self.app_rows = {}  # idx -> dict(name,path,btns,label,done,kill)
-        self.svc_btns = {}
-        self.net_paths = {}
         self.refresh_complete = False
         self._refresh_lock = asyncio.Lock()
         self._refresh_generation = 0
@@ -114,6 +105,7 @@ class TravelApp(
         self._mutation_action = None
         self._disabled_buttons = {}
         self._transaction_view = None
+        self.init_workflow()
 
     def execute(self, action):
         from travel_mode.failures import reporter
@@ -140,28 +132,8 @@ class TravelApp(
 
         if threading.current_thread() is threading.main_thread():
             self.logline(kind, message)
-            if kind == "bad":
-                self.highlight_action_failure()
         else:
             self.tlog(kind, message)
-            if kind == "bad":
-                self.call_from_thread(self.highlight_action_failure)
-
-    def highlight_action_failure(self):
-        rows = self.st.get("action_failures", [])
-        if not rows:
-            return
-        failed = rows[-1]
-        for row in self.app_rows.values():
-            if row["path"] == failed["target"] and row["label"].is_attached:
-                row["label"].update(f"[red]{escape(failed['reason'])}[/]")
-        for index, button in self.svc_btns.items():
-            if (
-                index < len(self.svc["unloadable"])
-                and self.svc["unloadable"][index]["plist_path"] == failed["target"]
-            ):
-                button.variant = "error"
-                button.label = t("failure.retry")
 
     def report_action_error(self, error, action=None):
         from travel_mode import failures
@@ -214,7 +186,12 @@ class TravelApp(
         self.notify(message, severity="error")
 
     def _disable_mutation_button(self, button):
-        if self._origin_error is not None and button.id != "b-doctor":
+        mutates = button.id in {"b-quick", "b-off", "b-reapply"} or (button.id or "").startswith(
+            ("ready-", "b-health-", "b-killcaff-", "retry-", "force-", "thaw-")
+        )
+        if not mutates:
+            return
+        if self._origin_error is not None:
             button.disabled = True
             return
         if self._mutation_action is not None and button.id not in {"b-dash-apps", "b-dash-svc"}:
@@ -235,11 +212,32 @@ class TravelApp(
         return state_snapshot(self._transaction_view if self._transaction_view is not None else self.st)
 
     def logline(self, kind, msg):
-        if self._recomposing:
+        if kind != "dim":
+            self.last_result = msg
+        if self._recomposing or self.scenario == "ask":
             self._pending_logs.append((kind, msg))
             return
         mark = {"ok": "[green]✔[/]", "warn": "[yellow]▲[/]", "bad": "[red]✘[/]", "dim": "[dim]○[/]"}[kind]
-        self.main_query_one("#log", RichLog).write(f"{mark} {escape(msg)}")
+        records = getattr(self, "_drawer_logs", [])
+        records.append((mark, msg))
+        self._drawer_logs = records[-400:]
+        if kind != "dim":
+            self.main_query_one("#last-result", Static).update(f"{mark} {escape(msg)}")
+        self.refresh_detail_log()
+
+    def refresh_detail_log(self):
+        if self._recomposing or self.scenario == "ask" or self._interface_closing:
+            return
+        from .widgets import ActionFooter
+
+        footer = self.main_query_one("#last-result", ActionFooter)
+        log = self.main_query_one("#log", RichLog)
+        log.clear()
+        for icon, text in getattr(self, "_drawer_logs", []):
+            # A short result is already fully visible. An abbreviated result
+            # remains available here in full, in the scrollable drawer log.
+            if text != self.last_result or footer.truncated:
+                log.write(f"{icon} {escape(text)}")
 
     def update_measurement_progress(self, message):
         self._pending_progress = message
@@ -262,6 +260,8 @@ class TravelApp(
             self.logline(kind, message)
         if self._pending_progress is not None:
             self.update_measurement_progress(self._pending_progress)
+        if self.scenario != "ask":
+            self.main_query_one("#body").focus()
 
     def tlog(self, kind, msg):
         self.call_from_thread(self.logline, kind, msg)
@@ -328,11 +328,19 @@ class TravelApp(
             self.refresh_bindings()
             if self.scenario != "ask":
                 self.action_refresh()
+            else:
+                self.main_query_one("#scenario-work").focus()
 
     def _translate_bindings(self):
         from dataclasses import replace
 
-        for key, message in (("q", "impl.quit_2"), ("l", "language.current"), ("r", "impl.refresh")):
+        for key, message in (
+            ("q", "impl.quit_2"),
+            ("l", "redesign.language"),
+            ("r", "impl.refresh"),
+            ("d", "redesign.details"),
+            ("question_mark", "redesign.help"),
+        ):
             self._bindings.key_to_bindings[key] = [
                 replace(binding, description=t(message)) for binding in self._bindings.key_to_bindings[key]
             ]
@@ -354,159 +362,6 @@ class TravelApp(
             # Recompose disposes the old button; only mounted widgets receive UI updates.
             if btn.is_attached:
                 btn.loading = False
-
-    @work(exclusive=True, group="dash")
-    async def refresh_dash(self):
-        with self.scenario_scope():
-            from textual.worker import get_current_worker
-
-            from travel_mode.network_apps import network_scan
-            from travel_mode.system.app_snapshot import AppSnapshot, snapshot_scope
-            from travel_mode.system.platform import supported_pmset_keys
-
-            worker = get_current_worker()
-            generation = self._refresh_generation
-            dash_values = None
-            self.pages_ready = set()
-            self.refresh_complete = False
-
-            async def apply(page, build, *args):
-                async with self._refresh_lock:
-                    if worker.is_cancelled or generation != self._refresh_generation:
-                        return
-                    # 每页原子挂载；其它页无需等待慢扫描结束。
-                    with self.batch_update():
-                        await build(*args)
-                        if not worker.is_cancelled and generation == self._refresh_generation:
-                            self.pages_ready.add(page)
-                            if (
-                                page in {"p-apps", "p-svc"}
-                                and "p-dash" in self.pages_ready
-                                and dash_values is not None
-                            ):
-                                await self.build_dash(*dash_values)
-                    from travel_mode.tui.messages import PageRefreshed
-
-                    self.post_message(PageRefreshed(page))
-
-            async def dash():
-                nonlocal dash_values
-                blocks, ac, batt, spot = await asyncio.to_thread(
-                    lambda: (
-                        flow_check.blockers_lines(),
-                        pmset.on_ac_power(),
-                        pmset.battery_line(),
-                        spotlight.spotlight_on(),
-                    )
-                )
-                dash_values = blocks, ac, batt, spot
-                from travel_mode.resurrection import detect
-
-                self.resurrected = await asyncio.to_thread(detect, self.display_state())
-                self._observed_resurrections.extend(self.resurrected)
-                if not self._mutation_lock.locked():
-                    self.flush_session_observations()
-                await apply("p-dash", self.build_dash, *dash_values)
-
-            async def power():
-                profs, supported = await asyncio.to_thread(
-                    lambda: (pmset.pmset_custom(), supported_pmset_keys())
-                )
-                await apply("p-power", self.build_power, profs, supported)
-
-            async def health():
-                from travel_mode.system.health import collect
-
-                report = await asyncio.to_thread(collect)
-                await apply("health", self.build_health, report)
-
-            async def services():
-                svc, spot = await asyncio.to_thread(lambda: (launchd.svc_scan(), spotlight.spotlight_on()))
-
-                async def build():
-                    self.svc = svc
-                    await self.build_svc(spot)
-
-                await apply("p-svc", build)
-
-            # 应用和网络页只共享本轮索引/进程快照，不共享完成时序。
-            snapshot_task = asyncio.create_task(
-                asyncio.to_thread(AppSnapshot.capture, system_apps.app_directories())
-            )
-
-            async def sample_apps(fn):
-                snapshot = await asyncio.shield(snapshot_task)
-
-                def sample():
-                    with snapshot_scope(snapshot):
-                        return fn()
-
-                return await asyncio.to_thread(sample)
-
-            async def apps():
-                scan = await sample_apps(system_apps.scan_apps)
-
-                async def build():
-                    self.scan = scan
-                    await self.build_apps()
-
-                await apply("p-apps", build)
-
-            async def network():
-                rows = await sample_apps(network_scan)
-
-                def connections():
-                    dev = system_network.wifi_dev()
-                    return (
-                        dev,
-                        system_network.wifi_powered(dev) if dev else None,
-                        system_network.bt_powered() if shutil.which("blueutil") else None,
-                    )
-
-                dev, wifi, bluetooth = await asyncio.to_thread(connections)
-                await apply("p-net", self.build_net, rows, dev, wifi, bluetooth)
-
-            async def guarded(fn, page, selector):
-                from travel_mode.system.shell import ReadError
-
-                try:
-                    await fn()
-                except ReadError as exc:
-                    message = t("health.legacy_failed", reason=str(exc))
-
-                    async def failed():
-                        box = self.main_query_one(selector)
-                        await box.remove_children()
-                        await box.mount(Static(escape(message)))
-
-                    await apply(page, failed)
-
-            tasks = [
-                asyncio.create_task(guarded(fn, page, selector))
-                for fn, page, selector in (
-                    (dash, "p-dash", "#dash-status"),
-                    (power, "p-power", "#power-list"),
-                    (services, "p-svc", "#svc-box"),
-                    (apps, "p-apps", "#apps-box"),
-                    (network, "p-net", "#net-box"),
-                    (health, "health", "#dash-health"),
-                )
-            ]
-            try:
-                await asyncio.gather(*tasks)
-                if not worker.is_cancelled and generation == self._refresh_generation:
-                    self.refresh_complete = True
-            except Exception as e:
-                self.logline("bad", t("impl.refresh_failed", v0=type(e).__name__, v1=e))
-                self.notify(t("impl.refresh_failed_2", v0=e), severity="error")
-                raise RuntimeError(t("impl.tui_refresh_failed", v0=e)) from e
-            finally:
-                # 取消所有待回填页；线程返回后也不能污染语言重组后的页面。
-                for task in tasks:
-                    task.cancel()
-                await asyncio.gather(*tasks, return_exceptions=True)
-                snapshot_task.cancel()
-                await asyncio.gather(snapshot_task, return_exceptions=True)
 
     @work(thread=True, exclusive=True, group="audit")
     def refresh_audit_detail(self):
@@ -579,7 +434,9 @@ class TravelApp(
             self._observed_external |= reading.get("reason") in {"external_power", "charging"}
             if not self._mutation_lock.locked():
                 self.flush_session_observations()
-            self.main_query_one("#dash-battery", Static).update(battery.describe(reading))
+            self.current_battery = reading
+            self.main_query_one("#dash-battery", Static).update(self.battery_heading(reading))
+            self.update_session()
 
     def flush_session_observations(self):
         from travel_mode.sessions import note
@@ -664,7 +521,7 @@ class TravelApp(
 
     async def action_select_scenario(self, scenario):
         if self.scenario == "ask":
-            await self.choose_scenario(scenario)
+            self.main_query_one("#scenario-" + scenario).focus()
 
     def start_pages(self):
         if self.merged:
@@ -683,43 +540,14 @@ class TravelApp(
             return
         if self.scenario == "ask" or (not self.origin_ready and self._origin_error is None):
             return
+        if self._mutation_lock.locked() and self._mutation_action is not None:
+            self._refresh_after_action = True
+            return
         self._refresh_generation += 1
         self.refresh_complete = False
         self.logline("dim", t("impl.refresh"))
         self.refresh_dash()
         self.refresh_battery()
-
-    def action_goto(self, pane: str):
-        if self.scenario == "ask":
-            return
-        self.main_query_one(TabbedContent).active = pane
-
-    def on_tabbed_content_tab_activated(self, event):
-        """1) 同步段: 若焦点仍滞留在旧 pane, 立即交给 Tabs 本体 — 否则隐藏 pane 重新获得焦点会
-        触发 TabPane.Focused 把 active 弹回旧页 (新页 display 永不生效);
-        2) 异步段: 等新 pane 真正显示后把焦点交给它的滚动容器 (方向键可滚页)."""
-        tb = self.main_query_one(TabbedContent)
-        new_pane = self.main_query_one(f"#{tb.active}") if tb.active else None
-        f = self.focused
-        if (
-            f is not None
-            and f is not tb
-            and (new_pane is None or (f is not new_pane and new_pane not in f.ancestors))
-        ):
-            tb.focus()
-
-        def fix():
-            if self._interface_closing or not tb.is_attached or not tb.active:
-                return
-            pane = tb.get_pane(tb.active)
-            if not pane.display or not pane.size.height:
-                return
-            pane.refresh(layout=True)
-            f = self.focused
-            if f is None or (f is not tb and f is not pane and pane not in f.ancestors):
-                pane.query_one(VerticalScroll).focus()
-
-        self.call_after_refresh(fix)
 
 
 def tui(return_class=False, dry_run=False, measure=None):
