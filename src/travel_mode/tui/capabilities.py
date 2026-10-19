@@ -28,7 +28,7 @@ class Capabilities:
 
         self.push_screen(ConfirmRemember(self.remember.prompt(name, scenario, action)), answered)
 
-    async def act_off(self, btn):
+    async def act_off(self, btn, only=None):
         age = snapshots.anchor_age_hours(self.st)
         if age is not None and age > 24:
             self.logline("warn", t("impl.snapshot_is_hours_old_restoring_the", v0=age))
@@ -36,8 +36,32 @@ class Capabilities:
         def flow():
             from travel_mode import sessions
 
-            n, fails = flow_restore.run_restore(self.st, lambda k, m: self.tlog(k, m))
-            if fails:
+            def emit(kind, message):
+                self.tlog(kind, message)
+
+            n, fails = (
+                flow_restore.run_restore(self.st, emit)
+                if only is None
+                else flow_restore.run_restore(self.st, emit, only=only)
+            )
+            remaining = only is not None and any(
+                self.st.get(key)
+                for key in (
+                    "batt_prof",
+                    "ac_prof",
+                    "sleepdisabled",
+                    "spotlight_off",
+                    "wifi_off",
+                    "bt_off",
+                    "brightness",
+                    "unloaded_sys_svcs",
+                    "unloaded_svcs",
+                    "frozen_apps",
+                    "frozen_pids",
+                    "quit_apps",
+                )
+            )
+            if fails or remaining:
                 if "session" in self.st:
                     self.st["session"]["restored"] += n
                     self.st["session"]["restore_failures"] += fails
@@ -61,9 +85,16 @@ class Capabilities:
             await self.push_screen(
                 SessionScreen("\n".join(sessions.describe(report, sessions.read_history())))
             )
-        if fails:
-            self.logline("bad", t("impl.restores_failed_snapshot_retained_resolve_failures", v0=fails))
-            self.notify(t("impl.restores_failed_snapshot_retained", v0=fails), severity="error")
+        if fails or report is None:
+            from travel_mode.actions.privilege_plan import pending_restore
+
+            rows = pending_restore(self.st)
+            names = t("admin.separator").join(
+                t("admin.pending_item", name=row["name"], reason=row["reason"]) for row in rows
+            )
+            text = t("admin.restore_pending", n=fails or len(rows), names=names)
+            self.logline("bad", text)
+            self.notify(text, severity="warning")
         else:
             self.logline("ok", t("impl.restore_complete_items_state_file_cleared", v0=n))
             self.notify(t("impl.original_state_restored_items", v0=n), severity="information")

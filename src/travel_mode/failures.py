@@ -296,6 +296,9 @@ def mutation(command):
 
 
 def action_name(action):
+    label = getattr(action, "failure_label", None)
+    if label is not None:
+        return label
     name = (
         getattr(action, "name", "")
         or getattr(action, "path", "")

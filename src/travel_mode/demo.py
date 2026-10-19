@@ -44,6 +44,8 @@ def _configure_demo() -> None:
                     "",
                     0,
                 )
+            if cmd[:3] == ("sudo", "-n", "-l"):
+                return CmdResult("NOPASSWD: ALL", "", 0)
             if cmd == ("tmutil", "status"):
                 return CmdResult("Backup session status:\n{ Running = 0; }", "", 0)
             if cmd == ("lsappinfo", "front"):

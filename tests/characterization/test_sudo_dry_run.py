@@ -8,13 +8,19 @@ from travel_mode.system import shell
 
 
 @pytest.mark.parametrize(
-    ("credentials", "tty", "exit_code"), [(True, False, 0), (False, True, 0), (False, False, 1)]
+    ("credentials", "tty", "exit_code"), [(True, False, 0), (False, True, 1), (False, False, 1)]
 )
 def test_dry_run_sudo_credentials(credentials, tty, exit_code, machine, monkeypatch, capsys):
     monkeypatch.setattr("sys.stdin.isatty", lambda: tty)
     real = shell.get_runner()
     auth = FakeRunner({("sudo", "-v"): shell.CmdResult("", "", 0)})
-    probe = FakeRunner({("sudo", "-n", "-l"): shell.CmdResult("", "", int(not credentials))})
+    probe = FakeRunner(
+        {
+            ("sudo", "-n", "-l"): shell.CmdResult(
+                "NOPASSWD: ALL" if credentials else "", "", int(not credentials)
+            )
+        }
+    )
     denied = FakeRunner({("sudo", "-n", "launchctl", "list"): shell.CmdResult("", "password required", 1)})
     authenticated = credentials
 
@@ -34,8 +40,8 @@ def test_dry_run_sudo_credentials(credentials, tty, exit_code, machine, monkeypa
     try:
         assert mode_apply(yes=True, dry_run=True) == exit_code
         output = capsys.readouterr()
-        assert bool(auth.calls) == (tty and not credentials)
-        assert bool(denied.calls) == (not tty and not credentials)
+        assert not auth.calls
+        assert not any(command == ("sudo", "-v") for command in probe.calls)
         if exit_code:
             assert "Unable to confirm (requires sudo)" in output.out + output.err
             assert "sudo -n launchctl list" in output.out + output.err

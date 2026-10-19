@@ -244,6 +244,8 @@ async def test_debug_scroll_updates_widget_coordinates(debug_modules, tmp_path, 
 
 
 async def test_debug_scrolled_plan_bottom_is_not_blank(debug_modules, tmp_path, monkeypatch):
+    import asyncio
+
     from textual.containers import VerticalScroll
 
     from travel_mode.paths import config_path
@@ -261,11 +263,19 @@ async def test_debug_scrolled_plan_bottom_is_not_blank(debug_modules, tmp_path, 
         assert await app.screen.wait_for_refresh()
         target = app.query_one("#q-measure")
         await pilot.pause()
-        scroll = next(parent for parent in target.ancestors if isinstance(parent, VerticalScroll))
-        scroll.scroll_to(y=scroll.max_scroll_y, animate=False, immediate=True)
-        assert await app.screen.wait_for_refresh()
-        app.write_layout()
-        assert app.visible_region(target).area
+        assert any(isinstance(parent, VerticalScroll) for parent in target.ancestors)
+        scrolled = asyncio.Event()
+        target.scroll_visible(animate=False, immediate=True, on_complete=scrolled.set)
+        await asyncio.wait_for(scrolled.wait(), 10)
+        await app.wait_layout(
+            lambda layout: any(
+                row["id"] == "q-measure"
+                and row["visible_region"][2:] == list(target.region.size)
+                and row["visible_region"][3] > 0
+                for row in layout["widgets"]
+            )
+        )
+        assert app.visible_region(target) == target.region
         layout = debug.read_layout(path)
         assert layout["body_visible"] and layout["content_visible"]
 

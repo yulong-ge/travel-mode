@@ -106,6 +106,15 @@ daemon load/unload, indexing, Wi-Fi and signals to root-owned processes. Permiss
 command is first checked with `sudo -n -l`; a password is requested only when needed and only in
 an interactive terminal. Privileged reads use `sudo -n` and never wait for a password.
 
+Before a batch (apply, restore, a single fix button) the TUI lists the items that would need a
+password and asks: enter password, skip these items, or cancel. "Enter password" suspends the TUI,
+prints which items need administrator permission and runs `sudo -v` in the terminal; the TUI then
+resumes and the commands themselves run with `sudo -n`. Items without permission (no password,
+wrong password, Ctrl-C, or "skip") are recorded as not run with the reason "needs administrator
+password"; the other items continue, and the session screen offers "Retry" for each. The
+interactive CLI asks for the password once before the batch. With `--yes` and no passwordless
+rule, such items are not run and one line explains why; nothing waits for a password.
+
 Apple tools (`pmset`, `ioreg`, `launchctl`, `ps`, `kill`, `osascript`, `sudo` and others) are run
 from fixed system paths such as `/usr/bin` and `/usr/sbin`; a same-named program earlier in `PATH`
 is never used, and a missing system tool is an error. Optional third-party tools (`blueutil`,

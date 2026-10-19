@@ -73,7 +73,7 @@ def _readonly_responses() -> dict[tuple[str, ...], CmdResult]:
         ("pgrep",): CmdResult("", "", 1),
         ("top",): CmdResult("", "", 0),
         ("mdfind",): CmdResult("", "", 0),
-        ("sudo", "-n", "-l"): CmdResult("", "", 0),
+        ("sudo", "-n", "-l"): CmdResult("NOPASSWD: ALL", "", 0),
         ("sudo", "-n", "true"): CmdResult("", "", 0),
     }
 

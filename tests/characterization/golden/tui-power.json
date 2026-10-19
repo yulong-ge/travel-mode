@@ -2,32 +2,9 @@
   "active": "result",
   "commands": [
     [
-      "ioreg",
-      "-rn",
-      "AppleSmartBattery"
-    ],
-    [
-      "pmset",
-      "-g",
-      "batt"
-    ],
-    [
       "sudo",
       "-n",
       "-l",
-      "pmset",
-      "-b",
-      "lowpowermode",
-      "1",
-      "sleep",
-      "5",
-      "displaysleep",
-      "3",
-      "hibernatemode",
-      "25"
-    ],
-    [
-      "sudo",
       "pmset",
       "-b",
       "lowpowermode",
@@ -49,6 +26,29 @@
       "0",
       "womp",
       "0"
+    ],
+    [
+      "ioreg",
+      "-rn",
+      "AppleSmartBattery"
+    ],
+    [
+      "pmset",
+      "-g",
+      "batt"
+    ],
+    [
+      "sudo",
+      "pmset",
+      "-b",
+      "lowpowermode",
+      "1",
+      "sleep",
+      "5",
+      "displaysleep",
+      "3",
+      "hibernatemode",
+      "25"
     ],
     [
       "sudo",

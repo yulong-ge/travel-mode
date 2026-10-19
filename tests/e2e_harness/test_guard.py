@@ -206,3 +206,15 @@ def test_local_backend_pins_paths_after_exact_guard_validation(sandbox, monkeypa
     assert calls == [executed]
     assert guard.trace[-1]["executable"] == executed[0]
     assert not guard.tripped
+
+
+@pytest.mark.parametrize("verbose", [False, True])
+def test_privilege_listing_preserves_exact_mutation_allowlist(sandbox, verbose):
+    _, guard, _ = sandbox
+    prefix = ["sudo", "-n", "-l", *(["-l"] if verbose else [])]
+    command = ["pmset", "-b", "lowpowermode", "1"]
+    assert guard.validate([*prefix, *command]) == [*prefix, "/usr/bin/pmset", *command[1:]]
+    with pytest.raises(GuardViolation):
+        guard.validate([*prefix, "mdutil", "-i", "on", "/"])
+    with pytest.raises(GuardViolation):
+        guard.validate([*prefix, "pmset", "-c", "sleep", "0"])

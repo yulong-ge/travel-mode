@@ -2,32 +2,18 @@
   "active": "result",
   "commands": [
     [
-      "ioreg",
-      "-rn",
-      "AppleSmartBattery"
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
     ],
     [
-      "pmset",
-      "-g",
-      "batt"
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
     ],
     [
       "sudo",
       "-n",
       "-l",
-      "pmset",
-      "-b",
-      "lowpowermode",
-      "1",
-      "sleep",
-      "5",
-      "displaysleep",
-      "3",
-      "hibernatemode",
-      "25"
-    ],
-    [
-      "sudo",
       "pmset",
       "-b",
       "lowpowermode",
@@ -49,6 +35,70 @@
       "0",
       "womp",
       "0"
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "launchctl",
+      "list"
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "launchctl",
+      "unload",
+      "<ROOT>/org.demo.daemon.plist"
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "kill",
+      "-TERM",
+      "910005"
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "networksetup",
+      "-setairportpower",
+      "en0",
+      "off"
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "mdutil",
+      "-i",
+      "off",
+      "/"
+    ],
+    [
+      "ioreg",
+      "-rn",
+      "AppleSmartBattery"
+    ],
+    [
+      "pmset",
+      "-g",
+      "batt"
+    ],
+    [
+      "sudo",
+      "pmset",
+      "-b",
+      "lowpowermode",
+      "1",
+      "sleep",
+      "5",
+      "displaysleep",
+      "3",
+      "hibernatemode",
+      "25"
     ],
     [
       "sudo",
@@ -125,23 +175,8 @@
     [
       "sudo",
       "-n",
-      "-l",
       "launchctl",
       "list"
-    ],
-    [
-      "sudo",
-      "-n",
-      "launchctl",
-      "list"
-    ],
-    [
-      "sudo",
-      "-n",
-      "-l",
-      "launchctl",
-      "unload",
-      "<ROOT>/org.demo.daemon.plist"
     ],
     [
       "sudo",
@@ -204,15 +239,6 @@
     ],
     [
       "sudo",
-      "-n",
-      "-l",
-      "networksetup",
-      "-setairportpower",
-      "en0",
-      "off"
-    ],
-    [
-      "sudo",
       "networksetup",
       "-setairportpower",
       "en0",
@@ -222,15 +248,6 @@
       "blueutil",
       "-p",
       "0"
-    ],
-    [
-      "sudo",
-      "-n",
-      "-l",
-      "mdutil",
-      "-i",
-      "off",
-      "/"
     ],
     [
       "sudo",

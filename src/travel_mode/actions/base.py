@@ -43,8 +43,17 @@ class RecoveryCommand(Command):
     argv: list
     name: str
     sudo: bool = False
+    restore_key: str | None = None
     requires_journal = False
     description = "failure.restore"
+
+    @property
+    def failure_label(self):
+        if self.restore_key is not None:
+            from .privilege_plan import restore_name
+
+            return restore_name(self.restore_key)
+        return None
 
     def command(self):
         return self.argv

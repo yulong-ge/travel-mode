@@ -68,6 +68,9 @@ class Lifecycle:
 
     async def _drain_interface(self):
         self._interface_closing = True
+        decision = getattr(self, "_administrator_result", None)
+        if decision is not None and not decision.done():
+            decision.set_result("cancel")
         self._measurement_cancelled.set()
         if self._battery_timer is not None:
             self._battery_timer.stop()

@@ -90,8 +90,23 @@ class Dispatch:
                 self.session_decision_complete.clear()
                 self.push_screen(SessionConflict(self.st), answered)
                 return
+            if hasattr(ev, "travel_credentials"):
+                credentials = ev.travel_credentials
+            else:
+                if getattr(self, "_permission_pending", False):
+                    return
+                self._permission_pending = True
+                try:
+                    credentials, pending = await self.authorize_event(ev)
+                except BaseException:
+                    self._permission_pending = False
+                    raise
+                if pending:
+                    self.run_worker(self.complete_permission(ev, credentials, pending), group="permissions")
+                    return
+                self._permission_pending = False
             async with self.executor.transaction(
-                self._mutation_lock, self.st, self.merged, self.save, self.action_authenticator()
+                self._mutation_lock, self.st, self.merged, self.save, credentials=credentials
             ):
                 if self.merged and not _path().exists():
                     raise StateError(t("impl.snapshot_deleted_externally_possibly_by_off"))
@@ -132,19 +147,102 @@ class Dispatch:
                 self._refresh_after_action = False
                 self.action_refresh()
 
-    def action_authenticator(self):
-        loop = asyncio.get_running_loop()
+    async def authorize_event(self, event):
+        from travel_mode.actions.privilege_plan import action_requests, restore_requests
+        from travel_mode.tui.plan import execution_units
 
-        async def acquire():
-            from travel_mode.system.sudo import SudoKeepAlive
+        bid = event.button.id or ""
+        if bid == "b-off" or bid.startswith("restore-retry-"):
+            only = {bid.removeprefix("restore-retry-")} if bid.startswith("restore-retry-") else None
+            requests = await self.in_thread(restore_requests, self.st, only)
+        elif bid == "b-quick":
+            requests = await self.in_thread(
+                action_requests,
+                [action for _, action in execution_units(self.plan_items, self.scenario, self.st, self.save)],
+            )
+        elif bid.startswith(("ready-", "b-health-", "b-killcaff-")):
+            from travel_mode.flows.doctor import make_action
 
-            self.logline("dim", t("impl.sudo_required_enter_your_password_in"))
-            with self.suspend():
-                keepalive = await self.in_thread(SudoKeepAlive().__enter__)
-            self.logline("ok", t("impl.sudo_credentials_acquired"))
-            return keepalive
+            requests = await self.in_thread(
+                action_requests, [make_action(event.button.health_descriptor, self.st, self.save)]
+            )
+        elif bid.startswith(("retry-", "force-")):
+            from .plan import operation
 
-        return lambda: asyncio.run_coroutine_threadsafe(acquire(), loop).result()
+            mode, key = bid.split("-", 1)
+            row = dict(next(row for row in self.plan_items if row["id"] == key))
+            row["action"] = "force" if mode == "force" else row.get("retry_action", row["action"])
+            requests = await self.in_thread(
+                action_requests, [operation(row, self.scenario, self.st, self.save)]
+            )
+        elif bid == "b-reapply":
+            from travel_mode.actions.apps import QuitDaemonApp, configured_daemon
+
+            actions = []
+            for row in self.resurrected:
+                spec = configured_daemon(row.get("name", ""))
+                if spec:
+                    actions.append(QuitDaemonApp(spec, self.st, self.save))
+            requests = await self.in_thread(action_requests, actions)
+        else:
+            requests = []
+        from travel_mode.system.sudo import Credentials
+
+        credentials = Credentials(interactive=False)
+        pending = await self.in_thread(credentials.preflight, requests)
+        return credentials, pending
+
+    async def complete_permission(self, event, credentials, pending):
+        try:
+            admitted = await self.authorize_requests([], credentials=credentials, pending=pending)
+            if admitted is not None:
+                event.travel_credentials = admitted
+                await self._handle_button_pressed(event)
+        except Exception as error:
+            from travel_mode.failures import BatchStopped
+
+            if not isinstance(error, BatchStopped):
+                self.report_action_error(error)
+            import os
+
+            if os.environ.get("TRAVEL_MODE_DEBUG") == "1":
+                raise
+        finally:
+            self._permission_pending = False
+
+    async def authorize_requests(self, requests, *, credentials=None, pending=None):
+        from travel_mode.system.sudo import Credentials, SudoKeepAlive
+
+        from .administrator import AdministratorScreen
+
+        credentials = credentials or Credentials(interactive=False)
+        if pending is None:
+            pending = await self.in_thread(credentials.preflight, requests)
+        if not pending:
+            return credentials
+        answered = asyncio.get_running_loop().create_future()
+        self._administrator_result = answered
+
+        def decided(choice):
+            if not answered.done():
+                answered.set_result(choice)
+
+        self.push_screen(AdministratorScreen(pending), decided)
+        try:
+            choice = await answered
+        finally:
+            self._administrator_result = None
+        if choice == "cancel":
+            return None
+        if choice == "enter":
+            names = t("admin.separator").join(dict.fromkeys(name for _, name in pending))
+            try:
+                with self.suspend():
+                    print(t("admin.terminal", names=names), flush=True)
+                    credentials.keepalive = SudoKeepAlive(prompt="").__enter__()
+            except (RuntimeError, KeyboardInterrupt):
+                self.logline("warn", t("sudo.not_provided"))
+        return credentials
 
     async def admit_session(self, choice, event):
         from travel_mode import snapshots
@@ -152,8 +250,13 @@ class Dispatch:
 
         try:
             if choice == "restore":
+                from travel_mode.actions.privilege_plan import restore_requests
+
+                credentials = await self.authorize_requests(await self.in_thread(restore_requests, self.st))
+                if credentials is None:
+                    return
                 async with self.executor.transaction(
-                    self._mutation_lock, self.st, self.merged, self.save, self.action_authenticator()
+                    self._mutation_lock, self.st, self.merged, self.save, credentials=credentials
                 ):
                     if not await self.in_thread(restore_active, self.st, self.tlog):
                         return

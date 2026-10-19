@@ -327,6 +327,8 @@ class DebugApp(TravelApp):
         Binding("f8", "debug_plan", "", show=False),
         Binding("f9", "debug_drawer", "", show=False),
         Binding("f10", "demo_away", "", show=False),
+        Binding("f11", "demo_administrator", "", show=False),
+        Binding("f12", "demo_pending_restore", "", show=False),
     ]
     """TravelApp plus layout telemetry for the tmux debug harness."""
 
@@ -552,6 +554,43 @@ class DebugApp(TravelApp):
         await self.render_attention()
         self.call_after_refresh(self.write_layout)
 
+    def action_demo_administrator(self):
+        if getattr(self, "live_readonly", False):
+            return
+        from travel_mode.tui.administrator import AdministratorScreen
+
+        self.push_screen(AdministratorScreen([(["mdutil", "-i", "on", "/"], t("admin.restore_spotlight"))]))
+        self.call_after_refresh(self.write_layout)
+
+    async def action_demo_pending_restore(self):
+        if getattr(self, "live_readonly", False):
+            return
+        from travel_mode import failures, state
+
+        await self.action_demo_session()
+        self.st["spotlight_off"] = "1"
+        failures.record(
+            self.st,
+            t("admin.restore_spotlight"),
+            t("sudo.not_provided"),
+            [dict(command=["sudo", "mdutil", "-i", "on", "/"], rc=77, stdout="", stderr="")],
+            kind="not_executed",
+            target="restore:spotlight_off",
+        )
+        state.save_state(self.st)
+        await self.render_restore_pending()
+        self.logline(
+            "bad",
+            t(
+                "admin.restore_pending",
+                n=1,
+                names=t(
+                    "admin.pending_item", name=t("admin.item_spotlight"), reason=t("admin.password_reason")
+                ),
+            ),
+        )
+        self.call_after_refresh(self.write_layout)
+
     def action_demo_away(self):
         if getattr(self, "live_readonly", False):
             return
@@ -744,6 +783,16 @@ def run_group(output: Path, cols: int, rows: int, language: str, args, results: 
             results.append(session.capture("scenario", "scenario"))
             session.keys("1", "Enter")
         session.wait_complete(active="plan")
+        if args.admin:
+            session.keys("F12")
+            session.wait_complete(active="session")
+            results.append(session.capture("restore-pending", "session"))
+            session.keys("F11")
+            from travel_mode.i18n import catalog
+
+            session.wait_text(catalog(language)["admin.title"])
+            results.append(session.capture("administrator", "session"))
+            return
         results.append(session.capture("plan", "plan"))
         if not args.live_readonly:
             session.keys("5")
@@ -779,6 +828,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--setup", action="store_true", help="capture the app defaults setup screen")
     parser.add_argument(
+        "--admin", action="store_true", help="capture administrator confirmation and pending recovery"
+    )
+    parser.add_argument(
         "--all",
         action="store_true",
         help="scenario, plan, result, session and drawer × 2 languages × 3 sizes",
@@ -803,6 +855,8 @@ def main() -> int:
         parser.error(f"--config is not a file: {args.config}")
     if args.live_readonly and args.config is None:
         parser.error("--live-readonly requires an explicit --config copy")
+    if args.admin and args.live_readonly:
+        parser.error("--admin requires demo fixtures")
     if args.demo and args.live_readonly:
         parser.error("--demo and --live-readonly are mutually exclusive")
     if args.child:

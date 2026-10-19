@@ -37,6 +37,7 @@ class Workflow:
             with Vertical(id="sleep-ready"):
                 yield Static(t("redesign.attention"), classes="heading")
             yield Static("", id="session-summary")
+            yield Vertical(id="restore-pending")
             with Horizontal(id="session-revived-line", classes="attention-line"):
                 yield Static("", id="session-revived", classes="grow")
                 yield Button(t("resurrection.reapply"), id="b-reapply")
@@ -112,6 +113,7 @@ class Workflow:
             self.main_query_one(selector).display = self.view_mode == "plan"
         self.main_query_one("#result-summary").display = self.view_mode == "result"
         self.main_query_one("#session-summary").display = self.view_mode == "session"
+        self.main_query_one("#restore-pending").display = self.view_mode == "session"
         self.main_query_one("#details-drawer").display = self.details_open
         self.main_query_one("#plan-list").display = self.view_mode != "session"
         self.main_query_one("#sleep-ready").display = self.view_mode != "result"
@@ -247,6 +249,25 @@ class Workflow:
         await box.remove_children()
         await box.mount(*widgets)
 
+    async def render_restore_pending(self):
+        from travel_mode.actions.privilege_plan import pending_restore
+
+        box = self.main_query_one("#restore-pending")
+        widgets = []
+        for row in pending_restore(self.st):
+            widgets.append(
+                Horizontal(
+                    Static(
+                        "✗ " + t("admin.pending_item", name=row["name"], reason=row["reason"]), classes="grow"
+                    ),
+                    Button(t("admin.retry"), id="restore-retry-" + row["key"]),
+                    classes="attention-line",
+                )
+            )
+        await box.remove_children()
+        if widgets:
+            await box.mount(*widgets)
+
     async def render_attention(self):
         from travel_mode.flows.doctor import action_label
 
@@ -332,6 +353,7 @@ class Workflow:
             )
         await box.remove_children()
         await box.mount(*widgets)
+        await self.render_restore_pending()
 
     async def render_observations(self):
         # Selection changes only the presentation; never repeat discovery.
@@ -459,6 +481,10 @@ class Workflow:
             await self.run_plan(event.button)
         elif bid == "b-off":
             await self.act_off(event.button)
+            self.view_mode = "session" if self.merged else "plan"
+            self.update_primary()
+        elif bid.startswith("restore-retry-"):
+            await self.act_off(event.button, only={bid.removeprefix("restore-retry-")})
             self.view_mode = "session" if self.merged else "plan"
             self.update_primary()
         elif bid == "b-reapply":

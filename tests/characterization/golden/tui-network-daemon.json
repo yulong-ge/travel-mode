@@ -2,6 +2,38 @@
   "active": "result",
   "commands": [
     [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "launchctl",
+      "list"
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "launchctl",
+      "unload",
+      "<ROOT>/org.demo.daemon.plist"
+    ],
+    [
+      "sudo",
+      "-n",
+      "-l",
+      "kill",
+      "-TERM",
+      "910005"
+    ],
+    [
       "ioreg",
       "-rn",
       "AppleSmartBattery"
@@ -14,23 +46,8 @@
     [
       "sudo",
       "-n",
-      "-l",
       "launchctl",
       "list"
-    ],
-    [
-      "sudo",
-      "-n",
-      "launchctl",
-      "list"
-    ],
-    [
-      "sudo",
-      "-n",
-      "-l",
-      "launchctl",
-      "unload",
-      "<ROOT>/org.demo.daemon.plist"
     ],
     [
       "sudo",

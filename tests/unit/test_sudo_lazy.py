@@ -51,7 +51,7 @@ def test_password_required_before_command(tty, monkeypatch, fake_runner):
         assert flow()[1] == 0
         assert fake_runner.calls[1] == ("sudo", "-v")
     else:
-        with pytest.raises(SudoCredentialError, match=r"pmset -b sleep 5.*sudo -v.*NOPASSWD"):
+        with pytest.raises(SudoCredentialError, match=r"未执行|Not executed"):
             flow()
         assert len(fake_runner.calls) == 1
 

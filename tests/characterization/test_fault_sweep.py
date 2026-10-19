@@ -185,3 +185,76 @@ async def test_tui_every_planned_mutation_failure_keeps_interface_and_off_recove
                 dict(interface="tui", scenario=scenario, page=page, commands=len(plan), injections=injections)
             )
         )
+
+
+@pytest.mark.parametrize("scenario", ["away", "work"])
+@pytest.mark.parametrize("interface", ["cli", "tui"])
+async def test_each_privileged_plan_command_without_password_is_not_executed(
+    machine, sweep, monkeypatch, scenario, interface, capsys
+):
+    from textual.widgets import Button
+
+    from travel_mode.tui.administrator import AdministratorScreen
+
+    original_push = TravelApp.push_screen
+
+    def push(app, screen, *args, **kwargs):
+        result = original_push(app, screen, *args, **kwargs)
+        if isinstance(screen, AdministratorScreen):
+            screen.call_after_refresh(lambda: screen.query_one("#admin-skip", Button).press())
+        return result
+
+    monkeypatch.setattr(TravelApp, "push_screen", push)
+    if interface == "cli":
+        monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    argv = ["on", "--scenario", scenario, "--yes", "--aggressive", "--no-measure"]
+    plan = sweep()
+    if interface == "cli":
+        assert cli.main(argv) == 0
+    else:
+        await run_ui(scenario, "quick")
+    plan = tuple(plan)
+    privileged = list(dict.fromkeys(command for command in plan if command[:1] == ("sudo",)))
+    assert privileged
+    for command in privileged:
+        observed = sweep()
+        machine["fake"].responses[("sudo", "-n", "-l", *command[1:])] = CmdResult("", "password required", 1)
+        if interface == "cli":
+            assert cli.main(argv) == 1
+        else:
+            await run_ui(scenario, "quick")
+        snapshot = state.load_state()
+        assert snapshot is not None
+        assert command not in observed
+        receipts = snapshot["action_failures"]
+        assert any(row["command"] == list(command) and row["kind"] == "not_executed" for row in receipts)
+        assert snapshot["session"]["actions"]["failed"] > 0
+        assert not any(c == ("sudo", "-v") for c in machine["fake"].calls)
+        later = {independent(cmd, machine) for cmd in plan[plan.index(command) + 1 :]} - {
+            independent(command, machine)
+        }
+        # A configured daemon must be stopped before quitting its owning app.
+        # Permission failure for its query/unload makes that Quit dependent.
+        if command[1:3] in (("launchctl", "unload"), ("launchctl", "list")):
+            import plistlib
+            from pathlib import Path
+
+            from travel_mode.config import load_config
+
+            for spec in load_config().apps.with_daemon:
+                if command[2] == "list" or command[-1] in spec.system_daemons:
+                    bundle = plistlib.loads(
+                        (Path(machine["paths"][spec.name]) / "Contents/Info.plist").read_bytes()
+                    )["CFBundleIdentifier"]
+                    related = {
+                        independent(c, machine)
+                        for c in plan
+                        if c[:1] == ("osascript",) and any(bundle in part for part in c)
+                    }
+                    later -= related
+        assert later <= {independent(cmd, machine) for cmd in observed}
+        machine["fake"].responses.pop(("sudo", "-n", "-l", *command[1:]))
+        assert cli.main(["off"]) == 0
+        output = capsys.readouterr()
+        assert "Traceback" not in output.out + output.err
+        assert "Password:" not in output.out + output.err

@@ -2,6 +2,15 @@
   "active": "result",
   "commands": [
     [
+      "sudo",
+      "-n",
+      "-l",
+      "mdutil",
+      "-i",
+      "off",
+      "/"
+    ],
+    [
       "ioreg",
       "-rn",
       "AppleSmartBattery"
@@ -15,15 +24,6 @@
       "launchctl",
       "unload",
       "<ROOT>/Library/LaunchAgents/org.demo.worker.plist"
-    ],
-    [
-      "sudo",
-      "-n",
-      "-l",
-      "mdutil",
-      "-i",
-      "off",
-      "/"
     ],
     [
       "sudo",

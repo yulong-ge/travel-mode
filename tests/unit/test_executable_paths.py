@@ -15,7 +15,7 @@ PATH_WHICH = shutil.which
     [
         (["ioreg", "-rn", "AppleSmartBattery"], ["/usr/sbin/ioreg", "-rn", "AppleSmartBattery"]),
         (["sw_vers", "-productVersion"], ["/usr/bin/sw_vers", "-productVersion"]),
-        (["sudo", "pmset", "-g"], ["/usr/bin/sudo", "/usr/bin/pmset", "-g"]),
+        (["sudo", "pmset", "-g"], ["/usr/bin/sudo", "-n", "/usr/bin/pmset", "-g"]),
         (["sudo", "-n", "-l", "pmset", "-g"], ["/usr/bin/sudo", "-n", "-l", "/usr/bin/pmset", "-g"]),
     ],
 )
@@ -98,7 +98,7 @@ def test_sudo_authentication_probe_and_execution_use_same_target(monkeypatch):
 
     def run(cmd, **kwargs):
         calls.append(cmd)
-        return subprocess.CompletedProcess(cmd, 0, "", "")
+        return subprocess.CompletedProcess(cmd, 0, "NOPASSWD: ALL", "")
 
     monkeypatch.setattr(shell, "_is_executable", lambda _: True)
     monkeypatch.setattr(shell.subprocess, "run", run)
@@ -108,7 +108,7 @@ def test_sudo_authentication_probe_and_execution_use_same_target(monkeypatch):
         shell.run_rc(["pmset", "-b", "lowpowermode", "1"], sudo=True)
     assert calls == [
         ["/usr/bin/sudo", "-n", "-l", "/usr/bin/pmset", "-b", "lowpowermode", "1"],
-        ["/usr/bin/sudo", "/usr/bin/pmset", "-b", "lowpowermode", "1"],
+        ["/usr/bin/sudo", "-n", "/usr/bin/pmset", "-b", "lowpowermode", "1"],
     ]
 
 
@@ -181,3 +181,17 @@ def test_fake_and_dry_run_keep_logical_commands(fake_runner, monkeypatch, capsys
     assert fake_runner.calls[-1] == ("ioreg", "-rn", "AppleSmartBattery")
     shell.DryRunRunner(fake_runner)(["sudo", "pmset", "-b", "lowpowermode", "1"])
     assert "[dry-run] sudo pmset -b lowpowermode 1" in capsys.readouterr().out
+
+
+def test_sudo_empty_prompt_keeps_system_target_pinned(monkeypatch):
+    monkeypatch.setattr(shell, "_is_executable", lambda _: True)
+    assert shell.resolve_command(["sudo", "-v", "-p", ""]) == ["/usr/bin/sudo", "-v", "-p", ""]
+    assert shell.resolve_command(["sudo", "-p", "", "pmset", "-g"]) == [
+        "/usr/bin/sudo",
+        "-p",
+        "",
+        "/usr/bin/pmset",
+        "-g",
+    ]
+    with pytest.raises(ValueError, match="-p"):
+        shell.resolve_command(["sudo", "-v", "-p"])

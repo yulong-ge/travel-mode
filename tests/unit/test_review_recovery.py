@@ -250,7 +250,7 @@ def test_fake_on_off_roundtrip_preserves_every_original_and_unmodified_key(monke
         cmd = command[1:] if command[0] == "sudo" else command
         output = ""
         if cmd == ["-n", "true"] or cmd[:2] == ["-n", "-l"]:
-            pass
+            output = "NOPASSWD: ALL"
         elif cmd == ["pmset", "-g", "custom"]:
             output = "\n".join(
                 f"{title}:\n" + "\n".join(f" {key} {value}" for key, value in profiles[domain].items())

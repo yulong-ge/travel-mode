@@ -33,6 +33,7 @@ class Executor:
         with self._lock, scope:
             from .. import failures, sessions
             from ..system.shell import ReadError, SudoReadError, is_dry_run
+            from ..system.sudo import SudoCredentialError
 
             counted = self.count_actions and ctx.state is not None and not is_dry_run()
             if counted:
@@ -63,7 +64,9 @@ class Executor:
                     from .base import Command
 
                     rc = getattr(exc, "rc", 1)
-                    if isinstance(exc, failures.CommandError) and not any(row["rc"] for row in commands):
+                    if isinstance(exc, SudoCredentialError) or (
+                        isinstance(exc, failures.CommandError) and not any(row["rc"] for row in commands)
+                    ):
                         commands.append(dict(command=exc.command, rc=rc, stdout="", stderr=exc.detail))
                     result = (
                         (str(exc), rc)
@@ -111,7 +114,8 @@ class Executor:
                 ]
             label = failures.action_name(action)
             target = (
-                getattr(action, "path", "")
+                ("restore:" + action.restore_key if getattr(action, "restore_key", None) else "")
+                or getattr(action, "path", "")
                 or (result[0] if isinstance(result, tuple) and len(result) == 3 else "")
                 or ""
             )
@@ -171,7 +175,11 @@ class Executor:
                     and not (isinstance(result, tuple) and len(result) == 3)
                 ):
                     bad = next((row for row in reversed(commands) if row["rc"]), None)
-                    if bad:
+                    if bad and bad["rc"] == 77:
+                        reason = t("sudo.not_provided")
+                    elif bad and bad["rc"] == 124:
+                        reason = t("admin.command_timeout")
+                    elif bad:
                         reason = t(
                             "json.command_failed",
                             command=" ".join(bad["command"]),
@@ -186,7 +194,13 @@ class Executor:
                     )
                 quit_status = getattr(getattr(result, "normal", result), "status", None)
                 row = failures.record(
-                    ctx.state, label, reason, commands, target=target, quit_status=quit_status
+                    ctx.state,
+                    label,
+                    reason,
+                    commands,
+                    target=target,
+                    quit_status=quit_status,
+                    kind="not_executed" if any(r["rc"] == 77 for r in commands) else "action",
                 )
                 if ctx.state is not None:
                     (ctx.save or save_state)(ctx.state)
@@ -222,13 +236,16 @@ class Executor:
         return [self.execute(action) for action in actions]
 
     @asynccontextmanager
-    async def transaction(self, lock, state, merged, save, authenticate=None):
+    async def transaction(self, lock, state, merged, save, authenticate=None, *, credentials=None):
         async with lock:
             if merged and not _path().exists():
                 raise StateError(t("impl.snapshot_deleted_externally_possibly_by_off"))
             from ..system.sudo import Credentials, credential_scope
 
-            with credential_scope(Credentials(authenticate)), journal.mutation_scope(state, save):
+            with (
+                credential_scope(credentials or Credentials(authenticate)),
+                journal.mutation_scope(state, save),
+            ):
                 yield
 
 
@@ -244,9 +261,10 @@ def _sudo_lifecycle(func):
 
     @wraps(func)
     def wrapped(*args, **kwargs):
-        from ..system.sudo import credential_scope
+        from ..system.sudo import Credentials, credential_scope
 
-        with credential_scope():
+        no_prompt = func.__name__ == "mode_apply" and (kwargs.get("yes", False) or (args and args[0]))
+        with credential_scope(Credentials(interactive=False if no_prompt else None)):
             return func(*args, **kwargs)
 
     return wrapped

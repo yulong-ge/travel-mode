@@ -151,10 +151,11 @@ class GuardRunner:
         if self.battery_measure and cmd and cmd[0] in {"sudo", "/usr/bin/sudo"}:
             self.refuse(cmd)
         if cmd[:3] == ["sudo", "-n", "-l"]:
-            target = self.validate(["sudo", *cmd[3:]])
+            verbose = cmd[3:4] == ["-l"]
+            target = self.validate(["sudo", *cmd[4 if verbose else 3 :]])
             if target[:3] != ["sudo", "-n", "/usr/bin/pmset"]:
                 self.refuse(cmd)
-            return ["sudo", "-n", "-l", *target[2:]]
+            return ["sudo", "-n", "-l", *(["-l"] if verbose else []), *target[2:]]
         # Documented pmset-only sudo policy. Product journal sees the original argv.
         if cmd[:2] in (["sudo", "pmset"], ["sudo", "/usr/bin/pmset"]):
             cmd = ["sudo", "-n", "/usr/bin/pmset", *cmd[2:]]

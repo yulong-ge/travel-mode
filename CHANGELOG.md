@@ -12,6 +12,7 @@ All notable changes follow Keep a Changelog.
 
 ### Fixed
 
+- The TUI no longer lets sudo print `Password:` over the screen and time out. Items that need a password are listed first (enter password, skip, cancel); entering it suspends the TUI for `sudo -v`. Items run without permission are reported as "needs administrator password" with a Retry button.
 - Apps that answer quit with -128 or time out but exit shortly afterwards are counted as quit; the main process is watched for up to 10 seconds and lingering helpers no longer cause a false failure.
 - Starting a scenario while a session is active no longer merges silently: choose restore and start, continue (`--continue-session`) or cancel; `--yes` cancels.
 - Health results read as ok / needs attention / cannot check in one sentence; idle-sleep assertions are explained as not blocking lid-close sleep; technical evidence moved to `check --verbose`, JSON and the log.

@@ -45,7 +45,7 @@
         "scenario": null,
         "stderr": "",
         "stdout": "",
-        "target": "<ROOT>/org.demo.daemon.plist"
+        "target": "restore:unloaded_sys_svcs"
       },
       {
         "action": "Restore item: <ROOT>/Library/LaunchAgents/org.demo.worker.plist",
@@ -57,7 +57,7 @@
         "scenario": null,
         "stderr": "",
         "stdout": "",
-        "target": "<ROOT>/Library/LaunchAgents/org.demo.worker.plist"
+        "target": "restore:unloaded_svcs"
       }
     ],
     "anchored_at": "<TIME>",

@@ -2,6 +2,15 @@
   "active": "plan",
   "commands": [
     [
+      "sudo",
+      "-n",
+      "-l",
+      "pmset",
+      "-a",
+      "disablesleep",
+      "0"
+    ],
+    [
       "ioreg",
       "-rn",
       "AppleSmartBattery"
@@ -10,15 +19,6 @@
       "pmset",
       "-g",
       "batt"
-    ],
-    [
-      "sudo",
-      "-n",
-      "-l",
-      "pmset",
-      "-a",
-      "disablesleep",
-      "0"
     ],
     [
       "sudo",

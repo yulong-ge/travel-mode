@@ -74,7 +74,11 @@ class Machine:
                 0,
             )
         if cmd[:3] == ["sudo", "-n", "-l"]:
-            return CmdResult("", "" if self.permission else "sudo denied", int(not self.permission))
+            return CmdResult(
+                "NOPASSWD: ALL" if self.permission else "",
+                "" if self.permission else "sudo denied",
+                int(not self.permission),
+            )
         if cmd == PROCESS_QUERY:
             out = "\n".join(f"{p} 1 {s} {b} {c}" for p, (s, b, c) in self.rows.items())
         elif cmd == STATUS_QUERY or cmd == ["ps", "-axo", "pid,stat,comm"]:

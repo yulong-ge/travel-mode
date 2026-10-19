@@ -93,6 +93,11 @@ def resolve_command(cmd: list[str]) -> list[str]:
             index += 1
             if option == "--":
                 break
+            if option == "-p":
+                if index >= len(cmd):
+                    raise ValueError(t("shell.sudo_prompt_missing"))
+                index += 1
+                continue
             if option not in {"-n", "-l", "-v", "-k"}:
                 raise ValueError(t("shell.sudo_option", option=option))
         if index < len(cmd):
@@ -117,6 +122,10 @@ def subprocess_runner(cmd: list[str], timeout: float | None = None, interactive:
     """执行命令并保留稳定的错误码语义。"""
     try:
         executed = resolve_command(cmd)
+        # Only explicit credential acquisition may ever prompt on the terminal.
+        # Keep Runner/journal argv logical; enforce -n at the real boundary.
+        if Path(cmd[0]).name == "sudo" and not interactive and cmd[1:2] != ["-n"]:
+            executed.insert(1, "-n")
         if interactive:
             proc = subprocess.run(executed, timeout=timeout, check=False)
             return CmdResult("", "", proc.returncode)
@@ -213,9 +222,10 @@ class DryRunRunner:
         self.real = real
 
     def __call__(self, cmd: list[str], timeout: float | None = None, interactive: bool = False) -> CmdResult:
-        if cmd == ["sudo", "-v"] and not (interactive and sys.stdin.isatty()):
+        authentication = cmd == ["sudo", "-v"] or (len(cmd) == 4 and cmd[:3] == ["sudo", "-v", "-p"])
+        if authentication and not (interactive and sys.stdin.isatty()):
             return CmdResult("", t("sudo.no_tty"), 1)
-        if _dry_run_readonly(cmd) or (cmd == ["sudo", "-v"] and interactive and sys.stdin.isatty()):
+        if _dry_run_readonly(cmd) or (authentication and interactive and sys.stdin.isatty()):
             return self.real(cmd, timeout, interactive)
         bare = cmd[1:] if cmd[:1] == ["sudo"] else cmd
         if bare[:2] == ["launchctl", "unload"] and cmd in _dry_run_commands:
@@ -291,11 +301,20 @@ def _invoke(cmd: list[str], timeout: float | None, interactive: bool) -> CmdResu
         from .sudo import ensure_command
 
         if not is_dry_run() or (privileged_read and sys.stdin.isatty()):
-            ensure_command(cmd[2:] if cmd[1:2] == ["-n"] else cmd[1:])
+            try:
+                ensure_command(cmd[2:] if cmd[1:2] == ["-n"] else cmd[1:])
+            except PermissionError as exc:
+                if is_dry_run() and privileged_read:
+                    raise SudoReadError(
+                        t("sudo.read_failed", command=shlex.join(cmd), rc=77, detail=str(exc))
+                    ) from exc
+                raise
     prepared = prepare_command(cmd)
     result = _runner(cmd, timeout, True) if interactive else _runner(cmd, timeout)
     from ..failures import observe
 
+    if cmd[:1] == ["sudo"] and result.rc and "password is required" in result.stderr.lower():
+        result = CmdResult(result.stdout, result.stderr, 77)
     observe(cmd, result)
     if privileged_read and result.rc:
         raise SudoReadError(

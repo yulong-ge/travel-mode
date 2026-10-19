@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import shlex
+import re
 import sys
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -13,10 +13,11 @@ from .shell import is_dry_run, run_rc
 
 
 class SudoKeepAlive:
-    def __init__(self, interval: float = 60):
+    def __init__(self, interval: float = 60, *, prompt: str | None = None):
         if interval <= 0:
             raise ValueError(t("sudo.invalid_interval"))
         self.interval = interval
+        self.prompt = prompt
         self.stop = Event()
         self.thread: Thread | None = None
         self.error: RuntimeError | None = None
@@ -24,7 +25,8 @@ class SudoKeepAlive:
     def __enter__(self):
         # CLI/TUI explicitly acquire dry-run credentials when a terminal is available.
         # There are no mutations requiring a background refresh in this lifecycle.
-        output, rc = run_rc(["-v"], sudo=True, interactive=True)
+        command = ["-v"] if self.prompt is None else ["-v", "-p", self.prompt]
+        output, rc = run_rc(command, sudo=True, interactive=True)
         if rc:
             raise RuntimeError(t("sudo.failed", operation="sudo -v", rc=rc, detail=output))
         if is_dry_run():
@@ -54,30 +56,73 @@ class SudoKeepAlive:
         return False
 
 
-class SudoCredentialError(RuntimeError):
+class SudoCredentialError(PermissionError):
     """Credentials could not be obtained before a privileged command."""
+
+    rc = 77
+
+    def __init__(self, command):
+        self.command = ["sudo", *command]
+        self.detail = t("sudo.not_provided")
+        super().__init__(self.detail)
 
 
 class Credentials:
     """Probe the exact command before execution; authenticate only on demand."""
 
-    def __init__(self, authenticate=None):
+    def __init__(self, authenticate=None, *, interactive=None):
         self.authenticate = authenticate
+        self.interactive = interactive
         self.keepalive = None
+        self.decisions = {}
+        self.attempted_authentication = False
+
+    def probe(self, command):
+        key = tuple(command)
+        if key in self.decisions:
+            return self.decisions[key]
+        output, rc = run_rc(["sudo", "-n", "-l", *command], timeout=10)
+        # -l reports permission, not whether authentication is required.
+        # Verbose matching entries expose the authenticate tag (sudo(8)).
+        allowed = False
+        if rc == 0:
+            tags = re.findall(r"(?<![A-Z])(NOPASSWD|PASSWD):", output)
+            if tags and tags[-1] == "NOPASSWD":
+                allowed = True
+            else:
+                policy, policy_rc = run_rc(["sudo", "-n", "-l", "-l", *command], timeout=10)
+                options = re.findall(r"Options:\s*([^\n]+)", policy)
+                if policy_rc == 0 and options and "!authenticate" in options[-1]:
+                    allowed = True
+                else:
+                    _, cached_rc = run_rc(["sudo", "-n", "-v"], timeout=10)
+                    allowed = cached_rc == 0
+        self.decisions[key] = allowed
+        return allowed
+
+    def preflight(self, requests):
+        if is_dry_run():
+            return []
+        return [(command, name) for command, name in requests if not self.probe(command)]
 
     def ensure(self, command):
         if self.keepalive is not None:
             self.keepalive.check()
             return
-        output, rc = run_rc(["sudo", "-n", "-l", *command], timeout=10)
-        if rc == 0:
+        if self.probe(command):
             return
-        if not sys.stdin.isatty():
-            raise SudoCredentialError(t("sudo.command_required", command=shlex.join(command), detail=output))
-        if self.authenticate is None:
-            self.keepalive = SudoKeepAlive().__enter__()
-        else:
-            self.keepalive = self.authenticate()
+        interactive = sys.stdin.isatty() if self.interactive is None else self.interactive
+        if interactive and not self.attempted_authentication:
+            self.attempted_authentication = True
+            try:
+                self.keepalive = (
+                    self.authenticate() if self.authenticate is not None else SudoKeepAlive().__enter__()
+                )
+            except (SudoCredentialError, RuntimeError, KeyboardInterrupt) as exc:
+                raise SudoCredentialError(command) from exc
+            if self.keepalive is not None:
+                return
+        raise SudoCredentialError(command)
 
     def close(self):
         if self.keepalive is not None:

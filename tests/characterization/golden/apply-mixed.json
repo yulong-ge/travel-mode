@@ -427,13 +427,6 @@
     [
       "sudo",
       "-n",
-      "-l",
-      "launchctl",
-      "list"
-    ],
-    [
-      "sudo",
-      "-n",
       "launchctl",
       "list"
     ],

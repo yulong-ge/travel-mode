@@ -17,16 +17,16 @@ from travel_mode.system import pmset, shell
 from travel_mode.system.shell import is_dry_run, run_rc
 
 
-def run_restore(st, emit):
+def run_restore(st, emit, only=None):
     """Restore only outstanding receipts; checkpoint each successful item."""
     from ..actions.journal import suspend_mutations
     from ..failures import batch, reporter
 
     with suspend_mutations(), reporter(emit), batch(emit):
-        return _run_restore(st, emit)
+        return _run_restore(st, emit, only)
 
 
-def _run_restore(st, emit):
+def _run_restore(st, emit, only=None):
     from .. import failures
     from ..actions.apps import ThawApp
     from ..actions.base import Context, RecoveryCommand
@@ -34,14 +34,27 @@ def _run_restore(st, emit):
     from ..actions.power import SetBrightness
     from ..failures import reporter
     from ..system.launchd import _loaded
+    from ..system.sudo import SudoCredentialError
 
     n = fails = 0
     executor = Executor(Context(st, state_api.save_state), count_actions=False)
 
-    def failed_read(path, error, commands=()):
+    def allowed(key):
+        return only is None or key in only
+
+    def failed_read(path, error, commands=(), key=None):
         nonlocal fails
         label = t("failure.restore") + ": " + str(path)
-        row = failures.record(st, label, str(error), commands, target=str(path))
+        if isinstance(error, SudoCredentialError):
+            commands = [*commands, dict(command=error.command, rc=77, stdout="", stderr=error.detail)]
+        row = failures.record(
+            st,
+            label,
+            str(error),
+            commands,
+            target="restore:" + key if key else str(path),
+            kind="not_executed" if isinstance(error, SudoCredentialError) else "action",
+        )
         state_api.save_state(st)
         failures.result(False, label)
         emit("bad", failures.message(row))
@@ -73,15 +86,19 @@ def _run_restore(st, emit):
             return tool is not None and c[:1] == [tool]
 
         st["pending_commands"] = [cmd for cmd in st.get("pending_commands", []) if not belongs(cmd)]
+        for failure in st.get("action_failures", []):
+            if failure.get("target") == "restore:" + key:
+                failure["recovered"] = True
         n += 1
         state_api.save_state(st)
 
     def execute(key, cmd, message, *, sudo=False, value=None):
         nonlocal fails
         with reporter(emit):
-            output, rc = executor.execute(RecoveryCommand(cmd, message, sudo))
+            output, rc = executor.execute(RecoveryCommand(cmd, message, sudo, key))
         if rc:
-            emit("warn", t("json.command_failed", command=shlex.join(cmd), rc=rc, detail=output))
+            if rc not in {77, 124}:
+                emit("warn", t("json.command_failed", command=shlex.join(cmd), rc=rc, detail=output))
             fails += 1
             return
         restored(key, value)
@@ -92,7 +109,7 @@ def _run_restore(st, emit):
         ("ac_prof", "-c", "impl.ac_profile_restored"),
     ):
         profile = st.get(field)
-        if not profile:
+        if not profile or not allowed(field):
             continue
         args = pmset._profile_args(profile)
         if not args:
@@ -107,7 +124,7 @@ def _run_restore(st, emit):
             fails += 1
             continue
         execute(field, ["pmset", flag, *args], t(message, v0=profile), sudo=True)
-    if st.get("sleepdisabled"):
+    if st.get("sleepdisabled") and allowed("sleepdisabled"):
         execute(
             "sleepdisabled",
             ["pmset", "-a", "disablesleep", st["sleepdisabled"]],
@@ -116,16 +133,16 @@ def _run_restore(st, emit):
         )
     for field, sudo in (("unloaded_sys_svcs", True), ("unloaded_svcs", False)):
         paths = list(st.get(field, []))
-        if not paths:
+        if not paths or not allowed(field):
             continue
         with failures.capture() as commands:
             try:
                 loaded = _loaded(shell._read(["launchctl", "list"], sudo=sudo).splitlines())
-            except (shell.ReadError, shell.SudoReadError) as exc:
+            except (shell.ReadError, shell.SudoReadError, SudoCredentialError) as exc:
                 if is_dry_run() and isinstance(exc, shell.SudoReadError):
                     shell.record_unknown(exc)
                 for path in paths:
-                    failed_read(path, exc, commands)
+                    failed_read(path, exc, commands, key=field)
                 continue
         for path in paths:
             try:
@@ -137,7 +154,7 @@ def _run_restore(st, emit):
                 if not isinstance(label, str) or not label or label.startswith("com.apple."):
                     raise ValueError(t("safety.invalid_restore_label", path=path, label=repr(label)))
             except (OSError, ValueError, plistlib.InvalidFileException) as exc:
-                failed_read(path, exc)
+                failed_read(path, exc, key=field)
                 continue
             if label in loaded:
                 restored(field, path)
@@ -150,21 +167,23 @@ def _run_restore(st, emit):
                     sudo=sudo,
                     value=path,
                 )
-    if st.get("spotlight_off"):
+    if st.get("spotlight_off") and allowed("spotlight_off"):
         execute(
             "spotlight_off", ["mdutil", "-i", "on", "/"], t("impl.spotlight_indexing_restored"), sudo=True
         )
-    if st.get("wifi_off"):
+    if st.get("wifi_off") and allowed("wifi_off"):
         execute(
             "wifi_off",
             ["networksetup", "-setairportpower", st["wifi_off"], "on"],
             t("impl.wi_fi_enabled", v0=st["wifi_off"]),
             sudo=True,
         )
-    if st.get("bt_off"):
+    if st.get("bt_off") and allowed("bt_off"):
         execute("bt_off", ["blueutil", "-p", "1"], t("impl.bluetooth_enabled"))
-    if st.get("brightness"):
-        _, rc = executor.execute(SetBrightness(st["brightness"]))
+    if st.get("brightness") and allowed("brightness"):
+        action = SetBrightness(st["brightness"])
+        action.restore_key = "brightness"
+        _, rc = executor.execute(action)
         if rc:
             fails += 1
             emit("warn", t("impl.restoring_brightness_failed"))
@@ -177,8 +196,10 @@ def _run_restore(st, emit):
             [*st.get("frozen_apps", []), *(receipt["path"] for receipt in st.get("frozen_pids", []))]
         )
     )
-    for path in frozen_paths:
-        ok = executor.execute(ThawApp(path, st))
+    for path in frozen_paths if allowed("frozen_apps") or allowed("frozen_pids") else ():
+        action = ThawApp(path, st)
+        action.restore_key = "frozen_apps"
+        ok = executor.execute(action)
         if not ok:
             fails += 1
             emit("warn", t("impl.thaw_failed", v0=path))
@@ -189,7 +210,7 @@ def _run_restore(st, emit):
             state_api.save_state(st)
             n += 1
             emit("ok", t("impl.thawed", v0=Path(path).stem))
-    for path in list(st.get("quit_apps", [])):
+    for path in list(st.get("quit_apps", [])) if allowed("quit_apps") else ():
         execute(
             "quit_apps",
             ["open", path] if Path(path).is_dir() else ["open", "-a", path],
