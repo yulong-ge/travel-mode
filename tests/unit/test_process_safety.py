@@ -93,6 +93,7 @@ def test_force_kill_targets_executable_not_regex_or_arguments(monkeypatch):
         ("/Applications/iTerm.app", 812),
         ("/Applications/Own.app", os.getpid()),
     ],
+    ids=["terminal", "iterm", "self"],
 )
 def test_freeze_rejects_terminal_system_and_self(path, pid):
     runner = ProcessRunner({pid: _row(path + "/Contents/MacOS/Main")})

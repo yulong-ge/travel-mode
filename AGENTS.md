@@ -12,7 +12,7 @@ exactly what was changed. It is developed and tested on macOS only.
 ```bash
 uv sync --group dev                      # environment (always use uv, never system python/pip)
 uv run ruff check && uv run ruff format --check
-uv run pytest                            # default suite; excludes the `macos` and `e2e` markers
+uv run pytest -n auto                    # default suite in parallel; excludes the `macos` and `e2e` markers
 uv run pytest tests/unit/test_config.py::test_name    # single test
 uv run pytest tests/characterization     # behavior contracts (golden files)
 uv run --python 3.10 pytest              # CI runs 3.10–3.13 on macOS
@@ -47,8 +47,18 @@ the filtered product view.
 - Tests are hermetic. An autouse strict `FakeRunner` (`tests/conftest.py`) rejects unregistered
   commands and host subprocesses; register responses and assert the recorded calls. Do not depend
   on the host's sudoers, fonts, locale, terminal width, platform or installed apps.
-- Run new or modified TUI/asynchronous tests repeatedly to verify stability before committing.
-  Run at least 30 consecutive suite iterations under CPU load: `uv run python scripts/stress_tui.py --runs 30 --coverage` (defaults to one concurrent pytest process per CPU; all processes exit after the finite run). Wait for button completion, current refresh generation and committed layout; worker snapshots and fixed sleeps do not establish action completion.
+- While developing, run the tests directly affected by the change; run the full suite
+  (`uv run pytest -n auto`), ruff and the package check once before handing off, not after every
+  edit. CI runs the full matrix.
+- TUI/async tests wait for button completion, the current refresh generation and committed layout;
+  worker snapshots, fixed sleeps and retries do not establish completion. The 30-iteration stress
+  run happens in the `TUI stress` workflow (on changes under `src/travel_mode/tui/`, `tests/tui/`
+  and manually); locally repeat only the tests you are investigating for a race
+  (`uv run python scripts/stress_tui.py --runs 10 <test ids>`).
+- Each test protects against a stated failure. Prefer assertions on system changes, restore,
+  process identity, the journal, sudo boundaries, failure propagation and data isolation. A fixed
+  product defect gets one minimal regression test. Do not add tests that only check types,
+  attribute existence or repeat whole output blocks.
 - Characterization goldens record ordered commands, final state, output and exit codes. A mismatch
   means behavior changed: investigate, don't regenerate to make it pass. Intentional changes go
   through `tests/characterization/update_golden.py ... --acknowledge-behavior-change`, listed and

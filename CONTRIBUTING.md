@@ -9,7 +9,7 @@ and which scripts change your system. Architecture notes for agents and humans a
 ```bash
 uv sync --group dev
 uv run ruff check && uv run ruff format --check
-uv run pytest                                        # default suite (excludes `macos` and `e2e`)
+uv run pytest -n auto                                # default suite in parallel (excludes `macos` and `e2e`)
 uv run pytest tests/unit/test_config.py::test_name   # one test
 uv build && uv run python scripts/check_dist.py      # package contents
 ```
@@ -36,9 +36,10 @@ validated the change (and what hardware it was not tested on) in the pull reques
   `zh.toml` with the same keys and placeholders (`tests/unit/test_i18n.py`).
 - **No personal data.** `tests/unit/test_no_personal_terms.py` scans public files for private
   identifiers. Screenshots are checked by eye; regenerate them in demo mode.
-- **Stable async tests.** New or changed TUI/async tests must pass repeatedly under load before
-  they are committed:
-  `uv run python scripts/stress_tui.py --jobs 10 --runs 30 <test ids>`.
+- **Stable async tests.** TUI/async tests wait for explicit completion signals, never fixed
+  sleeps or retries. The `TUI stress` workflow runs the suite 30 times under load when TUI code or
+  tests change; locally, repeat only a test you suspect of a race:
+  `uv run python scripts/stress_tui.py --runs 10 <test ids>`.
 
 ## Adding an Action
 

@@ -30,7 +30,7 @@ jobs:
         with:
           version: "0.8.x"
       - run: uv sync --group dev --python ${{ matrix.python }}
-      - run: uv run pytest --cov=travel_mode --cov-report=term-missing
+      - run: uv run pytest -n auto --cov=travel_mode --cov-report=term-missing
 
   build:
     runs-on: ubuntu-latest

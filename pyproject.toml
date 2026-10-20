@@ -34,7 +34,17 @@ Changelog = "https://github.com/yulong-ge/travel-mode/blob/main/CHANGELOG.md"
 travel-mode = "travel_mode.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8", "pytest-asyncio>=0.23", "pytest-cov>=6", "pre-commit>=4", "ruff>=0.6", "pillow>=10", "jsonschema>=4", "pyyaml>=6"]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=6",
+    "pre-commit>=4",
+    "ruff>=0.6",
+    "pillow>=10",
+    "jsonschema>=4",
+    "pyyaml>=6",
+    "pytest-xdist>=3.6,<4",
+]
 
 [build-system]
 requires = ["hatchling>=1.26"]
