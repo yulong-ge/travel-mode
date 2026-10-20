@@ -5,7 +5,7 @@ import plistlib
 from pathlib import Path
 
 import e2e_refusal
-from e2e_guard import LABEL, PROCESS_QUERY, QUIT_EVENT, STATUS_QUERY
+from e2e_guard import GRACEFUL_FIXTURES, LABEL, PROCESS_QUERY, QUIT_EVENTS, STATUS_QUERY
 
 from travel_mode.system.health import PROCESS_COMMAND, native_command
 from travel_mode.system.shell import CmdResult
@@ -52,6 +52,9 @@ class Machine:
         if interactive:
             raise RuntimeError("Fake machine never accepts interactive authentication")
         self.calls.append(tuple(cmd))
+        from travel_mode.system.shell import command_started
+
+        command_started()
         if cmd == native_command("displays"):
             return CmdResult("[]", "", 0)
         if cmd == native_command("brightness"):
@@ -112,10 +115,12 @@ class Machine:
                 )
                 self.next_pid += 1
             out = ""
-        elif cmd == QUIT_EVENT:
+        elif cmd in QUIT_EVENTS:
             if self.tcc:
                 return CmdResult("", self.tcc, 124 if self.tcc == "timeout" else 1)
-            self.rows = {p: r for p, r in self.rows.items() if not r[2].endswith("/Contents/MacOS/applet")}
+            name = GRACEFUL_FIXTURES[QUIT_EVENTS.index(cmd)][0]
+            path = str(self.root / f"TravelModeE2E-{name}.app")
+            self.rows = {p: r for p, r in self.rows.items() if not r[2].startswith(path + "/")}
             out = ""
         elif cmd[:1] == ["kill"]:
             pid = int(cmd[2])

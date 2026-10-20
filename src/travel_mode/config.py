@@ -272,6 +272,7 @@ class Config:
     profiles: dict[str, Profile] = field(default_factory=dict)
     categories: CategoriesConfig = field(default_factory=CategoriesConfig)
     measurement: Settings = field(default_factory=Settings)
+    automatic_measurement: bool = False
     health: HealthConfig = field(default_factory=HealthConfig)
     history_retain: int = 50
     automation: AutomationConfig = field(default_factory=AutomationConfig)
@@ -494,8 +495,13 @@ def load_config(path: str | Path | None = None) -> Config:
         raise _error(target, "profiles", t("config.expected_a_table"))
     profiles = parse_profiles(raw_profiles, target)
     measurement = _table(data, "measurement", target)
-    _check_keys(measurement, {"seconds", "interval", "settle_seconds", "updates"}, target, "measurement")
-    settings = Settings(**measurement)
+    _check_keys(
+        measurement, {"seconds", "interval", "settle_seconds", "updates", "automatic"}, target, "measurement"
+    )
+    automatic_measurement = measurement.get("automatic", False)
+    if type(automatic_measurement) is not bool:
+        raise _error(target, "measurement.automatic", t("measurement.invalid", field="automatic"))
+    settings = Settings(**{key: value for key, value in measurement.items() if key != "automatic"})
     try:
         validate_settings(settings)
     except ValueError as exc:
@@ -534,6 +540,7 @@ def load_config(path: str | Path | None = None) -> Config:
         power_overrides=overrides,
         options=OptionsConfig(aggressive, language, interface, scenario),
         measurement=settings,
+        automatic_measurement=automatic_measurement,
         health=HealthConfig(**health),
         profiles=profiles,
         categories=CategoriesConfig(

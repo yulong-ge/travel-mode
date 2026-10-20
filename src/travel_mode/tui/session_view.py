@@ -7,7 +7,7 @@ from travel_mode.status import duration
 from travel_mode.system.battery import IntervalError, describe_interval, interval
 
 
-def session_view(state, reading=None, *, now=None, reading_at=None):
+def session_view(state, reading=None, *, now=None, reading_at=None, estimate=None):
     active = state.get("session")
     result = dict(title="", lines=[], average_watts=None, remaining_minutes=None, percent_change=None)
     if not active:
@@ -64,7 +64,25 @@ def session_view(state, reading=None, *, now=None, reading_at=None):
             except IntervalError as exc:
                 observed = None
                 estimate_message = describe_interval(exc.reason)
-            if observed:
+            if estimate is not None:
+                result.update(
+                    average_watts=estimate["average_watts"], remaining_minutes=estimate["remaining_minutes"]
+                )
+                if estimate["estimate_source"] == "session_including_sleep" and estimate["average_watts"]:
+                    result["lines"].append(t("menubar.sleep_average", watts=estimate["average_watts"]))
+                elif estimate["remaining_minutes"] is not None:
+                    result["lines"].append(
+                        t(
+                            "menubar.wake_remaining"
+                            if estimate["estimate_source"] == "wake_telemetry"
+                            else "menubar.session_remaining",
+                            watts=estimate["average_watts"],
+                            duration=duration(estimate["remaining_minutes"]),
+                        )
+                    )
+                elif estimate.get("estimate_error"):
+                    result["lines"].append(estimate["estimate_error"])
+            elif observed:
                 watts = observed["average_watts"]
                 remaining = round(reading["remaining_wh"] / watts * 60)
                 result.update(average_watts=watts, remaining_minutes=remaining)
@@ -84,4 +102,8 @@ def session_view(state, reading=None, *, now=None, reading_at=None):
             services=len(state.get("unloaded_svcs", [])),
         )
     )
+    if state.get("measurement"):
+        from travel_mode.measurement import comparison_description
+
+        result["lines"].append(comparison_description(state["measurement"]))
     return result

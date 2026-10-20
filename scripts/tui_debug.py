@@ -240,12 +240,13 @@ class Session:
             time.sleep(0.05)
         raise TimeoutError("TUI did not mount its initial tab")
 
-    def wait_complete(self, *, active=None, group=None, details=None) -> None:
+    def wait_complete(self, *, active=None, group=None, details=None, predicate=None) -> None:
         deadline = time.monotonic() + self.timeout
         while time.monotonic() < deadline:
             layout = read_layout(self.root / "layout.json")
             if (
                 layout["ready"]
+                and (predicate is None or predicate(layout))
                 and (active is None or layout["active"] == active)
                 and (group is None or layout["active_filter"] == group)
                 and (details is None or layout["details_open"] is details)
@@ -322,6 +323,9 @@ class Session:
 class DebugApp(TravelApp):
     BINDINGS: ClassVar = [
         *TravelApp.BINDINGS,
+        Binding("f2", "demo_concurrent", "", show=False),
+        Binding("f3", "demo_partial", "", show=False),
+        Binding("f4", "demo_measurement", "", show=False),
         Binding("f6", "demo_results", "", show=False),
         Binding("f7", "demo_session", "", show=False),
         Binding("f8", "debug_plan", "", show=False),
@@ -442,6 +446,10 @@ class DebugApp(TravelApp):
                 content_visible=content_visible,
                 action_generation=self._mutation_generation,
                 mutation_busy=self._mutation_lock.locked(),
+                passive_before_intervals=(self.passive_measurement.before or {}).get("interval_count", 0),
+                passive_after_intervals=((self.st.get("measurement") or {}).get("after") or {}).get(
+                    "interval_count", 0
+                ),
                 focused_id=self.focused.id if self.focused else None,
                 active_filter=self.active_filter,
                 details_open=self.details_open,
@@ -461,10 +469,52 @@ class DebugApp(TravelApp):
         self.layout_published.set()
         return True
 
+    async def action_demo_concurrent(self):
+        if getattr(self, "live_readonly", False):
+            return
+        self.view_mode = "result"
+        self.batch_running = True
+        self.active_filter = "apps"
+        for row in self.plan_items:
+            member = row["descriptor"]["kind"] == "app" and row["action"] not in {"skip", "ask"}
+            row.update(result_member=member, state="running" if member else "skipped", result="")
+        await self.render_plan()
+        self.main_query_one("#body").scroll_home(animate=False, immediate=True)
+        self.call_after_refresh(self.write_layout)
+
+    async def action_demo_partial(self):
+        if getattr(self, "live_readonly", False):
+            return
+        for row in [r for r in self.plan_items if r.get("result_member")][:2]:
+            row.update(state="done", result=t("redesign.row_done"))
+        await self.render_plan()
+        self.call_after_refresh(self.write_layout)
+
+    async def action_demo_measurement(self):
+        if getattr(self, "live_readonly", False):
+            return
+
+        index = getattr(self, "demo_measure_index", 0)
+        self.demo_measure_index = index + 1
+        await self.action_demo_session()
+        before, after = (8.8, 8.5) if index == 1 else (23.1, 13.0)
+        count = 1 if index == 1 else 2
+        self.st["measurement"] = dict(
+            mode="passive",
+            before=dict(available=True, average_watts=before, interval_count=count),
+            after=None if index == 0 else dict(available=True, average_watts=after, interval_count=count),
+            saved_watts=None if index == 0 else before - after,
+            extra_hours=None,
+        )
+        self.update_session()
+        self.main_query_one("#body").scroll_home(animate=False, immediate=True)
+        self.call_after_refresh(self.write_layout)
+
     async def action_demo_results(self):
         if getattr(self, "live_readonly", False):
             return
         self.view_mode = "result"
+        self.batch_running = False
         self.active_filter = "apps" if self.size.width <= 80 else "all"
         for row in self.plan_items:
             row.update(
@@ -502,15 +552,6 @@ class DebugApp(TravelApp):
                 0 if row["state"] == "failed" else 1 if row["state"] == "warning" else 2,
             )
         )
-        self.last_batch = dict(
-            ok=sum(r["state"] in {"done", "warning"} for r in self.plan_items),
-            failed=sum(r["state"] == "failed" for r in self.plan_items),
-        )
-        from travel_mode.failures import log_path
-
-        self.main_query_one("#result-summary").update(
-            t("redesign.result_summary", **self.last_batch, path=log_path())
-        )
         await self.render_plan()
         self.logline(
             "bad",
@@ -522,6 +563,7 @@ class DebugApp(TravelApp):
     async def action_demo_session(self):
         if getattr(self, "live_readonly", False):
             return
+        self.batch_running = False
         from datetime import datetime, timedelta, timezone
 
         from travel_mode import sessions
@@ -542,6 +584,9 @@ class DebugApp(TravelApp):
             remaining_wh=36,
             telemetry=dict(system_count=110, system_sum_mw=1098000),
             power_source="PowerTelemetryData.SystemLoad",
+        )
+        self.current_estimate = dict(
+            average_watts=9.8, remaining_minutes=220, estimate_source="session_telemetry", estimate_error=None
         )
         self.main_query_one("#dash-battery").update(self.battery_heading(self.current_battery))
         self.st["scenario"] = "work"
@@ -834,6 +879,30 @@ def run_group(output: Path, cols: int, rows: int, language: str, args, results: 
             results.append(session.capture("administrator", "session"))
             return
         results.append(session.capture("plan", "plan"))
+        if args.fast_apply:
+            from travel_mode.i18n import catalog
+
+            session.keys("F2")
+            session.wait_complete(active="result", group="apps")
+            results.append(session.capture("concurrent-running", "result"))
+            session.keys("F3")
+            session.wait_complete(
+                active="result",
+                predicate=lambda layout: any(row["state"] == "done" for row in layout["plan_rows"]),
+            )
+            results.append(session.capture("concurrent-partial", "result"))
+            for name, key in (
+                ("waiting", "measurement.passive_wait"),
+                ("noise", "measurement.passive_noise"),
+                ("saving", "measurement.passive_comparison"),
+            ):
+                session.keys("F4")
+                session.wait_complete(active="session")
+                session.wait_text(
+                    catalog(language)[key] if name == "waiting" else "8.8 W" if name == "noise" else "23.1 W"
+                )
+                results.append(session.capture("measurement-" + name, "session"))
+            return
         if not args.live_readonly:
             session.keys("5")
             session.wait_complete(active="plan", group="network")
@@ -866,6 +935,9 @@ def run_group(output: Path, cols: int, rows: int, language: str, args, results: 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--fast-apply", action="store_true", help="capture concurrent results and passive power states"
+    )
     parser.add_argument("--setup", action="store_true", help="capture the app defaults setup screen")
     parser.add_argument(
         "--admin", action="store_true", help="capture administrator confirmation and pending recovery"
@@ -899,6 +971,8 @@ def main() -> int:
         parser.error(f"--config is not a file: {args.config}")
     if args.live_readonly and args.config is None:
         parser.error("--live-readonly requires an explicit --config copy")
+    if args.fast_apply and args.live_readonly:
+        parser.error("--fast-apply requires demo fixtures")
     if args.admin and args.live_readonly:
         parser.error("--admin requires demo fixtures")
     if args.session_report and args.live_readonly:

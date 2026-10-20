@@ -237,7 +237,7 @@ class InteractiveHarness(Harness):
         applet_pids = {
             pid
             for pid, (_, command) in self.runner.owned.items()
-            if command.startswith(str(self.runner.graceful) + "/")
+            if any(command.startswith(str(app) + "/") for app in self.runner.graceful_apps)
         }
         self.check(
             not any(
@@ -247,7 +247,10 @@ class InteractiveHarness(Harness):
             "UI graceful applet used no kill fallback",
         )
         if self.graceful_ready:
-            self.check(not apps.app_running(str(self.runner.graceful)), "UI gracefully quit fixture")
+            self.check(
+                all(not apps.app_running(str(app)) for app in self.runner.graceful_apps),
+                "UI concurrently quit both graceful fixtures",
+            )
         self.check(self.state_file.exists(), "UI persisted isolated state")
         saved = state.load_state()
         if self.refusing_ready:
@@ -291,7 +294,10 @@ class InteractiveHarness(Harness):
             "UI off resumed the same fixture identities",
         )
         if self.graceful_ready:
-            self.wait(lambda: apps.app_running(str(self.runner.graceful)), "UI off reopened applet")
+            self.wait(
+                lambda: all(apps.app_running(str(app)) for app in self.runner.graceful_apps),
+                "UI off reopened both applets",
+            )
         if self.refusing_ready:
             self.wait(lambda: apps.app_running(str(self.runner.refusing)), "UI off restored refusing fixture")
         self.verify_power()
@@ -503,7 +509,9 @@ def child(args):
                     builtins.input = guarded_input
                     try:
                         harness.check_power(
-                            product_main(["--no-tui", "--lang", "en"])
+                            product_main(
+                                ["--no-tui", "--lang", "en"] + (["--measure"] if args.battery_measure else [])
+                            )
                             == (1 if harness.refusing_ready and args.scenario == "work" else 0),
                             "CLI completed with the expected refusing-fixture partial-failure status",
                         )
@@ -751,8 +759,19 @@ def drive_tui(session):
     session.shot("01-dashboard")
     if getattr(session, "battery_measure", False):
         select_battery_quick(session)
+        wait_for(
+            lambda: read_layout(session.root / "layout.json")["passive_before_intervals"] >= 2,
+            "Passive pre-action battery intervals did not arrive",
+            session.timeout,
+        )
         session.shot("02-battery-selection")
-        mutate(session, "b-quick", "03-battery-measured")
+        mutate(session, "b-quick", "03-battery-applied")
+        wait_for(
+            lambda: read_layout(session.root / "layout.json")["passive_after_intervals"] >= 2,
+            "Passive post-action battery intervals did not arrive",
+            session.timeout,
+        )
+        session.shot("03-battery-measured")
         finish_tui(session)
         return
     capabilities = session.root / "capabilities.json"

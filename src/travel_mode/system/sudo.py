@@ -76,6 +76,7 @@ class Credentials:
         self.keepalive = None
         self.decisions = {}
         self.attempted_authentication = False
+        self.batch_confirmed = False
 
     def probe(self, command):
         key = tuple(command)
@@ -152,3 +153,20 @@ def ensure_command(command):
     credentials = _current.get()
     if credentials is not None:
         credentials.ensure(command)
+
+
+def confirm_batch(actions):
+    """Resolve all password interaction on the caller before starting workers."""
+    credentials = _current.get()
+    if credentials is None or credentials.batch_confirmed:
+        return
+    from ..actions.privilege_plan import action_requests
+
+    needed = credentials.preflight(action_requests(actions))
+    if needed:
+        try:
+            credentials.ensure(needed[0][0])
+        except SudoCredentialError:
+            # Each unexecuted action must still get its own failure receipt.
+            # ensure() will raise again on its worker, without another prompt.
+            credentials.attempted_authentication = True

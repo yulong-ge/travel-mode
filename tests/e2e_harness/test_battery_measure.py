@@ -35,6 +35,7 @@ def battery_sandbox(tmp_path, darwin_platform, monkeypatch):
     harness = InteractiveHarness(root, guard, tmp_path / "unused-state", pause=lambda _: None)
     harness.scenario, harness.battery_measure = "work", True
     clock = InstantClock()
+    harness.measurement_clock = clock
     monkeypatch.setattr(measurement, "Clock", lambda: clock)
     monkeypatch.setattr(measurement, "CancellableClock", lambda _: clock)
     baseline = datetime(2026, 10, 15, 12, tzinfo=timezone.utc)
@@ -203,7 +204,7 @@ def test_battery_cli_round_trip_measures_only_fixture_freeze(battery_sandbox, mo
     harness.setup()
     policy = answers("work", battery_measure=True)
     monkeypatch.setattr("builtins.input", lambda prompt: select_answer(prompt, policy)[1])
-    assert cli.main(["--no-tui", "--lang", "en"]) == 0
+    assert cli.main(["--no-tui", "--lang", "en", "--measure"]) == 0
     harness.assert_on()
     assert cli.main(["off", "--lang", "en"]) == 0
     harness.assert_off()
@@ -226,6 +227,18 @@ def test_battery_plan_contains_read_only_power_commands_and_quick_selection(caps
     assert QUICK_SELECTION == {"apps": True, "services": True, "power": False, "network": False}
 
 
+async def passive_intervals(app, clock, phase):
+    # Drive only existing refresh entry points with a controllable fixture clock.
+    for _ in range(20):
+        clock.sleep(30)
+        app.refresh_battery()
+        await app.wait_for_idle()
+        window = app.passive_measurement.before if phase == "before" else app.st["measurement"]["after"]
+        if window and window["interval_count"] >= 2:
+            return
+    pytest.fail(f"fixture did not produce two passive {phase} intervals")
+
+
 @pytest.mark.parametrize("empty_log", [False, True])
 async def test_battery_tui_round_trip_uses_measured_fixture_only_quick_action(
     battery_sandbox, monkeypatch, empty_log
@@ -246,9 +259,11 @@ async def test_battery_tui_round_trip_uses_measured_fixture_only_quick_action(
 
         select_fixture_plan(app, measure=True)
         await app.render_plan()
+        await passive_intervals(app, harness.measurement_clock, "before")
         assert not any(r["selected"] for r in app.plan_items if r["group"] == "power")
         await click_after_layout(pilot, "#b-quick")
         await app.wait_for_idle()
+        await passive_intervals(app, harness.measurement_clock, "after")
         harness.assert_on()
         await click_after_layout(pilot, "#b-complete")
         await click_after_layout(pilot, "#b-off")

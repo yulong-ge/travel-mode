@@ -72,6 +72,131 @@ def failed(error):
     return dict(available=False, reason="failed", error=str(error), samples=0)
 
 
+class PassiveComparison:
+    """Consume the TUI's existing observations; never read, sleep or poll."""
+
+    def __init__(self):
+        self.previous = None
+        self.before = None
+        self.result = None
+        self.after_started = None
+        self.after_generation = None
+
+    @staticmethod
+    def combine(previous, window):
+        if previous is None or previous["power_source"] != window["power_source"]:
+            return window
+        intervals = previous["intervals"] + window["intervals"]
+        weight = "seconds" if window["power_source"] == "voltage_current" else "accumulator_samples"
+        watts = sum(row["average_watts"] * row[weight] for row in intervals) / sum(
+            row[weight] for row in intervals
+        )
+        return {
+            **window,
+            "intervals": intervals,
+            "interval_count": len(intervals),
+            "samples": len(intervals) + 1,
+            "seconds": sum(row["seconds"] for row in intervals),
+            "covered_seconds": sum(row["seconds"] for row in intervals),
+            "average_watts": watts,
+            "remaining_hours": window["remaining_wh"] / watts,
+        }
+
+    def observe(self, reading, at):
+        if not reading.get("available"):
+            self.previous = None
+            self.before = None
+            return False
+        old = self.previous
+        self.previous = (reading, at)
+        if self.result is not None and self.after_started is not None:
+            # The first observation begun after completion is the baseline.
+            # Cached generations from before the action cannot count afterward.
+            if at <= self.after_started:
+                return False
+            if self.after_generation is None:
+                self.after_generation = battery.generation(reading)
+                self.previous = None
+                return False
+            if self.after_generation is not None and battery.generation(reading) == self.after_generation:
+                self.previous = None
+                return False
+            if old is None or old[1] <= self.after_started:
+                return False
+        if old is None:
+            return False
+        try:
+            segment = battery.interval(old[0], reading, seconds=(at - old[1]).total_seconds())
+        except battery.IntervalError:
+            self.before = None
+            raise
+        if segment is None:
+            self.previous = old
+            return False
+        window = dict(
+            available=True,
+            reason=None,
+            samples=2,
+            seconds=segment["seconds"],
+            covered_seconds=segment["seconds"],
+            interval_count=1,
+            intervals=[segment],
+            power_source=segment["power_source"],
+            average_watts=segment["average_watts"],
+            remaining_wh=reading["remaining_wh"],
+            remaining_hours=reading["remaining_wh"] / segment["average_watts"],
+            capacity_source=reading["capacity_source"],
+            macos=dict(raw="", minutes=None),
+        )
+        if self.result is None:
+            self.before = self.combine(self.before, window)
+            return False
+        if self.after_started is None:
+            return False
+        window = self.combine(self.result["after"], window)
+        self.result["after"] = window
+        before = self.result["before"]
+        if before["available"] and before["power_source"] == window["power_source"]:
+            self.result["saved_watts"] = before["average_watts"] - window["average_watts"]
+            self.result["extra_hours"] = window["remaining_wh"] * (
+                1 / window["average_watts"] - 1 / before["average_watts"]
+            )
+        elif before["available"]:
+            self.result["before"] = self.unavailable("source_changed")
+            self.result["saved_watts"] = None
+            self.result["extra_hours"] = None
+        return True
+
+    @staticmethod
+    def unavailable(reason="insufficient_samples"):
+        return dict(
+            available=False,
+            reason=reason,
+            samples=0,
+            required_updates=2,
+            seconds=0,
+            macos=dict(raw="", minutes=None),
+        )
+
+    def begin(self):
+        from copy import deepcopy
+
+        self.result = dict(
+            mode="passive",
+            before=deepcopy(self.before) or self.unavailable(),
+            after=None,
+            saved_watts=None,
+            extra_hours=None,
+        )
+        self.after_started = None
+        return self.result
+
+    def complete(self, at):
+        self.after_started = at
+        self.after_generation = None
+        self.previous = None
+
+
 def measure(settings=None, *, clock=None, progress=None, cancelled=None, source_checked=False):
     settings, clock = settings or Settings(), clock or Clock()
     validate_settings(settings)
@@ -293,6 +418,23 @@ def finish(before, settings, state, save, emit, *, clock=None, cancelled=None):
 
 
 def comparison_description(result):
+    if result.get("mode") == "passive":
+        before, after = result["before"], result["after"]
+        if after is None:
+            return t("measurement.passive_wait")
+        if not before["available"]:
+            return t("measurement.passive_before_unavailable", after=after["average_watts"])
+        difference = before["average_watts"] - after["average_watts"]
+        small = abs(difference) < max(1, before["average_watts"] * 0.1)
+        key = "measurement.passive_noise" if small else "measurement.passive_comparison"
+        single = before["interval_count"] == after["interval_count"] == 1
+        return t(
+            key,
+            before=before["average_watts"],
+            after=after["average_watts"],
+            saved=difference,
+            precision=t("measurement.passive_single") if single else "",
+        )
     if not result["before"]["available"]:
         return describe(result["before"])
     if not result["after"]["available"]:
@@ -327,17 +469,21 @@ def validate_comparison(value):
         ):
             invalid(field)
 
-    if not isinstance(value, dict) or set(value) != {"before", "after", "saved_watts", "extra_hours"}:
+    passive = isinstance(value, dict) and value.get("mode") == "passive"
+    if not isinstance(value, dict) or set(value) != (
+        {"before", "after", "saved_watts", "extra_hours"} | ({"mode"} if passive else set())
+    ):
         invalid("comparison")
     if (
         isinstance(value["before"], dict)
         and not value["before"].get("available")
         and value["after"] is not None
+        and not passive
     ):
         invalid("after")
     for key in ("before", "after"):
         row = value[key]
-        if key == "after" and row is None and not value["before"].get("available"):
+        if key == "after" and row is None and (passive or not value["before"].get("available")):
             continue
         if not isinstance(row, dict) or type(row.get("available")) is not bool:
             invalid(key)
@@ -406,7 +552,7 @@ def validate_comparison(value):
         }:
             invalid(f"{key}.reason")
     for field in ("saved_watts", "extra_hours"):
-        if value["after"] is not None and value["after"]["available"]:
+        if value["after"] is not None and value["after"]["available"] and value["before"]["available"]:
             number(value[field], field)
         elif value[field] is not None:
             invalid(field)

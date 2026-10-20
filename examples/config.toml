@@ -43,6 +43,14 @@ scenario = "ask"
 [profiles.flight]
 # Add profile-specific values in a future release.
 
+[measurement]
+# CLI blocks only with --measure. TUI comparisons consume existing telemetry refreshes.
+automatic = false
+seconds = 180
+interval = 5
+settle_seconds = 10
+updates = 2
+
 # Optional event agent is installed only by automation install.
 [automation]
 on_battery = "notify"

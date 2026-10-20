@@ -19,6 +19,8 @@ from travel_mode.system.shell import CmdResult
 
 from .conftest import artifact, assert_golden
 
+pytestmark = pytest.mark.usefixtures("serial_batches")
+
 
 def assert_template(machine):
     expected = tomlkit.parse(files("travel_mode").joinpath("config_template.toml").read_text()).unwrap()

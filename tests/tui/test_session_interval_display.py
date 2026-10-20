@@ -46,6 +46,11 @@ async def test_battery_refresh_and_session_render_never_log_interval_errors(case
         assert app.st["session"]["actions"] == counts
         assert not app.st.get("action_failures") and not failures.log_path().exists()
         assert "travel-mode.log" not in str(app.query_one("#last-result", Static).content)
+        # A cached reading cannot bypass the shared sleep-aware source while
+        # the current estimate is still unavailable.
+        app.current_estimate = None
+        app.update_session()
+        assert app.session_view["remaining_minutes"] is None
         # A cached/inflight snapshot must also be rejected on a plan refresh or
         # completion-button redraw, even without the hardware timestamp.
         app.current_battery = {**reading, "update_time": None}

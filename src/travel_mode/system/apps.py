@@ -6,8 +6,11 @@ import os
 import plistlib
 import re
 import time
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
+from threading import Event, Lock
 
 from ..config import load_config
 from ..i18n import t
@@ -19,6 +22,57 @@ APP_DIRS = [
     "/Applications/Utilities",
     "/System/Applications",
 ]
+
+_quit_batch = ContextVar("quit_batch_deadline", default=None)
+_quit_finished = ContextVar("quit_request_finished", default=False)
+
+
+def quit_target(action):
+    return type(action).__name__ in {"QuitApp", "QuitDaemonApp"}
+
+
+class QuitClock:
+    monotonic = staticmethod(time.monotonic)
+
+    @staticmethod
+    def sleep(seconds):
+        time.sleep(seconds)
+
+
+class QuitDeadline:
+    def __init__(self, pending, clock=None):
+        self.clock = clock or QuitClock()
+        self.pending = pending
+        self.deadline = None
+        self.lock = Lock()
+        self.ready = Event()
+
+    def retire(self, count=1):
+        with self.lock:
+            self.pending -= count
+            if self.pending == 0:
+                self.deadline = self.clock.monotonic() + 10
+                self.ready.set()
+
+
+def finish_quit_request():
+    batch = _quit_batch.get()
+    if batch is not None and not _quit_finished.get():
+        _quit_finished.set(True)
+        batch.retire()
+
+
+@contextmanager
+def quit_batch(actions, clock=None, *, enabled=True):
+    pending = sum(quit_target(action) for action in actions)
+    batch = QuitDeadline(pending, clock) if enabled and pending else None
+    token = _quit_batch.set(batch)
+    finished = _quit_finished.set(False)
+    try:
+        yield batch
+    finally:
+        _quit_finished.reset(finished)
+        _quit_batch.reset(token)
 
 
 def app_directories():
@@ -122,7 +176,9 @@ def _grace_quit(path, name):
     if active_state() is not None:
         record_change("quit_apps", path)
     command = ["osascript", "-e", "with timeout of 8 seconds", "-e", tell, "-e", "end timeout"]
+    batch = _quit_batch.get()
     result = run_result(command, timeout=10)
+    finish_quit_request()
     status = "exited"
     if result.rc:
         detail = result.stdout + result.stderr
@@ -144,10 +200,22 @@ def _grace_quit(path, name):
     main_exited = False
     for step in range(21):
         main_exited = not app_running(path)
-        if main_exited and not bundle_alive(path):
-            return QuitResult("exited", True, result.rc, result.stdout, result.stderr, command)
+        helpers = main_exited and bundle_alive(path)
+        if main_exited and (batch or not helpers):
+            return QuitResult(
+                "exited", True, result.rc, result.stdout, result.stderr, command, helpers_remaining=helpers
+            )
         if step < 20:
-            time.sleep(0.5)
+            if batch:
+                # Successful exits above render immediately. Targets still
+                # running share ten seconds after all quit requests settle.
+                batch.ready.wait()
+                remaining = batch.deadline - batch.clock.monotonic()
+                if remaining <= 0:
+                    break
+                batch.clock.sleep(min(0.5, remaining))
+            else:
+                time.sleep(0.5)
     return QuitResult(
         "exited" if main_exited else "timeout" if status == "exited" else status,
         main_exited,

@@ -101,6 +101,42 @@ async def test_footer_ignores_internal_events_and_drawer_does_not_repeat_result(
         assert t("redesign.evidence_path", value="/Demo.app") in evidence
 
 
+@pytest.mark.parametrize("language", ["en", "zh"])
+@pytest.mark.parametrize("scenario", ["ask", "work", "away"])
+async def test_default_footer_is_empty_on_every_screen_and_preserves_only_recent_result(language, scenario):
+    from travel_mode import sessions
+
+    set_language(language)
+    app = TravelApp(scenario=scenario, measure=False)
+    async with app.run_test(size=(120, 36)):
+        await app.wait_for_idle()
+        if scenario == "ask":
+            assert not app.query("#last-result")
+            assert app.last_result == ""
+            return
+        # An existing session's actions are not actions executed in this UI.
+        sessions.begin(app.st)
+        app.st["session"]["actions"]["succeeded"] = 3
+        app.save()
+        for mode in ("plan", "result", "session"):
+            app.view_mode = mode
+            await app.render_plan()
+            app.update_session()
+            assert str(app.query_one("#last-result").content) == ""
+        await app.action_toggle_language()
+        await app.wait_for_idle()
+        assert str(app.query_one("#last-result").content) == ""
+        app.logline("ok", "Fixture action completed")
+        for mode in ("plan", "result", "session"):
+            app.view_mode = mode
+            await app.render_plan()
+            app.logline("dim", "Internal refresh")
+            assert "Fixture action completed" in str(app.query_one("#last-result").content)
+        await app.action_toggle_language()
+        await app.wait_for_idle()
+        assert "Fixture action completed" in str(app.query_one("#last-result").content)
+
+
 async def test_reapply_is_in_same_line_as_revived_message():
     app = TravelApp(scenario="work", measure=False)
     async with app.run_test(size=(120, 36)):

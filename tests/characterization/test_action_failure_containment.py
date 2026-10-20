@@ -66,11 +66,21 @@ async def test_state_write_error_stops_remaining_modifications_without_exiting(
     from travel_mode.system import shell
 
     runner = shell.get_runner()
+    checking_intents = True
 
     def track(command, timeout=None, interactive=False):
         if (
             command[:2] == ["sudo", "pmset"] or command[:1] in (["osascript"], ["kill"], ["launchctl"])
         ) and command[:2] != ["launchctl", "list"]:
+            if checking_intents:
+                persisted = state.load_state()
+                assert persisted is not None
+                if command[0] == "osascript":
+                    assert any(path in persisted["quit_apps"] for path in machine["paths"].values())
+                elif command[:2] == ["kill", "-STOP"]:
+                    assert any(str(row["pid"]) == command[-1] for row in persisted["frozen_pids"])
+                else:
+                    assert command in persisted["pending_commands"]
             modifications.append(command)
         return runner(command, timeout, interactive)
 
@@ -88,9 +98,14 @@ async def test_state_write_error_stops_remaining_modifications_without_exiting(
         monkeypatch.setattr(state, "save_state", broken)
         await click_after_layout(pilot, "#b-quick")
         assert app.is_running and app._exception is None
-        assert len(modifications) == int(after_mutation)
+        # Other independent commands may already be in flight when storage
+        # fails. Each must have its own durable intent; the affected command
+        # must never run if its intent write failed.
+        affected = [cmd for cmd in modifications if cmd[:3] == ["sudo", "pmset", "-b"]]
+        assert len(affected) == int(after_mutation)
         assert "fixture write denied" in (machine["root"] / "travel-mode.log").read_text()
         assert state.load_state() is not None
+        checking_intents = False
         monkeypatch.setattr(state, "save_state", original)
         assert cli.main(["off"]) == 0
         report = json.loads((machine["root"] / "history.jsonl").read_text().splitlines()[-1])

@@ -1,4 +1,4 @@
-"""Cheap menu status: local files and a single bounded power-source query."""
+"""Finite menu status with bounded source, telemetry and active-session log reads."""
 
 import json
 import os
@@ -109,24 +109,10 @@ def data(*, clock=time.monotonic, now=None):
             elif reading["external_connected"] or reading["is_charging"]:
                 battery["estimate_error"] = t("battery.reason.external_power")
             else:
-                start = {
-                    "telemetry": active["start"]["telemetry"],
-                    "update_time": active["start"].get("update_time"),
-                    "power_source": "PowerTelemetryData.SystemLoad",
-                }
-                seconds = (
-                    (now or datetime.now().astimezone())
-                    - datetime.fromisoformat(active["started_at"]).astimezone()
-                ).total_seconds()
-                interval = battery_api.interval(start, reading, seconds=seconds)
-                if interval:
-                    watts = interval["average_watts"]
-                    battery.update(
-                        average_watts=watts,
-                        remaining_minutes=round(reading["remaining_wh"] / watts * 60),
-                        estimate_source="session_telemetry",
-                    )
-                else:
+                from .live_power import observe
+
+                battery.update(observe(active, reading, now or datetime.now().astimezone()))
+                if battery["average_watts"] is None:
                     battery["estimate_error"] = battery_api.describe_interval()
         except battery_api.IntervalError as exc:
             battery["estimate_error"] = battery_api.describe_interval(exc.reason)
@@ -182,12 +168,19 @@ def power_line(result):
     text = t("menubar.source_" + source)
     if percent is not None:
         text += f" {percent}%"
-    if battery.get("remaining_minutes") is not None and battery.get("estimate_source") == "session_telemetry":
+    if battery.get("remaining_minutes") is not None and battery.get("estimate_source") in {
+        "session_telemetry",
+        "wake_telemetry",
+    }:
         text += " · " + t(
-            "menubar.session_remaining",
+            "menubar.wake_remaining"
+            if battery["estimate_source"] == "wake_telemetry"
+            else "menubar.session_remaining",
             watts=battery["average_watts"],
             duration=duration(battery["remaining_minutes"]),
         )
+    if battery.get("estimate_source") == "session_including_sleep" and battery.get("average_watts"):
+        text += " · " + t("menubar.sleep_average", watts=battery["average_watts"])
     return text
 
 

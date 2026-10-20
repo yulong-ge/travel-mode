@@ -122,7 +122,9 @@
         "estimate_source": {
           "enum": [
             null,
-            "session_telemetry"
+            "session_telemetry",
+            "session_including_sleep",
+            "wake_telemetry"
           ]
         },
         "estimate_error": {

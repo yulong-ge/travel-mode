@@ -98,13 +98,13 @@ def test_plan_fault_families_preserve_recovery_without_pilot(machine, sweep, sce
                 with pytest.raises(error, match=message):
                     execute_plan(scenario, page, sweep)
                 assert sweep.triggered
-                assert len(observed) <= index + int(family == "internal")
+                assert (command in observed) is (family == "internal")
                 logged = [
                     json.loads(line)
                     for line in (machine["root"] / "travel-mode.log").read_text().splitlines()
                 ]
-                assert logged[-1]["kind"] == family
-                assert error.__name__ in logged[-1]["traceback"]
+                assert any(row["kind"] == family for row in logged)
+                assert any(error.__name__ in row.get("traceback", "") for row in logged)
                 sweep.disable()
                 assert cli.main(["off"]) == 0
                 assert state.load_state() is None
@@ -184,7 +184,7 @@ async def test_tui_fault_representative_admits_continues_retries_and_restores(
         if family == "refused":
             assert snapshot["action_failures"][0]["quit_status"] == "refused"
         if family in {"state", "internal"}:
-            assert len(sweep.observed) <= index + int(family == "internal")
+            assert (target in sweep.observed) is (family == "internal")
         sweep.disable()
         if family in {"command", "refused"}:
             row = app_item(app, "Quit Demo")
@@ -219,7 +219,7 @@ def test_cli_every_planned_mutation_failure_continues_and_off_recovers(
     mutations = 0
     for index, command in enumerate(plan):
         for refusal in [False, True] if command[:1] == ("osascript",) else [False]:
-            observed = sweep(index, refusal)
+            observed = sweep(index, refusal, target=command)
             assert cli.main(argv) in {0, 1}
             captured = capsys.readouterr()
             assert "Traceback" not in captured.out + captured.err

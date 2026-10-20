@@ -142,7 +142,11 @@ def describe(report, peers=(), *, verbose=False):
         else:
             yield t("session.no_average")
     measurement = report["measurement"]
-    if measurement:
+    if measurement and measurement.get("mode") == "passive":
+        from .measurement import comparison_description
+
+        yield comparison_description(measurement)
+    elif measurement:
         before, after = measurement["before"], measurement["after"]
         if before["available"]:
             yield t("report.before", watts=before["average_watts"])

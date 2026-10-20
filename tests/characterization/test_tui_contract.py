@@ -16,6 +16,8 @@ from tui_plan import select_plan
 
 from .conftest import artifact, assert_golden
 
+pytestmark = pytest.mark.usefixtures("serial_batches")
+
 CASES = [
     "fixsleep",
     "caffeinate",

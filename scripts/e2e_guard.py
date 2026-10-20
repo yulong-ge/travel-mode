@@ -46,6 +46,9 @@ QUIT_EVENT = [
     "-e",
     "end timeout",
 ]
+GRACEFUL_FIXTURES = (("Graceful", GRACEFUL_ID), ("Graceful-2", GRACEFUL_ID + "2"))
+QUIT_EVENTS = [QUIT_EVENT, [part.replace(GRACEFUL_ID, GRACEFUL_ID + "2") for part in QUIT_EVENT]]
+
 LABEL = "com.example.travelmode-e2e.agent"
 
 
@@ -88,6 +91,9 @@ class LocalBackend:
                 cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
             self.children.append(child)
+            from travel_mode.system.shell import command_started
+
+            command_started()
             return CmdResult(str(child.pid), "", 0)
         return subprocess_runner(cmd, timeout, interactive)
 
@@ -125,12 +131,11 @@ class GuardRunner:
         self.shells = tuple(
             str(app / f"Contents/{directory}/sh") for app in self.apps for directory in ("MacOS", "Helpers")
         )
-        self.graceful = self.root / "TravelModeE2E-Graceful.app"
+        self.graceful_apps = tuple(self.root / f"TravelModeE2E-{name}.app" for name, _ in GRACEFUL_FIXTURES)
+        self.graceful = self.graceful_apps[0]
         self.refusing = self.root / "TravelModeE2E-Refusing.app"
-        self.shells += (
-            str(self.graceful / "Contents/MacOS/applet"),
-            str(self.refusing / "Contents/MacOS/refusing"),
-        )
+        self.shells += tuple(str(app / "Contents/MacOS/applet") for app in self.graceful_apps)
+        self.shells += (str(self.refusing / "Contents/MacOS/refusing"),)
         self.owned = {}
         self.plan = plan
         self.battery_measure = battery_measure
@@ -242,8 +247,16 @@ class GuardRunner:
             ["open", "-g", "-j", str(self.refusing)],
             [LSREGISTER, "-u", str(self.refusing)],
         ]
-        if cmd == ["open", str(self.graceful)]:
-            return ["open", "-g", "-j", str(self.graceful)]
+        for app, event in zip(self.graceful_apps, QUIT_EVENTS, strict=True):
+            allowed |= cmd in [
+                ["osacompile", "-s", "-o", str(app), "-e", "on idle", "-e", "return 1", "-e", "end idle"],
+                ["codesign", "--force", "--sign", "-", str(app)],
+                ["open", "-g", "-j", str(app)],
+                [LSREGISTER, "-u", str(app)],
+                event,
+            ]
+            if cmd == ["open", str(app)]:
+                return ["open", "-g", "-j", str(app)]
         if cmd == ["open", str(self.refusing)]:
             return ["open", "-g", "-j", str(self.refusing)]
         if cmd[:4] == ["sudo", "-n", "/usr/bin/pmset", "-a"]:

@@ -19,6 +19,49 @@ MAX_FAILURES = 50
 _commands = ContextVar("action_commands", default=None)
 _batch = ContextVar("action_batch", default=None)
 _reporter = ContextVar("action_failure_reporter", default=None)
+_identity = ContextVar("action_identity", default=None)
+
+
+def action_identity(action):
+    """Stable recovery key; display labels and locale never identify an action."""
+    from dataclasses import asdict, fields, is_dataclass
+
+    target = getattr(action, "path", None)
+    if target is None and getattr(action, "restore_key", None):
+        target = {"restore": action.restore_key}
+        if callable(getattr(action, "command", None)):
+            target["command"] = action.command()
+    if target is None and callable(getattr(action, "command", None)):
+        target = action.command()
+    if target is None:
+        spec = getattr(action, "spec", None)
+        process = getattr(getattr(action, "target", None), "process", None)
+        if is_dataclass(spec):
+            target = asdict(spec)
+        elif process is not None:
+            target = {key: getattr(process, key) for key in ("pid", "started", "command")}
+        elif type(action).__name__ == "QuitConfiguredDaemons":
+            from .config import load_config
+
+            target = [asdict(spec) for spec in load_config().apps.with_daemon if spec.group == "network"]
+        elif is_dataclass(action):
+            target = {
+                field.name: getattr(action, field.name)
+                for field in fields(action)
+                if field.name not in {"state", "save", "name", "force", "fallback"}
+            }
+        else:
+            target = type(action).__name__
+    return json.loads(json.dumps({"type": type(action).__name__, "target": target}, sort_keys=True))
+
+
+@contextmanager
+def identity_scope(action):
+    token = _identity.set(action_identity(action))
+    try:
+        yield
+    finally:
+        _identity.reset(token)
 
 
 class CommandError(RuntimeError):
@@ -121,6 +164,8 @@ def record(
     )
     if quit_status is not None:
         row["quit_status"] = quit_status
+    if _identity.get() is not None:
+        row["identity"] = _identity.get()
     if state and "session" in state:
         row["session_id"] = state["session"]["id"]
         row["counts"] = dict(state["session"]["actions"])
@@ -144,7 +189,7 @@ def validate(rows):
         if (
             not isinstance(row, dict)
             or not keys <= row.keys()
-            or row.keys() - keys - {"recovered", "session_id", "counts", "quit_status"}
+            or row.keys() - keys - {"recovered", "session_id", "counts", "quit_status", "identity"}
             or row["scenario"] not in (None, "work", "away")
             or any(
                 not isinstance(row[k], str) or len(row[k]) > 2000
@@ -157,6 +202,13 @@ def validate(rows):
             or ("recovered" in row and type(row["recovered"]) is not bool)
         ):
             raise ValueError("action_failures: invalid receipt")
+        if "identity" in row and (
+            not isinstance(row["identity"], dict)
+            or set(row["identity"]) != {"type", "target"}
+            or not isinstance(row["identity"]["type"], str)
+            or not isinstance(row["identity"]["target"], (str, list, dict))
+        ):
+            raise ValueError("action_failures.identity: invalid action key")
         if "session_id" in row and (not isinstance(row["session_id"], str) or len(row["session_id"]) > 2000):
             raise ValueError("action_failures: invalid session id")
         if "counts" in row and (
@@ -240,6 +292,25 @@ def result(ok, name):
     batch = _batch.get()
     if batch is not None:
         batch["success" if ok else "failed"].append(name)
+
+
+@contextmanager
+def isolated_results():
+    """Workers collect outcomes locally; the owner publishes in plan order."""
+    values = dict(success=[], failed=[], warnings=False)
+    token = _batch.set(values)
+    try:
+        yield values
+    finally:
+        _batch.reset(token)
+
+
+def merge_results(values):
+    current = _batch.get()
+    if current is not None:
+        for key in ("success", "failed"):
+            current[key].extend(values[key])
+        current["warnings"] |= values["warnings"]
 
 
 def warning(state, action, reason, commands=(), *, target=""):

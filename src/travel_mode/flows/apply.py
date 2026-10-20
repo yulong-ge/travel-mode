@@ -113,7 +113,7 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None, continu
     from .. import measurement
 
     before = measurement.begin(
-        config.options.scenario, measure, config.measurement, lambda msg: emit("dim", escape(msg))
+        config.options.scenario, measure is True, config.measurement, lambda msg: emit("dim", escape(msg))
     )
     if not merged and config.options.scenario != "ask":
         st["scenario"] = config.options.scenario
@@ -289,11 +289,11 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None, continu
             emit("warn", t("impl.skipped_message", v0=msg))
         if not scan["running"]:
             emit("ok", t("impl.no_listed_high_energy_apps_are"))
+        admitted = []
         for app in scan["running"]:
             name, path = app["name"], app["path"]
             if path in st.get("frozen_apps", []):
                 continue
-            cpu = app["cpu"] or "?"
             if app["defact"] == "skip":
                 emit("dim", t("impl.keeping_skip", v0=name))
                 continue
@@ -301,27 +301,15 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None, continu
                 emit("dim", t("impl.default_action_for_is_ask_skipped", v0=name))
                 continue
             default_act = ("skip" if work else "quit") if app["defact"] == "ask" else app["defact"]
-            act = ask_qf(f"{name} (CPU {cpu}%)", default_act, yes=yes)
+            act = ask_qf(f"{name} (CPU {app['cpu'] or '?'}%)", default_act, yes=yes)
             spec = configured_daemon(name)
-            if spec is not None and act == "quit":
-                _, okq, msg = execute(QuitDaemonApp(spec, st, state_api.save_state))
-                emit("ok" if okq else "warn", msg)
-                continue
             if act == "quit":
-                fallback = (
-                    (lambda name=name: ask(t("impl.has_not_quit_possible_unsaved_dialog", v0=name), yes=yes))
-                    if not work
-                    else False
+                # Away uses the same force-after-deadline policy as the TUI.
+                # Workers never prompt; successful force quits retain warnings.
+                fallback = not work
+                action = (
+                    QuitDaemonApp(spec, st, state_api.save_state) if spec else QuitApp(path, name, fallback)
                 )
-                result = execute(QuitApp(path, name, fallback=fallback))
-                if result:
-                    if not (getattr(result, "forced", False) or getattr(result, "helpers_remaining", False)):
-                        emit("ok", t("impl.quit", v0=name))
-                    state_api.save_state(st)
-                    if not yes:
-                        remember.cli(name, "work" if work else "away", "quit", app["defact"], dry_run=dry_run)
-                else:
-                    emit("warn", t("impl.did_not_quit", v0=name))
             elif act == "freeze":
                 from ..failures import probe
 
@@ -332,7 +320,22 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None, continu
                     continue
                 for line in assertions[:1]:
                     emit("warn", t("impl.holds_a_sleep_assertion_freezing_will", v0=name, v1=line[:90]))
-                if execute(FreezeApp(path)):
+                action = FreezeApp(path)
+            else:
+                continue
+            admitted.append((app, act, action))
+        from ..actions.base import Context
+        from ..actions.executor import Executor
+
+        results = Executor(Context(st, state_api.save_state)).execute_all([a for _, _, a in admitted])
+        for (app, act, action), result in zip(admitted, results, strict=True):
+            name, path = app["name"], app["path"]
+            if isinstance(action, QuitDaemonApp):
+                _, okq, msg = result
+                emit("ok" if okq else "warn", msg)
+                continue
+            if result:
+                if act == "freeze":
                     emit(
                         "ok",
                         t(
@@ -341,25 +344,30 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None, continu
                             v1=system_apps.freeze_result_count(path),
                         ),
                     )
-                    state_api.save_state(st)
-                    if not yes:
-                        remember.cli(
-                            name, "work" if work else "away", "freeze", app["defact"], dry_run=dry_run
-                        )
-                else:
-                    emit("warn", t("impl.freezing_failed", v0=name))
+                elif not (getattr(result, "forced", False) or getattr(result, "helpers_remaining", False)):
+                    emit("ok", t("impl.quit", v0=name))
+                state_api.save_state(st)
+                if not yes:
+                    remember.cli(name, "work" if work else "away", act, app["defact"], dry_run=dry_run)
+            else:
+                emit("warn", t("impl.freezing_failed" if act == "freeze" else "impl.did_not_quit", v0=name))
 
         c.rule(t("impl.background_agents"))
-        for s in launchd.svc_scan()["unloadable"]:
+        services = [
+            s
+            for s in launchd.svc_scan()["unloadable"]
             if ask(
                 t("impl.unload_agent_prompt", label=s["label"], pid=s["pid"], cpu=s["cpu"] or "?"), yes=yes
-            ):
-                _, rc = execute(UnloadAgent(s["plist_path"]))
-                if rc == 0:
-                    emit("ok", t("impl.unloaded", v0=s["label"]))
-                    state_api.save_state(st)
-                else:
-                    emit("warn", t("impl.unloading_failed", v0=s["label"]))
+            )
+        ]
+        service_results = Executor(Context(st, state_api.save_state)).execute_all(
+            [UnloadAgent(s["plist_path"]) for s in services]
+        )
+        for service, (_, rc) in zip(services, service_results, strict=True):
+            emit(
+                "ok" if rc == 0 else "warn",
+                t("impl.unloaded" if rc == 0 else "impl.unloading_failed", v0=service["label"]),
+            )
         if profile.get("spotlight") != "keep" and spotlight.spotlight_on():
             if profile_spotlight_off or (
                 not (work and yes)
@@ -395,20 +403,22 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None, continu
                 emit=emit,
             )
         ):
+            network_actions = []
             for name in network_api.configured_names():
-                p = system_apps.app_path(name)
+                path = system_apps.app_path(name)
                 spec = configured_daemon(name)
                 if spec is not None:
-                    _, okq, msg = execute(QuitDaemonApp(spec, st, state_api.save_state))
+                    network_actions.append((name, QuitDaemonApp(spec, st, state_api.save_state)))
+                elif path and system_apps.app_running(path):
+                    network_actions.append((name, QuitApp(path, name, fallback=True)))
+            results = Executor(Context(st, state_api.save_state)).execute_all([a for _, a in network_actions])
+            for (name, action), result in zip(network_actions, results, strict=True):
+                if isinstance(action, QuitDaemonApp):
+                    _, okq, msg = result
                     emit("ok" if okq else "warn", msg)
-                    continue
-                if not p or not system_apps.app_running(p):
-                    continue
-                result = execute(QuitApp(p, name, fallback=True))
-                if result:
+                elif result:
                     if not (getattr(result, "forced", False) or getattr(result, "helpers_remaining", False)):
                         emit("ok", t("impl.quit", v0=name))
-                    state_api.save_state(st)
                 else:
                     emit("warn", t("impl.did_not_quit", v0=name))
             dev = system_network.wifi_dev()

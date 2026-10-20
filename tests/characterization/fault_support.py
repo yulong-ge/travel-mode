@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from travel_mode import cli, state
+from travel_mode.actions.journal import preparing_command
 from travel_mode.system import apps, process_control, shell
 from travel_mode.system.shell import CmdResult
 
@@ -50,7 +51,11 @@ def sweep(machine, monkeypatch):
     active = {}
 
     def save(snapshot, *args, **kwargs):
-        if active.get("family") == "state" and active.get("armed") and len(reset.observed) == active["index"]:
+        if (
+            active.get("family") == "state"
+            and active.get("armed")
+            and tuple(preparing_command.get() or ()) == active.get("target")
+        ):
             reset.triggered = True
             raise state.StateError("fixture journal save denied")
         return original_save(snapshot, *args, **kwargs)
@@ -70,7 +75,12 @@ def sweep(machine, monkeypatch):
             (machine["root"] / name).unlink(missing_ok=True)
         observed = []
         reset.observed, reset.triggered = observed, False
-        active.update(index=index, family=family or ("refused" if refusal else "command"), armed=False)
+        active.update(
+            index=index,
+            target=tuple(target) if target else None,
+            family=family or ("refused" if refusal else "command"),
+            armed=False,
+        )
         if family == "password":
             assert target[0] == "sudo"
             machine["fake"].responses[("sudo", "-n", "-l", *target[1:])] = CmdResult(
@@ -80,11 +90,20 @@ def sweep(machine, monkeypatch):
         def runner(command, timeout=None, interactive=False):
             if mutation(command):
                 observed.append(tuple(command))
-                if len(observed) - 1 == active["index"] and active["family"] in {
-                    "command",
-                    "refused",
-                    "internal",
-                }:
+                if (
+                    not reset.triggered
+                    and (
+                        tuple(command) == active["target"]
+                        if active["target"]
+                        else len(observed) - 1 == active["index"]
+                    )
+                    and active["family"]
+                    in {
+                        "command",
+                        "refused",
+                        "internal",
+                    }
+                ):
                     reset.triggered = True
                     machine["fake"].calls.append(tuple(command))
                     if active["family"] == "internal":

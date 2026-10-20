@@ -25,11 +25,12 @@ from unittest.mock import patch
 # Support both `uv run python scripts/e2e_local.py` and imports in default tests.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from e2e_guard import (
-    GRACEFUL_ID,
+    GRACEFUL_FIXTURES,
     LABEL,
     LSREGISTER,
     PROCESS_QUERY,
     QUIT_EVENT,
+    QUIT_EVENTS,
     STATUS_QUERY,
     GuardRunner,
     LocalBackend,
@@ -403,14 +404,21 @@ class Harness:
     def graceful(self):
         self.graceful_attempted = True
         create_graceful(self.root, self.runner)
-        self.command(["open", "-g", "-j", str(self.runner.graceful)])
+        for app in self.runner.graceful_apps:
+            self.command(["open", "-g", "-j", str(app)])
         self.graceful_registered = True
-        self.wait(lambda: apps.app_running(str(self.runner.graceful)), "Background applet started")
+        self.wait(
+            lambda: all(apps.app_running(str(app)) for app in self.runner.graceful_apps),
+            "Background applets started",
+        )
         self.runner.observe()
         st = state.new_state()
         start = len(self.runner.commands)
         try:
-            ok = Executor(Context(st)).execute(QuitApp(str(self.runner.graceful), self.runner.graceful.stem))
+            results = Executor(Context(st)).execute_all(
+                [QuitApp(str(app), app.stem) for app in self.runner.graceful_apps]
+            )
+            ok = all(results)
         except RuntimeError:
             if not tcc_denied(self.runner):
                 raise
@@ -421,14 +429,20 @@ class Harness:
             print(TCC_SKIP)
             self.state_file.unlink(missing_ok=True)
             return False
-        self.check(ok and not apps.app_running(str(self.runner.graceful)), "AppleEvent quit exited applet")
+        self.check(
+            ok and all(not apps.app_running(str(app)) for app in self.runner.graceful_apps),
+            "Concurrent AppleEvent quit exited both applets",
+        )
         self.check(
             not any(c[0] == "kill" for c in self.runner.commands[start:]),
             "Graceful quit used no kill fallback",
         )
         print("Reopen mapping: open <graceful bundle> -> open -g -j <graceful bundle>")
         self.off(st)
-        self.wait(lambda: apps.app_running(str(self.runner.graceful)), "Applet reopened hidden in background")
+        self.wait(
+            lambda: all(apps.app_running(str(app)) for app in self.runner.graceful_apps),
+            "Applets reopened hidden in recorded order",
+        )
         return True
 
     def thaw(self):
@@ -696,18 +710,20 @@ class Harness:
                 )
 
         def quit_applet():
-            if self.graceful_attempted and apps.app_running(str(self.runner.graceful)):
-                result = self.runner(QUIT_EVENT, timeout=10)
-                if result.rc and not tcc_denied(self.runner):
-                    raise RuntimeError(f"Cleanup AppleEvent quit failed: {result}")
-                if result.rc:
-                    print(TCC_SKIP)
-                else:
-                    self.pause(1)
+            for app, event in zip(self.runner.graceful_apps, QUIT_EVENTS, strict=True):
+                if self.graceful_attempted and apps.app_running(str(app)):
+                    result = self.runner(event, timeout=10)
+                    if result.rc and not tcc_denied(self.runner):
+                        raise RuntimeError(f"Cleanup AppleEvent quit failed: {result}")
+                    if result.rc:
+                        print(TCC_SKIP)
+                    else:
+                        self.pause(1)
 
         def unregister():
-            if getattr(self, "graceful_registered", False) and self.runner.graceful.exists():
-                self.command([LSREGISTER, "-u", str(self.runner.graceful)])
+            for app in self.runner.graceful_apps:
+                if getattr(self, "graceful_registered", False) and app.exists():
+                    self.command([LSREGISTER, "-u", str(app)])
             if getattr(self, "refusing_registered", False) and self.runner.refusing.exists():
                 self.command([LSREGISTER, "-u", str(self.runner.refusing)])
 
@@ -763,19 +779,20 @@ def tcc_denied(runner):
 
 
 def create_graceful(root, runner):
-    app = runner.graceful
-    result = runner(
-        ["osacompile", "-s", "-o", str(app), "-e", "on idle", "-e", "return 1", "-e", "end idle"], timeout=30
-    )
-    if result.rc:
-        raise RuntimeError(f"osacompile failed: {result}")
-    plist = app / "Contents/Info.plist"
-    metadata = plistlib.loads(plist.read_bytes())
-    metadata.update(CFBundleIdentifier=GRACEFUL_ID, LSUIElement=True)
-    plist.write_bytes(plistlib.dumps(metadata))
-    result = runner(["codesign", "--force", "--sign", "-", str(app)], timeout=30)
-    if result.rc:
-        raise RuntimeError(f"Applet ad-hoc signing failed: {result}")
+    for app, (_, identifier) in zip(runner.graceful_apps, GRACEFUL_FIXTURES, strict=True):
+        result = runner(
+            ["osacompile", "-s", "-o", str(app), "-e", "on idle", "-e", "return 1", "-e", "end idle"],
+            timeout=30,
+        )
+        if result.rc:
+            raise RuntimeError(f"osacompile failed: {result}")
+        plist = app / "Contents/Info.plist"
+        metadata = plistlib.loads(plist.read_bytes())
+        metadata.update(CFBundleIdentifier=identifier, LSUIElement=True)
+        plist.write_bytes(plistlib.dumps(metadata))
+        result = runner(["codesign", "--force", "--sign", "-", str(app)], timeout=30)
+        if result.rc:
+            raise RuntimeError(f"Applet ad-hoc signing failed: {result}")
 
 
 def print_plan():

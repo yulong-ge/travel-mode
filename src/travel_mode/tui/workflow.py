@@ -50,7 +50,7 @@ class Workflow:
             yield Static(t("redesign.keepalive"), id="keepalive-note", classes="muted")
             yield Checkbox(
                 t("measurement.checkbox"),
-                self.scenario == "work" if self.measure_enabled is None else self.measure_enabled,
+                self.config.automatic_measurement if self.measure_enabled is None else self.measure_enabled,
                 id="q-measure",
             )
         yield Static("", id="measurement-progress", classes="muted")
@@ -67,7 +67,7 @@ class Workflow:
             yield Static("", id="row-evidence")
             yield RichLog(id="log", markup=True, max_lines=400, wrap=True)
             yield Static("", id="dash-audit")
-        yield ActionFooter(getattr(self, "last_result", t("redesign.no_result")), id="last-result")
+        yield ActionFooter(self.last_result, id="last-result")
         yield Static(t("redesign.footer"), id="key-footer")
 
     def on_resize(self, event):
@@ -80,6 +80,9 @@ class Workflow:
             self.run_worker(self.render_observations(), group="attention", exclusive=True)
 
     def init_workflow(self):
+        from travel_mode.measurement import PassiveComparison
+
+        self.passive_measurement = PassiveComparison()
         self._plan_render_lock = asyncio.Lock()
         self.view_mode = "plan"
         self._preparing_new_plan = False
@@ -92,10 +95,28 @@ class Workflow:
         self.focused_evidence = None
         self.show_normal_checks = False
         self.show_suggestions = False
-        self.last_result = t("redesign.no_result")
+        self.last_result = ""
         self.current_battery = None
         self.current_battery_at = None
+        self.current_estimate = None
         self.last_batch = dict(ok=0, failed=0)
+        self.batch_running = False
+
+    def update_result_summary(self):
+        rows = [row for row in self.plan_items if row.get("result_member", False)]
+        self.last_batch = dict(
+            ok=sum(row["state"] in {"done", "warning"} for row in rows),
+            failed=sum(row["state"] == "failed" for row in rows),
+        )
+        if self.batch_running:
+            message = t("redesign.result_running", total=len(rows), completed=sum(self.last_batch.values()))
+        else:
+            message = t("redesign.result_summary", **self.last_batch)
+            if any(row["state"] in {"failed", "warning"} for row in rows):
+                from travel_mode.failures import log_path
+
+                message += t("redesign.result_details", path=log_path())
+        self.main_query_one("#result-summary", Static).update(message)
 
     def update_primary(self):
         if self.scenario == "ask" or self._recomposing:
@@ -110,6 +131,7 @@ class Workflow:
         button.display = self.view_mode == "plan"
         self.main_query_one("#b-off").display = self.view_mode == "session"
         self.main_query_one("#b-complete").display = self.view_mode == "result"
+        self.main_query_one("#b-complete").disabled = any(r["state"] == "running" for r in self.plan_items)
         for selector in ("#filters", "#q-measure", "#keepalive-note"):
             self.main_query_one(selector).display = self.view_mode == "plan"
         self.main_query_one("#result-summary").display = self.view_mode == "result"
@@ -210,20 +232,7 @@ class Workflow:
         for group in ("all", "power", "apps", "services", "network"):
             self.main_query_one("#filter-" + group).set_class(self.active_filter == group, "active-filter")
         if self.view_mode == "result":
-            self.last_batch = dict(
-                ok=sum(
-                    row.get("result_member", False) and row["state"] in {"done", "warning"}
-                    for row in self.plan_items
-                ),
-                failed=sum(
-                    row.get("result_member", False) and row["state"] == "failed" for row in self.plan_items
-                ),
-            )
-            from travel_mode.failures import log_path
-
-            self.main_query_one("#result-summary", Static).update(
-                t("redesign.result_summary", **self.last_batch, path=log_path())
-            )
+            self.update_result_summary()
         self.update_primary()
         self.update_details()
 
@@ -541,6 +550,8 @@ class Workflow:
                 await self.render_observations()
             return
         if bid == "b-complete":
+            if self._mutation_lock.locked():
+                return
             self.view_mode = "session" if self.merged else "plan"
             self.update_primary()
             self.update_session()
@@ -586,62 +597,50 @@ class Workflow:
         ]
         from travel_mode.failures import BatchStopped
 
+        measure = self.main_query_one("#q-measure", Checkbox).value
+        for row in selected:
+            row["result_member"] = True
+        self.batch_running = True
+        self.view_mode = "result"
+        await self.render_plan()
         try:
-            await self.execute_rows(
-                button, selected, measure=self.main_query_one("#q-measure", Checkbox).value
-            )
+            await self.execute_rows(button, selected, measure=measure)
         except BatchStopped:
             self.update_details()  # busy() already persisted and displayed the stopping error.
         for row in self.plan_items:
             if row["state"] == "planned":
                 row.update(state="skipped", selected=False, result=t("redesign.row_skipped"), operations=[])
         self.view_mode = "result"
-        from travel_mode.failures import log_path
-
-        self.main_query_one("#result-summary", Static).update(
-            t("redesign.result_summary", **self.last_batch, path=log_path())
-        )
         await self.render_plan()
         self.main_query_one("#body").focus()
         self.action_refresh()
 
     async def execute_rows(self, button, rows, *, measure):
-        from travel_mode import measurement
-
         from .plan import success
 
         notices = []
         self.last_batch = dict(ok=0, failed=0)
+        self.batch_running = True
 
         async def updated(row):
             if any(r is row for r in self.plan_items):
                 await self.refresh_row(row)
+                self.update_result_summary()
 
         def flow():
-            from travel_mode.config import load_config
+            from travel_mode.system.shell import is_dry_run
 
-            config = load_config()
-            clock = measurement.CancellableClock(self._measurement_cancelled)
-
-            def progress(message):
-                self.call_from_thread(self.update_measurement_progress, message)
-                self.tlog("dim", message)
-
-            before = measurement.begin(
-                self.scenario,
-                measure,
-                config.measurement,
-                progress,
-                clock=clock,
-                cancelled=self._measurement_cancelled,
-            )
+            comparison = self.passive_measurement.begin() if measure and not is_dry_run() else None
             from .plan import execution_units
 
-            for unit, action in execution_units(rows, self.scenario, self.st, self.save):
+            units = list(execution_units(rows, self.scenario, self.st, self.save))
+            for unit, _action in units:
                 for row in unit:
                     row.update(state="running", operations=[], result_member=True)
                     self.call_from_thread(updated, row)
-                result = self.execute(action)
+
+            def completed(index, result):
+                unit, action = units[index]
                 for row in unit:
                     ok = success(result)
                     forced = getattr(result, "forced", False) or getattr(result, "helpers_remaining", False)
@@ -713,7 +712,13 @@ class Workflow:
                         if row["descriptor"]["kind"] == "app" and row["action"] in {"quit", "freeze"}:
                             notices.append((row["name"], row["action"], row["default_action"]))
                     else:
-                        failures = self.st.get("action_failures", [])
+                        from travel_mode.failures import action_identity
+
+                        failures = [
+                            receipt
+                            for receipt in self.st.get("action_failures", [])
+                            if receipt.get("identity") == action_identity(action)
+                        ]
                         row["result"] = failures[-1]["reason"] if failures else t("failure.incomplete")
                         row["retry_action"] = row["action"]
                         row["quit_status"] = getattr(getattr(result, "normal", result), "status", "error")
@@ -736,15 +741,20 @@ class Workflow:
                             row["evidence"].insert(0, json.dumps(failure, ensure_ascii=False))
                         self.last_batch["failed"] += 1
                     self.call_from_thread(updated, row)
-            measurement.finish(
-                before,
-                config.measurement,
-                self.st,
-                self.save,
-                progress,
-                clock=clock,
-                cancelled=self._measurement_cancelled,
-            )
+
+            from travel_mode.actions.base import Context
+            from travel_mode.failures import reporter
+
+            with reporter(self.action_notice):
+                self.executor.execute_all(
+                    [action for _, action in units], Context(self.st, self.save), completed=completed
+                )
+            if comparison is not None and "session" in self.st:
+                from datetime import datetime
+
+                self.passive_measurement.complete(datetime.now().astimezone())
+                self.st["measurement"] = comparison
+                self.save()
 
         try:
             await self.busy(button, flow)
@@ -753,6 +763,8 @@ class Workflow:
                 if row["state"] == "running":
                     row.update(state="failed", result=self.last_result)
                     self.last_batch["failed"] += 1
+            self.batch_running = False
+            self.update_result_summary()
             self.update_primary()
         for name, action, default in notices:
             self.offer_remember(name, action, default)
@@ -782,9 +794,22 @@ class Workflow:
     def update_session(self):
         if self.scenario == "ask":
             return
+        from travel_mode.system.battery import describe_interval
+
         from .session_view import session_view
 
-        view = session_view(self.st, self.current_battery, reading_at=self.current_battery_at)
+        view = session_view(
+            self.st,
+            self.current_battery,
+            reading_at=self.current_battery_at,
+            estimate=self.current_estimate
+            or dict(
+                average_watts=None,
+                remaining_minutes=None,
+                estimate_source=None,
+                estimate_error=describe_interval(),
+            ),
+        )
         self.session_view = view
         self.main_query_one("#session-summary", Static).update("\n".join(view["lines"]))
         if self.view_mode == "session" and view["title"]:
@@ -865,6 +890,10 @@ class Workflow:
                 self.active_filter = "all"
                 self._session_admitted = False
                 self._preparing_new_plan = True
+                from travel_mode.measurement import PassiveComparison
+
+                self.passive_measurement = PassiveComparison()
+                self.current_estimate = None
             self.action_refresh()
         finally:
             self.new_plan_complete.set()

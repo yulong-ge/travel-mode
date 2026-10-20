@@ -23,7 +23,9 @@ INDEX_QUERY = ["mdfind", 'kMDItemContentType == "com.apple.application-bundle"']
 
 def write_fixture_config(root, *, graceful=None, battery_measure=False, refusing=False):
     quit_apps = (
-        ["TravelModeE2E-Quit"] if graceful is None else (["TravelModeE2E-Graceful"] if graceful else [])
+        ["TravelModeE2E-Quit"]
+        if graceful is None
+        else (["TravelModeE2E-Graceful", "TravelModeE2E-Graceful-2"] if graceful else [])
     )
     skip = [] if graceful is None else ["TravelModeE2E-Quit"]
     if refusing:
@@ -58,7 +60,7 @@ class FixtureDiscoveryRunner:
         self.runner = runner
         self.bundles = tuple(
             (root / f"TravelModeE2E-{name}.app").resolve()
-            for name in ("Quit", "Freeze", "Graceful", "Burn", "Refusing")
+            for name in ("Quit", "Freeze", "Graceful", "Graceful-2", "Burn", "Refusing")
         )
 
     def fixture_path(self, value):

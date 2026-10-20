@@ -8,6 +8,16 @@ from ..i18n import t
 from ..state import StateError
 
 _active: ContextVar[tuple[dict, object] | None] = ContextVar("travel_mutation", default=None)
+preparing_command = ContextVar("journal_preparing_command", default=None)
+
+
+@contextmanager
+def command_scope(command):
+    token = preparing_command.set(command)
+    try:
+        yield
+    finally:
+        preparing_command.reset(token)
 
 
 def active_state():

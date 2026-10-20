@@ -30,6 +30,7 @@ class FakeRunner:
     def __call__(self, cmd, timeout=None, interactive=False):
         key = tuple(cmd)
         self.calls.append(key)
+        shell.command_started()
         for prefix, result in sorted(self.responses.items(), key=lambda item: len(item[0]), reverse=True):
             if key[: len(prefix)] == prefix:
                 return result

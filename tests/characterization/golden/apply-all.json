@@ -420,6 +420,19 @@
       "pid=,ppid=,stat=,lstart=,comm="
     ],
     [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
       "ps",
       "-axo",
       "pid=,ppid=,stat=,lstart=,comm="
@@ -442,10 +455,6 @@
       "ps",
       "-axo",
       "pid=,ppid=,stat=,lstart=,comm="
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
     ],
     [
       "sudo",

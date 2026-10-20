@@ -115,9 +115,10 @@ travel-mode power --json
 ```
 
 macOS does not update battery telemetry continuously (on the tested Mac, every 20–60 seconds),
-so a measurement waits for at least two fresh updates (up to 180 s by default). In `work` on battery, the tool measures before
-and after applying actions and reports the difference; `--no-measure` skips this. On AC power
-the result is "not measurable".
+so `travel-mode power` waits for at least two fresh updates (up to 180 s by default). Applying
+actions never waits for a measurement: with the before/after comparison enabled, the TUI records
+the values in the background and shows the difference on the session screen when the data
+arrives. On AC power the result is "not measurable".
 
 Measured on one MacBook Pro (M1 Pro, macOS 27), on battery, light workload (browser and editor):
 

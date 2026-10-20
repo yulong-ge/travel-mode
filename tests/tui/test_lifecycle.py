@@ -103,7 +103,9 @@ async def test_shutdown_drains_actions_before_unmounting_log(cancel_await, fake_
     assert finished.is_set() and app._exception is None
 
 
-async def test_measurement_queries_stay_on_ui_thread_and_language_waits(fake_runner, monkeypatch):
+async def test_passive_measurement_queries_stay_on_ui_thread_and_language_waits_for_actions(
+    fake_runner, monkeypatch
+):
     from travel_mode import measurement
 
     fake_runner.responses[("sudo", "pmset")] = CmdResult("", "", 0)
@@ -116,16 +118,20 @@ async def test_measurement_queries_stay_on_ui_thread_and_language_waits(fake_run
         assert threading.current_thread() is threading.main_thread()
         return original_query(*args, **kwargs)
 
-    def begin(*args, **kwargs):
-        args[3]("fixture measurement progress")
-        app.call_from_thread(entered.set)
-        if not release.wait(30):
-            raise TimeoutError("fixture measurement was not released")
-        return None
+    def runner(command, timeout=None, interactive=False):
+        if command[:2] == ["sudo", "pmset"]:
+            app.call_from_thread(entered.set)
+            if not release.wait(30):
+                raise TimeoutError("fixture action was not released")
+        return fake_runner(command, timeout, interactive)
 
+    from travel_mode.system import shell
+
+    shell.set_runner(runner)
     monkeypatch.setattr(app, "query_one", query)
-    monkeypatch.setattr(measurement, "begin", begin)
-    monkeypatch.setattr(measurement, "finish", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        measurement, "begin", lambda *a, **kw: pytest.fail("TUI must not block on measurement")
+    )
     async with app.run_test(size=(140, 55)) as pilot:
         await app.wait_for_idle()
         from tui_plan import select_plan
@@ -152,7 +158,8 @@ async def test_measurement_queries_stay_on_ui_thread_and_language_waits(fake_run
             if switch is not None:
                 await asyncio.wait_for(switch, 30)
         await app.wait_for_idle()
-        assert "fixture measurement progress" in str(app.query_one("#measurement-progress").content)
+        assert app.st["measurement"]["mode"] == "passive"
+        assert app.st["measurement"]["after"] is None
         assert app._exception is None
 
 

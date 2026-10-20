@@ -199,11 +199,21 @@ returns **insufficient samples**, without a number. AC power, charging or no bat
 - **Capacity.** Top-level `AppleRawCurrentCapacity`/`AppleRawMaxCapacity` if present, otherwise
   `BatteryData.RemainingCapacity`/`FullChargeCapacity`; the source is reported. Remaining hours =
   remaining Wh / mean W. macOS's own estimate (`pmset -g batt`) is shown alongside.
-- **Before/after.** In work on battery, apply measures one window, runs the actions, waits 10
-  seconds and measures again (about 2–6 minutes in total). `--no-measure` skips it; `--measure`
-  enables it in away. A measurement failure is reported in the session and does not stop the
-  actions. A short comparison does not prove causality.
-- **TUI.** While open, the overview reads ioreg every 30 seconds and labels the value as a cached
+- **Before/after.** Applying never waits for a measurement. With the comparison enabled
+  (`[measurement] automatic = true`, the TUI checkbox or `--measure`), the TUI records the battery
+  reading when it opens and uses the existing 30-second refresh: if a fresh interval completes
+  while you review the plan, it is the "before" value, otherwise "before" is unavailable. After
+  applying, the first reading is discarded as possibly cached, and the "after" value appears on
+  the session screen when a real interval completes. A difference smaller than 1 W or 10% of the
+  "before" value (whichever is larger) is shown as "within measurement error", and a comparison
+  based on one interval each is labelled lower precision. The CLI `on` command measures only with
+  `--measure`, using the bounded blocking window above. A short comparison does not prove
+  causality.
+- **Remaining time.** The session screen and `status` share one calculation. If the Mac slept
+  during the session (Sleep/Wake events in the pmset log; DarkWake does not count as a wake), only
+  complete intervals after the last wake are used, labelled "at the average since waking". Until
+  such an interval exists, the session average including sleep is shown without a remaining time.
+- **TUI.** While open, the TUI reads ioreg every 30 seconds and labels the value as a cached
   snapshot. The energy ranking runs only when its button is pressed.
 
 ```toml
@@ -211,7 +221,8 @@ returns **insufficient samples**, without a number. AC power, charging or no bat
 seconds = 180        # maximum wait per window
 interval = 5         # polling interval, at least 5
 updates = 2          # fresh updates required, 2–720
-settle_seconds = 10  # wait after applying, before the second window
+settle_seconds = 10  # wait after applying, before the second window (CLI --measure)
+automatic = false    # passive before/after comparison in the TUI
 ```
 
 Tool overhead measured on 2026-10-15 (CPU time, not energy): 10 ioreg calls and one pmset call over
@@ -412,6 +423,15 @@ the batch ends with a summary such as "4 succeeded, 1 failed". A state file that
 written stops the remaining changes, because their recovery could not be recorded. An unexpected
 internal error keeps the TUI open and shows one line with the log path; set `TRAVEL_MODE_DEBUG=1`
 to see the traceback instead.
+
+Independent actions in a batch run at the same time: quit requests go to all apps at once and
+share one 10-second verification deadline, and freezes and LaunchAgent unloads run in parallel.
+Steps for the same app, plist or settings domain keep their order; power settings remain one
+`pmset` command. Each action's recovery intent is written to the state file by a single writer
+before its command is sent. If a batch must stop, no new action starts, running ones finish, and
+the original error is reported. The CLI prints results in plan order. `off` reloads services and
+reopens apps in parallel; reopen requests are sent in the recorded order. A retry marks only its
+own earlier failure as recovered, matched by action type and exact target, not by display text.
 
 Quitting an app uses AppleScript. After the request the tool watches the app's main process for
 up to 10 seconds, also when AppleScript reported -128 or a timeout: some apps reply "cancelled"

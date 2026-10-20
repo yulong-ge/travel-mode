@@ -48,7 +48,7 @@ def test_measurement_failure_continues_cli_and_is_retained_in_session_report(
 
         monkeypatch.setattr(measurement, "_read", source)
     monkeypatch.setattr(measurement, "Clock", FakeClock)
-    assert cli.main(["--scenario", "work", "--yes"]) == 0
+    assert cli.main(["--scenario", "work", "--yes", "--measure"]) == 0
     assert any(c[:3] == ("sudo", "pmset", "-b") for c in fake_runner.calls)
     saved = state.load_state()
     result = saved["measurement"]

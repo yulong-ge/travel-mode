@@ -10,12 +10,34 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
 from ..i18n import t
 from ..privileges import PRIVILEGED_PATHS
+
+_ordered_start = ContextVar("command_ordered_start", default=None)
+
+
+@contextmanager
+def ordered_start(wait, started):
+    token = _ordered_start.set((wait, started))
+    try:
+        yield
+    finally:
+        started()  # An action with no command must not strand later requests.
+        _ordered_start.reset(token)
+
+
+def command_started():
+    """Runner adapters call this after issuing a request, before awaiting completion."""
+    ordering = _ordered_start.get()
+    if ordering:
+        ordering[1]()
+
 
 # Apple tools are selected independently of PATH, including sudo's target.
 # Keep logical argv upstream for Runner doubles, journaling and dry-run output.
@@ -129,10 +151,22 @@ def subprocess_runner(cmd: list[str], timeout: float | None = None, interactive:
         if interactive:
             proc = subprocess.run(executed, timeout=timeout, check=False)
             return CmdResult("", "", proc.returncode)
-        proc = subprocess.run(
-            executed, capture_output=True, text=True, errors="replace", timeout=timeout, check=False
-        )
-        return CmdResult(proc.stdout, proc.stderr, proc.returncode)
+        if _ordered_start.get() is None:
+            proc = subprocess.run(
+                executed, capture_output=True, text=True, errors="replace", timeout=timeout, check=False
+            )
+            return CmdResult(proc.stdout, proc.stderr, proc.returncode)
+        with subprocess.Popen(
+            executed, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace"
+        ) as proc:
+            command_started()
+            try:
+                stdout, stderr = proc.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.communicate()
+                raise
+            return CmdResult(stdout, stderr, proc.returncode)
     except CommandResolutionError as exc:
         return CmdResult("", str(exc), 127)
     except FileNotFoundError:
@@ -290,7 +324,7 @@ def get_runner() -> Runner:
 
 
 def _invoke(cmd: list[str], timeout: float | None, interactive: bool) -> CmdResult:
-    from ..actions.journal import complete_command, prepare_command
+    from ..actions.journal import command_scope, complete_command, persist, prepare_command
 
     privileged_read = cmd[:1] == ["sudo"] and _dry_run_readonly(cmd[1:])
     if privileged_read:
@@ -309,8 +343,20 @@ def _invoke(cmd: list[str], timeout: float | None, interactive: bool) -> CmdResu
                         t("sudo.read_failed", command=shlex.join(cmd), rc=77, detail=str(exc))
                     ) from exc
                 raise
-    prepared = prepare_command(cmd)
-    result = _runner(cmd, timeout, True) if interactive else _runner(cmd, timeout)
+    with command_scope(cmd):
+        prepared = prepare_command(cmd)
+        if not prepared:
+            from ..failures import mutation
+
+            if mutation(cmd):
+                persist()
+    ordering = _ordered_start.get()
+    if ordering:
+        ordering[0]()
+    try:
+        result = _runner(cmd, timeout, True) if interactive else _runner(cmd, timeout)
+    finally:
+        command_started()
     from ..failures import observe
 
     if cmd[:1] == ["sudo"] and result.rc and "password is required" in result.stderr.lower():

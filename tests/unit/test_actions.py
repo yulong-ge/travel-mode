@@ -32,12 +32,12 @@ def test_action_sequence_persists_intent_before_each_command(fake_runner):
     set_runner(runner)
     actions = [EnableSleep(), SetPowerProfile(["sleep", "5"]), WifiOff("en0"), BluetoothOff()]
     assert Executor(Context(snapshot)).execute_all(actions) == [("", 0)] * 4
-    assert observed == [
+    assert set(observed) == {
         ("sudo", "pmset", "-a", "disablesleep", "0"),
         ("sudo", "pmset", "-b", "sleep", "5"),
         ("sudo", "networksetup", "-setairportpower", "en0", "off"),
         ("blueutil", "-p", "0"),
-    ]
+    }
     restored = state.load_state()
     assert restored["batt_prof"] == "sleep 1"
     assert restored["wifi_off"] == "en0"

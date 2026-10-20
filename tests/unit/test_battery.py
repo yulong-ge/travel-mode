@@ -174,7 +174,7 @@ def test_cli_work_comparison_runs_around_actions_without_real_sleep(
     fresh_readings(monkeypatch, read)
     clock = FakeClock()
     monkeypatch.setattr(measurement, "Clock", lambda: clock)
-    assert cli.main(["--scenario", "work", "--yes"]) == 0
+    assert cli.main(["--scenario", "work", "--yes", "--measure"]) == 0
     assert observed == [False] * 3 + [True] * 3
     assert clock.now == 30
     assert state.load_state()["measurement"]["saved_watts"] == 6

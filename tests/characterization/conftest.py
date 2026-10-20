@@ -22,6 +22,14 @@ from .contracts import canonical_name, load_contract, validate_contract
 GOLDEN_DIR = Path(__file__).parent / "golden"
 
 
+@pytest.fixture
+def serial_batches(monkeypatch):
+    """Golden traces use a deterministic scheduler; fault/concurrency tests use real overlap."""
+    from travel_mode.actions.executor import Executor
+
+    monkeypatch.setattr(Executor, "batch_workers", 1)
+
+
 class FixedTime(datetime):
     @classmethod
     def now(cls, tz=None):

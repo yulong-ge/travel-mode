@@ -88,7 +88,14 @@ def _run_restore(st, emit, only=None):
         st["pending_commands"] = [cmd for cmd in st.get("pending_commands", []) if not belongs(cmd)]
         for failure in st.get("action_failures", []):
             if failure.get("target") == "restore:" + key:
-                failure["recovered"] = True
+                identity_target = failure.get("identity", {}).get("target")
+                command = (
+                    identity_target.get("command", [])
+                    if isinstance(identity_target, dict) and "command" in identity_target
+                    else failure["command"]
+                )
+                if value is None or command[-1:] == [value]:
+                    failure["recovered"] = True
         n += 1
         state_api.save_state(st)
 
@@ -103,6 +110,25 @@ def _run_restore(st, emit, only=None):
             return
         restored(key, value)
         emit("ok", message)
+
+    def parallel(entries, *, ordered=False):
+        nonlocal fails
+        actions = [RecoveryCommand(cmd, message, sudo, key) for key, cmd, message, sudo, value in entries]
+
+        def completed(index, result):
+            nonlocal fails
+            key, _cmd, _message, _sudo, value = entries[index]
+            if result[1]:
+                fails += 1
+            else:
+                restored(key, value)
+
+        results = executor.execute_all(actions, completed=completed, ordered=ordered)
+        for (_key, cmd, message, _sudo, _value), (output, rc) in zip(entries, results, strict=True):
+            if rc and rc not in {77, 124}:
+                emit("warn", t("json.command_failed", command=shlex.join(cmd), rc=rc, detail=output))
+            elif not rc:
+                emit("ok", message)
 
     for field, flag, message in (
         ("batt_prof", "-b", "impl.battery_profile_restored"),
@@ -144,6 +170,7 @@ def _run_restore(st, emit, only=None):
                 for path in paths:
                     failed_read(path, exc, commands, key=field)
                 continue
+        entries = []
         for path in paths:
             try:
                 with Path(path).open("rb") as fh:
@@ -160,13 +187,10 @@ def _run_restore(st, emit, only=None):
                 restored(field, path)
                 emit("dim", t("impl.agent_already_running_loaded_at_login", v0=label))
             else:
-                execute(
-                    field,
-                    ["launchctl", "load", path],
-                    t("impl.reloaded_agent", v0=label),
-                    sudo=sudo,
-                    value=path,
+                entries.append(
+                    (field, ["launchctl", "load", path], t("impl.reloaded_agent", v0=label), sudo, path)
                 )
+        parallel(entries)
     if st.get("spotlight_off") and allowed("spotlight_off"):
         execute(
             "spotlight_off", ["mdutil", "-i", "on", "/"], t("impl.spotlight_indexing_restored"), sudo=True
@@ -210,13 +234,18 @@ def _run_restore(st, emit, only=None):
             state_api.save_state(st)
             n += 1
             emit("ok", t("impl.thawed", v0=Path(path).stem))
-    for path in list(st.get("quit_apps", [])) if allowed("quit_apps") else ():
-        execute(
+    entries = [
+        (
             "quit_apps",
             ["open", path] if Path(path).is_dir() else ["open", "-a", path],
             t("impl.started", v0=path),
-            value=path,
+            False,
+            path,
         )
+        for path in list(st.get("quit_apps", []))
+        if allowed("quit_apps")
+    ]
+    parallel(entries, ordered=True)
     return n, fails
 
 

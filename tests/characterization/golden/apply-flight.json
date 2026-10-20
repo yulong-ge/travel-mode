@@ -245,6 +245,11 @@
       "pid=,%cpu=,command="
     ],
     [
+      "pmset",
+      "-g",
+      "assertions"
+    ],
+    [
       "ps",
       "-axo",
       "pid=,ppid=,stat=,lstart=,comm="
@@ -269,11 +274,6 @@
       "pid=,ppid=,stat=,lstart=,comm="
     ],
     [
-      "pmset",
-      "-g",
-      "assertions"
-    ],
-    [
       "ps",
       "-axo",
       "pid=,ppid=,stat=,lstart=,comm="
@@ -294,11 +294,6 @@
       "pid=,ppid=,stat=,lstart=,comm="
     ],
     [
-      "ps",
-      "-axo",
-      "pid=,ppid=,stat=,lstart=,comm="
-    ],
-    [
       "osascript",
       "-e",
       "with timeout of 8 seconds",
@@ -306,6 +301,11 @@
       "tell application id \"org.demo.app910004\" to quit",
       "-e",
       "end timeout"
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
     ],
     [
       "ps",
@@ -421,6 +421,19 @@
       "pid=,ppid=,stat=,lstart=,comm="
     ],
     [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "mdfind",
+      "kMDItemContentType == \"com.apple.application-bundle\""
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
       "ps",
       "-axo",
       "pid=,ppid=,stat=,lstart=,comm="
@@ -443,10 +456,6 @@
       "ps",
       "-axo",
       "pid=,ppid=,stat=,lstart=,comm="
-    ],
-    [
-      "mdfind",
-      "kMDItemContentType == \"com.apple.application-bundle\""
     ],
     [
       "sudo",

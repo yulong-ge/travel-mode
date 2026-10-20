@@ -10,6 +10,8 @@ from travel_mode.system.process_control import process_table
 
 from .conftest import artifact, assert_golden
 
+pytestmark = pytest.mark.usefixtures("serial_batches")
+
 
 @pytest.mark.parametrize("case", ["reload", "loaded", "invalid", "power", "pids", "reopen-order"])
 def test_restore_branches(case, machine, capsys):

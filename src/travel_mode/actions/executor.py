@@ -11,12 +11,20 @@ from .base import Context
 
 
 class Executor:
+    batch_workers = 32
+
     def __init__(self, context=None, *, count_actions=True):
         self.context = context
         self._lock = RLock()
         self.count_actions = count_actions
 
     def execute(self, action, context=None):
+        from ..failures import identity_scope
+
+        with identity_scope(action):
+            return self._execute(action, context)
+
+    def _execute(self, action, context=None):
         ctx = context or self.context or Context(journal.active_state())
         if ctx.state is None and hasattr(action, "state"):
             ctx = Context(action.state, getattr(action, "save", None))
@@ -225,15 +233,18 @@ class Executor:
                 # receipt, while retaining the failed attempt in the report.
                 changed = False
                 for row in ctx.state.get("action_failures", []):
-                    if row["kind"] == "action" and row["action"] == label and row["target"] == target:
+                    if row["kind"] == "action" and row.get("identity") == failures.action_identity(action):
                         row["recovered"] = True
                         changed = True
                 if changed:
                     (ctx.save or save_state)(ctx.state)
             return result
 
-    def execute_all(self, actions):
-        return [self.execute(action) for action in actions]
+    def execute_all(self, actions, context=None, *, completed=None, clock=None, ordered=False):
+        from .batch import execute_batch
+
+        ctx = context or self.context or Context(journal.active_state())
+        return execute_batch(self, actions, ctx, completed, ordered, clock)
 
     @asynccontextmanager
     async def transaction(self, lock, state, merged, save, authenticate=None, *, credentials=None):

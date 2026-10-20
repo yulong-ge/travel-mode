@@ -419,6 +419,7 @@ class TravelApp(Workflow, Lifecycle, Dispatch, Capabilities, App):
 
         from textual.worker import get_current_worker
 
+        from travel_mode.state import StateError
         from travel_mode.system import battery
         from travel_mode.system.shell import ReadError
 
@@ -426,7 +427,13 @@ class TravelApp(Workflow, Lifecycle, Dispatch, Capabilities, App):
         reading_at = datetime.now().astimezone()
         try:
             reading = await asyncio.to_thread(battery.read)
-        except (ReadError, battery.BatteryError) as exc:
+            estimate = None
+            active = self.st.get("session")
+            if active and active["start"].get("telemetry"):
+                from travel_mode.live_power import observe
+
+                estimate = await asyncio.to_thread(observe, active, reading, reading_at)
+        except (ReadError, battery.BatteryError, StateError) as exc:
             if (
                 not get_current_worker().is_cancelled
                 and generation == self._refresh_generation
@@ -439,6 +446,12 @@ class TravelApp(Workflow, Lifecycle, Dispatch, Capabilities, App):
                 )
                 self.main_query_one("#dash-battery", Static).update(escape(message))
                 self.logline("warn", message)
+                self.current_battery = None if not isinstance(exc, battery.IntervalError) else reading
+                self.current_battery_at = reading_at
+                self.current_estimate = dict(
+                    average_watts=None, remaining_minutes=None, estimate_source=None, estimate_error=message
+                )
+                self.update_session()
             return
         if (
             not get_current_worker().is_cancelled
@@ -450,6 +463,20 @@ class TravelApp(Workflow, Lifecycle, Dispatch, Capabilities, App):
                 self.flush_session_observations()
             self.current_battery = reading
             self.current_battery_at = reading_at
+            self.current_estimate = estimate
+            if not self._mutation_lock.locked():
+                comparison = self.st.get("measurement")
+                passive = self.passive_measurement
+                if comparison and comparison.get("mode") == "passive" and passive.result is None:
+                    passive.result = comparison
+                    passive.complete(reading_at)
+                try:
+                    changed = passive.observe(reading, reading_at)
+                except battery.IntervalError as exc:
+                    self.logline("warn", battery.describe_interval(exc.reason))
+                else:
+                    if changed and comparison is passive.result:
+                        self.save()
             self.main_query_one("#dash-battery", Static).update(self.battery_heading(reading))
             self.update_session()
 

@@ -6,12 +6,17 @@ All notable changes follow Keep a Changelog.
 
 ### Changed
 
+- Applying no longer waits for a power measurement: the TUI records the "before" value passively while you review the plan and fills in "after" on the session screen; small differences are shown as within measurement error. The CLI measures only with `--measure`.
+- Independent actions run in parallel: apps get their quit requests at once and share one 10-second deadline (10 apps: about 100 s -> 10 s in simulation), and restore reopens apps and reloads services in parallel.
+- Remaining battery time after the Mac slept uses only readings since the last wake.
 - Redesigned TUI: a plan screen (sleep readiness, health findings, one row per action with target and reason, filters instead of five tabs) that turns into a result screen, a session screen while a session is active, and a details drawer (`d`). Rows have exactly one state and only the controls that state allows; noise such as uninstalled network apps and unreadable plists is summarised in one dim line, and empty placeholder plists are ignored.
 - Scenarios are shown as "On the go" (`work`) and "Overnight / flight" (`away`). `work` now also turns off Power Nap and wake for network access, which only act during sleep; `away` quits apps instead of freezing them and offers Wi-Fi/Bluetooth off unselected. Network keep-alive during sleep is never turned off because Find My needs it.
 - Sleep readiness: `SleepDisabled` and system-sleep assertions are reported first with the likely source; `status --json` adds `sleep_ready` and the menu bar shows a warning icon.
 
 ### Fixed
 
+- A retry that succeeded is now marked as recovered even when the action label is long; failures are matched by action type and exact target.
+- The session screen no longer reports an internal error in the first minute of a session; it waits for new battery data.
 - Session reports and history use local time, readable durations and percentages; failures fixed by a later retry are listed as recovered; commands, exit codes and mAh moved to `--verbose`.
 - A short session without power-source events in the pmset log is now counted as battery only when both ends were on battery, instead of "unknown".
 - The TUI no longer lets sudo print `Password:` over the screen and time out. Items that need a password are listed first (enter password, skip, cancel); entering it suspends the TUI for `sudo -v`. Items run without permission are reported as "needs administrator password" with a Retry button.

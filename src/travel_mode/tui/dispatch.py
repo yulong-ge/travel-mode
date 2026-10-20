@@ -190,6 +190,7 @@ class Dispatch:
 
         credentials = Credentials(interactive=False)
         pending = await self.in_thread(credentials.preflight, requests)
+        credentials.batch_confirmed = True
         return credentials, pending
 
     async def complete_permission(self, event, credentials, pending):

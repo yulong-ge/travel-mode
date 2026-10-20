@@ -87,7 +87,14 @@ async def test_hib25_alone_when_original_equals_recommendation(monkeypatch):
 
         await select_plan(app, ids={"deep-sleep"})
         calls = []
-        monkeypatch.setattr(app, "execute", lambda action: calls.append(action) or ("", 0))
+
+        def execute_all(actions, context=None, *, completed=None):
+            for index, action in enumerate(actions):
+                calls.append(action)
+                completed(index, ("", 0))
+            return [("", 0)] * len(actions)
+
+        monkeypatch.setattr(app.executor, "execute_all", execute_all)
         monkeypatch.setattr(app, "save", lambda: None)
         await app.run_plan(app.query_one("#b-quick"))
         assert len(calls) == 1 and isinstance(calls[0], SetPowerProfile)

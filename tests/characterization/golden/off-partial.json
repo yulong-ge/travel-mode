@@ -152,6 +152,17 @@
           "-p",
           "1"
         ],
+        "identity": {
+          "target": {
+            "command": [
+              "blueutil",
+              "-p",
+              "1"
+            ],
+            "restore": "bt_off"
+          },
+          "type": "RecoveryCommand"
+        },
         "kind": "action",
         "rc": 2,
         "reason": "command failed: blueutil -p 1 (exit 2): fixture failure",

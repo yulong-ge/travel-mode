@@ -243,7 +243,8 @@ async def test_tui_refresh_recompose_batch_uses_original_rows(action_ui, fake_ru
             if switch is not None:
                 await switch
         await settled(app, pilot)
-        assert frozen == originals and app.st["frozen_apps"] == originals
+        assert sorted(frozen) == sorted(originals)
+        assert sorted(app.st["frozen_apps"]) == sorted(originals)
         app.view_mode = "plan"
         app.plan_items = []
         app.action_refresh()
