@@ -94,6 +94,7 @@ class Workflow:
         self.show_suggestions = False
         self.last_result = t("redesign.no_result")
         self.current_battery = None
+        self.current_battery_at = None
         self.last_batch = dict(ok=0, failed=0)
 
     def update_primary(self):
@@ -783,7 +784,7 @@ class Workflow:
             return
         from .session_view import session_view
 
-        view = session_view(self.st, self.current_battery)
+        view = session_view(self.st, self.current_battery, reading_at=self.current_battery_at)
         self.session_view = view
         self.main_query_one("#session-summary", Static).update("\n".join(view["lines"]))
         if self.view_mode == "session" and view["title"]:

@@ -83,7 +83,6 @@ def test_after_window_skips_settling_and_ioreg_if_ac_is_connected(fake_runner, m
     before = measurement.measure(
         measurement.Settings(seconds=20),
         clock=FakeClock(),
-        first=battery.parse((FIXTURES / "discharging.txt").read_text()),
     )
     fake_runner.calls.clear()
     fake_runner.responses[("pmset", "-g", "ps")] = CmdResult("AC Power", "", 0)

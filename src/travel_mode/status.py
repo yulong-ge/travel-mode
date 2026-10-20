@@ -111,6 +111,7 @@ def data(*, clock=time.monotonic, now=None):
             else:
                 start = {
                     "telemetry": active["start"]["telemetry"],
+                    "update_time": active["start"].get("update_time"),
                     "power_source": "PowerTelemetryData.SystemLoad",
                 }
                 seconds = (
@@ -125,6 +126,10 @@ def data(*, clock=time.monotonic, now=None):
                         remaining_minutes=round(reading["remaining_wh"] / watts * 60),
                         estimate_source="session_telemetry",
                     )
+                else:
+                    battery["estimate_error"] = battery_api.describe_interval()
+        except battery_api.IntervalError as exc:
+            battery["estimate_error"] = battery_api.describe_interval(exc.reason)
         except (battery_api.BatteryError, ReadError) as exc:
             battery["estimate_error"] = str(exc)
     result["swiftbar"] = render(result)

@@ -1,0 +1,30 @@
+{
+  "started_at": "2026-10-20T04:17:07+00:00",
+  "start": {
+    "system_sum_mw": 3104325514,
+    "system_count": 458963,
+    "update_time": 1792469807
+  },
+  "cases": {
+    "stale": {
+      "system_sum_mw": 3104305514,
+      "system_count": 458943,
+      "update_time": 1792469787
+    },
+    "unchanged": {
+      "system_sum_mw": 3104326514,
+      "system_count": 458963,
+      "update_time": 1792469808
+    },
+    "reset": {
+      "system_sum_mw": 1000,
+      "system_count": 1,
+      "update_time": 1792470045
+    },
+    "normal": {
+      "system_sum_mw": 3118964536,
+      "system_count": 486471,
+      "update_time": 1792470045
+    }
+  }
+}

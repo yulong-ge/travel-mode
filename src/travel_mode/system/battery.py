@@ -208,31 +208,41 @@ def validate_telemetry(data):
 
 def interval(start, end, *, seconds):
     """Average only a monotonic hardware interval; resets/wraps are not guessed."""
+    if seconds < 0:
+        raise ValueError(t("battery.interval_order_invalid"))
     source = start.get("power_source", "voltage_current")
     if source != end.get("power_source", "voltage_current"):
         raise IntervalError("source_changed")
     first, last = generation(start), generation(end)
     if first is None or last is None:
         raise IntervalError("missing_update_marker")
+    # Telemetry and the top-level timestamp update independently. Equal
+    # timestamps can contain fresh counters, but an older snapshot cannot end
+    # this interval. Keep the baseline until a later observation arrives.
+    if source != "voltage_current" and (
+        start.get("update_time") is not None
+        and end.get("update_time") is not None
+        and end["update_time"] < start["update_time"]
+    ):
+        return None
     if last < first:
         raise IntervalError("counter_reset")
     if last == first:
-        if (
-            source != "voltage_current"
-            and start["telemetry"]["system_sum_mw"] != end["telemetry"]["system_sum_mw"]
-        ):
-            raise IntervalError("counter_reset")
+        # ioreg may expose a new sum before the matching count. No complete
+        # accumulator interval exists yet, even if the sum has changed.
         return None
-    if seconds <= 0:
-        raise IntervalError("counter_reset")
+    if seconds == 0:
+        return None
     result = {"seconds": seconds, "power_source": source}
     if source == "voltage_current":
         result["average_watts"] = (start["watts"] + end["watts"]) / 2
         return result
     a, b = start["telemetry"], end["telemetry"]
     delta = b["system_sum_mw"] - a["system_sum_mw"]
-    if delta <= 0:
+    if delta < 0:
         raise IntervalError("counter_reset")
+    if delta == 0:
+        return None
     result.update(average_watts=delta / (last - first) / 1000, accumulator_samples=last - first)
     if "battery_source" not in a or a.get("battery_source") != b.get("battery_source"):
         result["battery_average_reason"] = "unavailable"
@@ -251,6 +261,17 @@ def interval(start, end, *, seconds):
             battery_power_source="PowerTelemetryData." + b["battery_source"],
         )
     return result
+
+
+def describe_interval(reason=None):
+    """Explain unavailable estimates without treating telemetry as a UI fault."""
+    if reason == "counter_reset":
+        return t("battery.interval_discontinuous")
+    if reason == "source_changed":
+        return t("battery.interval_source_changed")
+    if reason in (None, "missing_update_marker"):
+        return t("battery.interval_waiting")
+    raise ValueError(f"battery interval: unknown reason {reason!r}")
 
 
 def capacity(properties, *, include_maximum=True):

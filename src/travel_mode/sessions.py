@@ -243,7 +243,18 @@ def build_report(state, restored, failed):
     ):
         report["power_status"] = "external_seen"
     values = [start[k] is not None and end[k] is not None for k in ("percent", "remaining_mah", "voltage_mv")]
-    if report["power_status"] == "battery_only" and all(values) and not start["errors"] and not end["errors"]:
+    stale = (
+        start.get("update_time") is not None
+        and end.get("update_time") is not None
+        and end["update_time"] < start["update_time"]
+    )
+    if (
+        report["power_status"] == "battery_only"
+        and not stale
+        and all(values)
+        and not start["errors"]
+        and not end["errors"]
+    ):
         percent = start["percent"] - end["percent"]
         mah = start["remaining_mah"] - end["remaining_mah"]
         if min(percent, mah) >= 0:
@@ -257,12 +268,20 @@ def build_report(state, restored, failed):
         else:
             report["errors"].append(t("report.capacity_increased"))
     if report["power_status"] == "battery_only" and "telemetry" in start and "telemetry" in end:
-        from .system.battery import IntervalError, interval
+        from .system.battery import IntervalError, describe_interval, interval
 
         try:
             aggregate = interval(
-                {"telemetry": start["telemetry"], "power_source": "PowerTelemetryData.SystemLoad"},
-                {"telemetry": end["telemetry"], "power_source": "PowerTelemetryData.SystemLoad"},
+                {
+                    "telemetry": start["telemetry"],
+                    "update_time": start.get("update_time"),
+                    "power_source": "PowerTelemetryData.SystemLoad",
+                },
+                {
+                    "telemetry": end["telemetry"],
+                    "update_time": end.get("update_time"),
+                    "power_source": "PowerTelemetryData.SystemLoad",
+                },
                 seconds=seconds,
             )
             if aggregate is not None:
@@ -272,9 +291,9 @@ def build_report(state, restored, failed):
                     average_source=aggregate["power_source"],
                 )
             else:
-                report["errors"].append(t("measurement.reason.insufficient_samples"))
+                report["errors"].append(describe_interval())
         except IntervalError as exc:
-            report["errors"].append(str(exc))
+            report["errors"].append(describe_interval(exc.reason))
     if (
         report["average_watts"] is None
         and report["measurement"]

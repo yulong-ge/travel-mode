@@ -138,7 +138,14 @@ class TravelApp(Workflow, Lifecycle, Dispatch, Capabilities, App):
     def report_action_error(self, error, action=None):
         from travel_mode import failures
         from travel_mode.state import StateError
+        from travel_mode.system.battery import IntervalError, describe_interval
         from travel_mode.system.shell import ReadError, SudoReadError
+
+        if isinstance(error, IntervalError):
+            message = describe_interval(error.reason)
+            self.logline("warn", message)
+            self.notify(message, severity="warning")
+            return
 
         expected = isinstance(error, (failures.CommandError, ReadError, SudoReadError, PermissionError))
 
@@ -408,12 +415,15 @@ class TravelApp(Workflow, Lifecycle, Dispatch, Capabilities, App):
 
     @work(exclusive=True, group="battery")
     async def refresh_battery(self):
+        from datetime import datetime
+
         from textual.worker import get_current_worker
 
         from travel_mode.system import battery
         from travel_mode.system.shell import ReadError
 
         generation = self._refresh_generation
+        reading_at = datetime.now().astimezone()
         try:
             reading = await asyncio.to_thread(battery.read)
         except (ReadError, battery.BatteryError) as exc:
@@ -422,7 +432,11 @@ class TravelApp(Workflow, Lifecycle, Dispatch, Capabilities, App):
                 and generation == self._refresh_generation
                 and not self._interface_closing
             ):
-                message = t("measurement.failed", reason=str(exc))
+                message = (
+                    battery.describe_interval(exc.reason)
+                    if isinstance(exc, battery.IntervalError)
+                    else t("measurement.failed", reason=str(exc))
+                )
                 self.main_query_one("#dash-battery", Static).update(escape(message))
                 self.logline("warn", message)
             return
@@ -435,6 +449,7 @@ class TravelApp(Workflow, Lifecycle, Dispatch, Capabilities, App):
             if not self._mutation_lock.locked():
                 self.flush_session_observations()
             self.current_battery = reading
+            self.current_battery_at = reading_at
             self.main_query_one("#dash-battery", Static).update(self.battery_heading(reading))
             self.update_session()
 

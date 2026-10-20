@@ -72,7 +72,7 @@ def failed(error):
     return dict(available=False, reason="failed", error=str(error), samples=0)
 
 
-def measure(settings=None, *, clock=None, progress=None, cancelled=None, first=None, source_checked=False):
+def measure(settings=None, *, clock=None, progress=None, cancelled=None, source_checked=False):
     settings, clock = settings or Settings(), clock or Clock()
     validate_settings(settings)
     if cancelled is not None and cancelled.is_set():
@@ -106,7 +106,9 @@ def measure(settings=None, *, clock=None, progress=None, cancelled=None, first=N
         remaining = settings.seconds - (clock.monotonic() - started)
         if remaining <= 0:
             return unavailable("insufficient_samples")
-        reading = first if polls == 0 and first is not None else battery.read(timeout=min(10, remaining))
+        # Each window acquires its own initial snapshot. A cached pre-action
+        # reading must not make pre-action telemetry count as a fresh baseline.
+        reading = battery.read(timeout=min(10, remaining))
         polls += 1
         now = clock.monotonic()
         if not reading["available"]:
@@ -116,7 +118,7 @@ def measure(settings=None, *, clock=None, progress=None, cancelled=None, first=N
             return unavailable("missing_update_marker")
         if previous is None:
             # This first registry snapshot may predate the window/action. Wait
-            # for a genuine update before accepting a baseline, then two intervals.
+            # for a genuine update before accepting a baseline, then an interval.
             previous, previous_at = reading, now
         else:
             try:
