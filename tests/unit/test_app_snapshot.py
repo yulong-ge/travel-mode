@@ -112,3 +112,24 @@ def test_extra_app_search_directories_reject_invalid_entries(value, monkeypatch)
     monkeypatch.setenv("TRAVEL_MODE_APP_DIRS", value)
     with pytest.raises(ValueError, match="TRAVEL_MODE_APP_DIRS"):
         app_directories()
+
+
+async def test_tui_snapshot_honors_extra_app_dirs(monkeypatch, tmp_path):
+    from travel_mode.system.app_snapshot import AppSnapshot
+    from travel_mode.tui.app import TravelApp
+
+    extra = str(tmp_path / "extra")
+    monkeypatch.setenv("TRAVEL_MODE_APP_DIRS", extra)
+    observed = []
+    capture = AppSnapshot.capture
+
+    def record(directories):
+        observed.append(directories)
+        return capture(directories)
+
+    monkeypatch.setattr(AppSnapshot, "capture", record)
+    app = TravelApp(scenario="away")
+    async with app.run_test() as pilot:
+        await app.wait_for_idle()
+        await pilot.pause()
+    assert observed and all(extra in dirs for dirs in observed)

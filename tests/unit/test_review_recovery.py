@@ -1,8 +1,10 @@
 """Safety regressions use command doubles and isolated state only."""
 
+import io
 import json
 import plistlib
 import shutil
+import sys
 
 import pytest
 
@@ -14,6 +16,7 @@ import travel_mode.state as state_api
 from travel_mode import config as config_module
 from travel_mode import state
 from travel_mode.config import load_config
+from travel_mode.state import StateError, load_state
 from travel_mode.system import apps as system_apps
 from travel_mode.system import brightness, daemon_apps, launchd, network, pmset, processes, spotlight
 from travel_mode.system.shell import CmdResult
@@ -338,3 +341,27 @@ def test_configured_daemon_helper_handles_all_network_specs(monkeypatch):
     assert called == ["First", "Second", "Third"]
     assert not ok
     assert all(spec.name in message for spec in specs)
+
+
+def test_nonempty_unparseable_state_is_an_error(tmp_path):
+    path = tmp_path / "state.json"
+    path.write_text("not a state file\n", encoding="utf-8")
+    with pytest.raises(StateError, match="状态文件损坏"):
+        load_state(path)
+
+
+def test_higher_state_version_is_rejected(tmp_path):
+    path = tmp_path / "state.json"
+    path.write_text('{"version": 999}\n', encoding="utf-8")
+    with pytest.raises(StateError, match="未知更高版本"):
+        load_state(path)
+
+
+def test_noninteractive_off_without_snapshot_does_not_restoredefaults(monkeypatch):
+    commands = []
+    monkeypatch.setattr(snapshots, "load_state", lambda: None)
+    monkeypatch.setattr(sys, "stdin", io.StringIO(""))
+    monkeypatch.setattr(sys, "stdout", io.StringIO())
+    monkeypatch.setattr(flow_restore, "run_rc", lambda *args, **kwargs: commands.append(args) or ("", 0))
+    assert flow_restore.mode_off() == 1
+    assert not any("restoredefaults" in command for args in commands for command in args[0])

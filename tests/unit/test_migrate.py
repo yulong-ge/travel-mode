@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+from travel_mode import config
 from travel_mode.config import load_config, migrate_legacy
 from travel_mode.paths import config_path, legacy_conf_path, legacy_state_path, state_path
 from travel_mode.state import load_state
@@ -85,3 +86,20 @@ def test_when_both_old_and_new_exist_migration_does_not_overwrite(tmp_path, monk
     assert not old_state.with_name(old_state.name + ".migrated").exists()
     assert sum("新配置已存在" in message for message in messages) == 1
     assert sum("新状态已存在" in message for message in messages) == 1
+
+
+def test_load_conf_group_single_default_and_comments(tmp_path, monkeypatch):
+    path = tmp_path / "travel-mode.conf"
+    path.write_text("""# comment\nfreeze: Alpha|Beta\nAlpha=quit\ndefault: ask\nblank = invalid\n""")
+    monkeypatch.setattr(config, "CONF_PATH", path)
+    actions, default = config.load_conf()
+    assert actions == {"Alpha": "quit", "Beta": "freeze"}
+    assert default == "ask"
+
+
+def test_ensure_conf_writes_default(tmp_path, monkeypatch):
+    path = tmp_path / "travel-mode.conf"
+    monkeypatch.setattr(config, "CONF_PATH", path)
+    assert config.ensure_conf() is True
+    assert path.exists()
+    assert config.ensure_conf() is False

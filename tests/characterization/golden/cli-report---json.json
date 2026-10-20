@@ -16,8 +16,6 @@
       "log"
     ]
   ],
-  "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
   "exit_code": 0,
-  "output": "{\"version\": \"1.1.0\", \"sleep_segments\": [{\"start\": \"2026-10-14 21:00:00\", \"end\": \"2026-10-15 07:00:00\", \"start_charge\": 90, \"end_charge\": 85, \"drain\": 5}], \"darkwake_reasons\": {\"RTC\": 1}}\n",
   "state": null
 }

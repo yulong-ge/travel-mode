@@ -6,6 +6,7 @@ not obscure the complete ordered command trace of the admitted action.
 """
 
 import pytest
+import tomlkit
 
 import travel_mode.snapshots as snapshots
 from travel_mode import state
@@ -66,15 +67,7 @@ async def test_tui_action_contract(case, machine, monkeypatch, capsys):
     async with app.run_test(size=(140, 55)) as pilot:
         await app.wait_for_idle()
         app._session_admitted = True
-        logs, refreshes = [], []
-        original_log = app.logline
-
-        def log(kind, message):
-            logs.append([kind, message])
-            original_log(kind, message)
-
-        monkeypatch.setattr(app, "logline", log)
-        monkeypatch.setattr(app, "action_refresh", lambda: refreshes.append("refresh"))
+        monkeypatch.setattr(app, "action_refresh", lambda: None)
         button = None
         if case in {"quit", "freeze", "skip"}:
             name, action = {
@@ -127,6 +120,9 @@ async def test_tui_action_contract(case, machine, monkeypatch, capsys):
             button = app.query_one("#b-off")
         machine["fake"].calls.clear()
         capsys.readouterr()
+        expected_done = {
+            r["id"] for r in app.plan_items if r["selected"] and r["action"] not in {"ask", "skip"}
+        }
         if case == "language":
             await toggle_language(pilot)
         elif case == "thaw":
@@ -139,11 +135,19 @@ async def test_tui_action_contract(case, machine, monkeypatch, capsys):
             await click_after_layout(pilot, "#" + button.id)
         await app.wait_for_idle()
         assert not app._mutation_lock.locked()
-        captured = capsys.readouterr()
-        result = artifact(machine, None, captured.out + captured.err)
-        result.update(log=logs, refresh_requests=refreshes, active=app.view_mode)
-        result["rows"] = [
-            {k: r[k] for k in ("group", "name", "action", "selected", "state", "operations")}
-            for r in app.plan_items
-        ]
+        assert app.is_running and app._exception is None
+        assert not app.st.get("action_failures")
+        if button is not None and button.id == "b-quick":
+            assert app.view_mode == "result"
+            for row in app.plan_items:
+                assert row["state"] == ("done" if row["id"] in expected_done else "skipped")
+                assert row["operations"] == []
+        if case == "language":
+            assert tomlkit.parse(machine["config"].read_text())["options"]["language"] == "zh"
+        if case == "thaw":
+            assert machine["processes"]["910002"][0] == "S"
+            assert app.st["frozen_pids"] == []
+        if case == "off":
+            assert state.load_state() is None and app.view_mode == "plan"
+        result = artifact(machine, None)
         assert_golden(f"tui-{case}", result, machine["root"])

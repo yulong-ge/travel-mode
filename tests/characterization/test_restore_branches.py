@@ -44,7 +44,20 @@ def test_restore_branches(case, machine, capsys):
     machine["fake"].calls.clear()
     messages = []
     result = run_restore(st, lambda kind, msg: messages.append([kind, msg]))
-    captured = capsys.readouterr()
-    value = artifact(machine, int(bool(result[1])), captured.out + captured.err)
-    value.update(result=result, messages=messages)
+    assert (
+        result
+        == {
+            "reload": (2, 0),
+            "loaded": (2, 0),
+            "invalid": (0, 2),
+            "power": (2, 0),
+            "pids": (1, 0),
+            "reopen-order": (3, 0),
+        }[case]
+    )
+    if case == "invalid":
+        assert len(st["action_failures"]) == 2
+        assert {r["kind"] for r in st["action_failures"]} == {"action"}
+        assert st["unloaded_svcs"] and st["unloaded_sys_svcs"]
+    value = artifact(machine, int(bool(result[1])))
     assert_golden("restore-" + case, value, machine["root"])

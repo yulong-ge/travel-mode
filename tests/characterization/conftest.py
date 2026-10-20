@@ -17,6 +17,10 @@ from travel_mode.system import apps as system_apps
 from travel_mode.system import daemon_discovery
 from travel_mode.system.shell import CmdResult, set_runner
 
+from .contracts import canonical_name, load_contract, validate_contract
+
+GOLDEN_DIR = Path(__file__).parent / "golden"
+
 
 class FixedTime(datetime):
     @classmethod
@@ -238,8 +242,9 @@ def assert_golden(name, value, root):
     import os
     import subprocess
 
-    target = Path(__file__).parent / "golden" / f"{name}.json"
-    actual = json.dumps(normalize(value, root), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    target = GOLDEN_DIR / f"{canonical_name(name)}.json"
+    value = validate_contract(normalize(value, root), target)
+    actual = json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if os.environ.get("TRAVEL_MODE_RECORD_INITIAL") == "1" and not target.exists():
         tracked = subprocess.run(
             ["git", "ls-files", "--error-unmatch", str(target)], capture_output=True, check=False
@@ -251,24 +256,22 @@ def assert_golden(name, value, root):
     if not target.exists():
         diagnostic = Path("/tmp/tm-verify/golden-actual")
         diagnostic.mkdir(parents=True, exist_ok=True)
-        (diagnostic / target.name).write_text(actual)
+        (diagnostic / f"{name}.json").write_text(actual)
         raise FileNotFoundError(f"Missing characterization golden: {target}; actual saved to {diagnostic}")
-    expected = target.read_text()
-    if expected != actual:
+    expected = load_contract(target)
+    if expected != value:
         # Diagnostic artifact only; never update an expected golden here.
         diagnostic = Path("/tmp/tm-verify/golden-actual")
         diagnostic.mkdir(parents=True, exist_ok=True)
-        (diagnostic / target.name).write_text(actual)
-    assert expected == actual
+        (diagnostic / f"{name}.json").write_text(actual)
+    assert expected == value
 
 
-def artifact(machine, rc, output):
+def artifact(machine, rc):
     root = machine["root"]
     path = root / "state.json"
     return {
         "commands": machine["fake"].calls,
         "state": json.loads(path.read_text()) if path.exists() else None,
-        "config": machine["config"].read_text() if machine["config"].exists() else None,
         "exit_code": rc,
-        "output": output,
     }

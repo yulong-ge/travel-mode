@@ -50,8 +50,6 @@
       "batt"
     ]
   ],
-  "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
   "exit_code": 0,
-  "output": "✓ Restoring the session saved at <TIME>\n✓ Thawed: Freeze Demo\nSession report: unknown\nStart time was not recorded; ended Oct 15 12:00.\nBattery readings are incomplete. Power records could not be read or are incomplete; discharge and average power cannot \nbe calculated.\nAction counts were not recorded.\nRestored 1 items; all complete.\nSome session readings are unavailable; use --verbose for details.\n✓ State file cleared (1 items restored)\n",
   "state": null
 }

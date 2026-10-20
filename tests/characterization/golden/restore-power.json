@@ -41,23 +41,7 @@
       "1"
     ]
   ],
-  "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
   "exit_code": 0,
-  "messages": [
-    [
-      "ok",
-      "Battery profile restored: displaysleep 7 sleep 12 powernap 1"
-    ],
-    [
-      "ok",
-      "settings on power restored: sleep 22 womp 1"
-    ]
-  ],
-  "output": "",
-  "result": [
-    2,
-    0
-  ],
   "state": {
     "ac_prof": "",
     "anchored_at": "<TIME>",

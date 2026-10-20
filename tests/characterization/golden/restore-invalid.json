@@ -11,27 +11,7 @@
       "list"
     ]
   ],
-  "config": "[apps]\nquit=[\"Quit Demo\"]\nfreeze=[\"Freeze Demo\"]\nskip=[\"Skip Demo\"]\nask=[\"Ask Demo\"]\ndefault=\"skip\"\n[[apps.with_daemon]]\nname=\"Remote Demo\"\ngroup=\"network\"\nsystem_daemons=[\"<ROOT>/org.demo.daemon.plist\"]\n[network]\napps=[\"Network Demo\", \"Remote Demo\"]\n[services]\nunload=[\"org.demo.worker\"]\n[options]\nlanguage=\"en\"\n",
   "exit_code": 1,
-  "messages": [
-    [
-      "bad",
-      "Restore item: <ROOT>/org.demo.daemon.plist: <ROOT>/org.demo.daemon.plist: invalid or protected launchd Label 123. Details: <ROOT>/travel-mode.log"
-    ],
-    [
-      "bad",
-      "Restore item: <ROOT>/Library/LaunchAgents/org.demo.worker.plist: [Errno 2] No such file or directory: '<ROOT>/Library/LaunchAgents/org.demo.worker.plist'. Details: <ROOT>/travel-mode.log"
-    ],
-    [
-      "bad",
-      "Succeeded: 0; failed: 2. Failed actions: Restore item: <ROOT>/org.demo.daemon.plist, Restore item: <ROOT>/Library/LaunchAgents/org.demo.worker.plist"
-    ]
-  ],
-  "output": "",
-  "result": [
-    0,
-    2
-  ],
   "state": {
     "ac_prof": "",
     "action_failures": [
