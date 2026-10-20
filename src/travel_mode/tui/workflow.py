@@ -321,7 +321,7 @@ class Workflow:
                 button.health_descriptor = descriptor
                 widgets.append(
                     EvidenceLine(
-                        Static(t("health_view.caffeinate"), classes="grow"),
+                        Static(escape(row["summary"]), classes="grow"),
                         button,
                         name="caffeinate",
                         evidence=[str(descriptor)],
@@ -495,8 +495,11 @@ class Workflow:
             self.action_refresh()
         elif bid.startswith(("ready-", "b-health-", "b-killcaff-")):
             descriptor = event.button.health_descriptor
-            row = item("health-action", "health", str(event.button.label), "apply", "", descriptor)
-            await self.execute_rows(event.button, [row], measure=False)
+            rows = [
+                item(f"health-action-{index}", "health", str(event.button.label), "apply", "", target)
+                for index, target in enumerate(descriptor.get("targets", [descriptor]))
+            ]
+            await self.execute_rows(event.button, rows, measure=False)
             self._transaction_view = deepcopy(self.st)
             self.action_refresh()
         elif bid.startswith(("retry-", "force-")):

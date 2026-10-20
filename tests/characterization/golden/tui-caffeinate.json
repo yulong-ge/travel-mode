@@ -32,11 +32,11 @@
   "log": [
     [
       "dim",
-      "Executing: Stop caffeinate"
+      "Executing: Stop"
     ],
     [
       "ok",
-      "Stop caffeinate: Completed"
+      "Stop: Completed"
     ]
   ],
   "output": "",

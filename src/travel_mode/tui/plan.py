@@ -13,7 +13,7 @@ def collect(scenario, state):
     from travel_mode.health_view import presentation
     from travel_mode.network_apps import network_scan
     from travel_mode.profiles import active_values
-    from travel_mode.sleep_readiness import evaluate
+    from travel_mode.sleep_readiness import cached, evaluate
     from travel_mode.system import apps, launchd, network, pmset
     from travel_mode.system.app_snapshot import snapshot_scope
     from travel_mode.system.health import collect as health_collect
@@ -48,7 +48,19 @@ def collect(scenario, state):
     )
     assertion_row = next(row for row in health["checks"] if row["id"] == "assertions")
     holders = pmset.sleep_blocking_assertions(assertion_row["evidence"])
-    readiness = evaluate(sd, holders, processes=processes, error=sleep_row["error"] or assertion_row["error"])
+    awake = next(row for row in health["checks"] if row["id"] == "keep_awake")
+    readiness = evaluate(
+        sd,
+        holders,
+        processes=processes,
+        error=sleep_row["error"] or assertion_row["error"],
+        caffeinate=awake.get("subjects", ()),
+        caffeinate_actions=[a for a in awake["actions"] if a["kind"] == "caffeinate"],
+        previous=cached(),
+    )
+    readiness_pids = {
+        member["pid"] for row in readiness["items"] for member in row.get("caffeinate", {}).get("members", [])
+    }
     rows, satisfied = [], {key: [] for key in ("power", "apps", "services", "network")}
     # Scoped structured values survive language changes without a new system read.
     satisfied["power"] = preview["satisfied_settings"]
@@ -232,6 +244,25 @@ def collect(scenario, state):
     for finding in health_rows:
         if finding["id"] in {"sleep_disabled", "assertions"}:
             continue
+        if finding["id"] == "keep_awake" and readiness_pids:
+            # The readiness line owns both the explanation and exact-PID button.
+            import re
+
+            remaining = dict(awake)
+            remaining["actions"] = [
+                a
+                for a in awake["actions"]
+                if a["kind"] != "caffeinate" or a["process"]["pid"] not in readiness_pids
+            ]
+            remaining["subjects"] = [s for s in awake.get("subjects", ()) if s["pid"] not in readiness_pids]
+            remaining["evidence"] = [
+                line
+                for line in awake["evidence"]
+                if not any(int(pid) in readiness_pids for pid in re.findall(r"\bPID\s+(\d+)", line))
+            ]
+            if not remaining["evidence"]:
+                continue
+            finding = presentation({**health, "checks": [remaining]}, scenario=scenario)[0]
         if finding["state"] == "normal":
             normal += 1
             continue

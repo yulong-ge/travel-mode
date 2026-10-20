@@ -330,6 +330,7 @@ class DebugApp(TravelApp):
         Binding("f11", "demo_administrator", "", show=False),
         Binding("f12", "demo_pending_restore", "", show=False),
         Binding("ctrl+o", "demo_report", "", show=False),
+        Binding("ctrl+g", "demo_health_sources", "", show=False),
     ]
     """TravelApp plus layout telemetry for the tmux debug harness."""
 
@@ -562,6 +563,14 @@ class DebugApp(TravelApp):
 
         self.push_screen(AdministratorScreen([(["mdutil", "-i", "on", "/"], t("admin.restore_spotlight"))]))
         self.call_after_refresh(self.write_layout)
+
+    def action_demo_health_sources(self):
+        if getattr(self, "live_readonly", False):
+            return
+        from travel_mode.demo import _configure_health_sources
+
+        _configure_health_sources()
+        self.action_refresh()
 
     def action_demo_report(self):
         if getattr(self, "live_readonly", False):
@@ -799,6 +808,14 @@ def run_group(output: Path, cols: int, rows: int, language: str, args, results: 
             results.append(session.capture("scenario", "scenario"))
             session.keys("1", "Enter")
         session.wait_complete(active="plan")
+        if args.health_sources:
+            session.keys("C-g")
+            session.wait_complete(active="plan")
+            if rows <= 26:
+                session.widget_click("b-suggestions")
+            session.wait_text("Claude Code")
+            results.append(session.capture("health-sources", "plan"))
+            return
         if args.session_report:
             session.keys("C-o")
             from travel_mode.i18n import catalog
@@ -855,6 +872,9 @@ def main() -> int:
     )
     parser.add_argument("--session-report", action="store_true", help="capture the readable session report")
     parser.add_argument(
+        "--health-sources", action="store_true", help="capture observed keep-awake and CPU sources"
+    )
+    parser.add_argument(
         "--all",
         action="store_true",
         help="scenario, plan, result, session and drawer × 2 languages × 3 sizes",
@@ -883,6 +903,8 @@ def main() -> int:
         parser.error("--admin requires demo fixtures")
     if args.session_report and args.live_readonly:
         parser.error("--session-report requires demo fixtures")
+    if args.health_sources and args.live_readonly:
+        parser.error("--health-sources requires demo fixtures")
     if args.demo and args.live_readonly:
         parser.error("--demo and --live-readonly are mutually exclusive")
     if args.child:

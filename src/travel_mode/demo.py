@@ -245,3 +245,51 @@ def _configure_demo_views() -> None:
         "unmatched": [{"item": "demo-backup"}],
         "time_machine": {"running": False, "available": True},
     }
+
+
+def _configure_health_sources():
+    """Two finite synthetic observations establish a repeated launcher for screenshots."""
+    from .sleep_readiness import from_report, store
+    from .system.health import PROCESS_COMMAND, collect
+    from .system.shell import CmdResult, get_runner, set_runner
+
+    previous = get_runner()
+
+    class Sources:
+        child = 900100
+
+        def __call__(self, command, timeout=None, interactive=False):
+            if command == PROCESS_COMMAND:
+                rows = [
+                    (900000, 1, 0, "/System/Library/CoreServices/loginwindow"),
+                    (self.child, 900101, 0, "/usr/bin/caffeinate"),
+                    (900101, 1, 0, "/opt/demo/bin/claude"),
+                    (900200, 1, 85, "/opt/demo/bin/render-worker"),
+                    (900201, 1, 65, "/opt/demo/bin/sync-worker"),
+                    (900202, 1, 55, "/opt/demo/bin/build-worker"),
+                ]
+                return CmdResult(
+                    "\n".join(
+                        f"{pid} {ppid} {os.getuid()} S {cpu} Thu Oct 15 12:00:00 2026 {exe}"
+                        for pid, ppid, cpu, exe in rows
+                    ),
+                    "",
+                    0,
+                )
+            if command == ["pmset", "-g"]:
+                return CmdResult("SleepDisabled 0\nlowpowermode 1", "", 0)
+            if command == ["pmset", "-g", "assertions"]:
+                return CmdResult(
+                    "Assertion status system-wide:\n"
+                    f'pid {self.child}(caffeinate): 00:03:00 PreventUserIdleSystemSleep named: "task"',
+                    "",
+                    0,
+                )
+            if command == ["ps", "-ww", "-p", str(self.child), "-o", "command="]:
+                return CmdResult("/usr/bin/caffeinate -i -t 300", "", 0)
+            return previous(command, timeout, interactive)
+
+    source = Sources()
+    set_runner(source)
+    store(from_report(collect(clock=lambda: 0)))
+    source.child = 900105

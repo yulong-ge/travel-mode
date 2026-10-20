@@ -63,6 +63,26 @@ class LocalBackend:
         self.children = []
 
     def __call__(self, cmd, timeout=None, interactive=False):
+        if cmd[:1] == ["swiftc"]:
+            # GuardRunner has already matched this exact source/output pair.
+            # File sinks preserve compiler diagnostics even if the parent is interrupted.
+            from travel_mode.system.shell import resolve_command
+
+            root = Path(cmd[3]).parent
+            outputs = [root / "refusing-build.stdout", root / "refusing-build.stderr"]
+            with outputs[0].open("w") as stdout, outputs[1].open("w") as stderr:
+                for path in outputs:
+                    path.chmod(0o600)
+                try:
+                    result = subprocess.run(
+                        resolve_command(cmd), stdout=stdout, stderr=stderr, timeout=timeout, check=False
+                    )
+                    rc = result.returncode
+                except subprocess.TimeoutExpired:
+                    rc = 124
+            return CmdResult(
+                outputs[0].read_text(errors="replace"), outputs[1].read_text(errors="replace"), rc
+            )
         if len(cmd) == 1 and cmd[0] in self.executables:
             child = subprocess.Popen(
                 cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
@@ -302,6 +322,9 @@ class GuardRunner:
         started = time.monotonic()
         try:
             result = self.backend(cmd, timeout, interactive)
+        except BaseException as error:
+            event["error"] = f"{type(error).__name__}: {error}"
+            raise
         finally:
             event["seconds"] = time.monotonic() - started
         event.update(rc=result.rc, stdout_bytes=len(result.stdout.encode()), stderr=result.stderr)

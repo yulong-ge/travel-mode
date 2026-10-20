@@ -2,6 +2,10 @@
 
 import plistlib
 
+from harness_evidence import write_json
+
+COMPILE_TIMEOUT = 120
+
 IDENTIFIER = "com.example.travelmode-e2e.refusing"
 SOURCE = """import AppKit
 final class RefusingDelegate: NSObject, NSApplicationDelegate {
@@ -37,7 +41,7 @@ def compile_command(root):
     ]
 
 
-def create(root, runner):
+def create(root, runner, *, evidence=None):
     app = runner.refusing
     (app / "Contents/MacOS").mkdir(parents=True)
     (root / "Refusing.swift").write_text(SOURCE)
@@ -52,9 +56,25 @@ def create(root, runner):
             )
         )
     )
-    result = runner(compile_command(root), timeout=120)
-    if result.rc:
-        raise RuntimeError(f"Refusing fixture compilation failed: {result}")
-    result = runner(["codesign", "--force", "--sign", "-", str(app)], timeout=30)
-    if result.rc:
-        raise RuntimeError(f"Refusing fixture signing failed: {result}")
+    path = (evidence or root) / "refusing-build.json"
+    stages = []
+    for name, command, timeout in (
+        ("compilation", compile_command(root), COMPILE_TIMEOUT),
+        ("signing", ["codesign", "--force", "--sign", "-", str(app)], 30),
+    ):
+        row = dict(stage=name, command=command, timeout=timeout, status="running")
+        stages.append(row)
+        write_json(path, {"stages": stages})
+        try:
+            result = runner(command, timeout=timeout)
+        except BaseException as error:
+            row.update(status="interrupted", error=f"{type(error).__name__}: {error}")
+            for key in ("stdout", "stderr"):
+                output = root / ("refusing-build." + key)
+                row[key] = output.read_text(errors="replace") if output.exists() else None
+            write_json(path, {"stages": stages})
+            raise
+        row.update(status="complete", rc=result.rc, stdout=result.stdout, stderr=result.stderr)
+        write_json(path, {"stages": stages})
+        if result.rc:
+            raise RuntimeError(f"Refusing fixture {name} failed: {result}")

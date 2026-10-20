@@ -205,8 +205,11 @@ def test_evidence_error_still_interrupts_child_and_closes_session(tmp_path, monk
             self.root = evidence
             self.captures = []
 
+        def wait_fixture_setup(self):
+            pass
+
         def shot(self, name):
-            assert name == "failure"
+            assert name in {"failure", "failure-after-cleanup"}
 
         def tmux(self, *command):
             assert command == ("send-keys", "C-c")

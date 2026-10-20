@@ -164,7 +164,7 @@ def test_cli_confirms_each_holder_and_yes_requires_aggressive(
         assert "PID 101" in prompts[0] and "PID 102" in prompts[1]
 
 
-async def test_tui_has_one_button_per_holder_and_terminates_only_selected(fake_runner, monkeypatch):
+async def test_tui_one_source_button_terminates_only_verified_holders(fake_runner, monkeypatch):
     from textual.widgets import Button
 
     two_assertion_holders(fake_runner)
@@ -174,13 +174,18 @@ async def test_tui_has_one_button_per_holder_and_terminates_only_selected(fake_r
         from tui_interaction import click_after_layout
 
         await click_after_layout(pilot, "#b-suggestions")
-        assert {b.id for b in app.query("Button") if b.id and b.id.startswith("b-killcaff-")} == {
-            "b-killcaff-101",
-            "b-killcaff-102",
-        }
+        buttons = [
+            b for b in app.query(Button) if getattr(b, "health_descriptor", {}).get("kind") == "caffeinate"
+        ]
+        assert len(buttons) == 1
+        assert {d["process"]["pid"] for d in buttons[0].health_descriptor["targets"]} == {101, 102}
         monkeypatch.setattr(app, "action_refresh", lambda: None)
-        await app.on_button_pressed(Button.Pressed(app.query_one("#b-killcaff-102")))
-        assert [c for c in fake_runner.calls if c[0] == "kill"] == [("kill", "-TERM", "102")]
+        await app.on_button_pressed(Button.Pressed(buttons[0]))
+        await app.wait_for_idle()
+        assert [c for c in fake_runner.calls if c[0] == "kill"] == [
+            ("kill", "-TERM", "101"),
+            ("kill", "-TERM", "102"),
+        ]
 
 
 def test_caffeinate_assertion_released_before_confirmation_refuses_signal(fake_runner):

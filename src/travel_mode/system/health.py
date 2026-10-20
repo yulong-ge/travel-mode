@@ -82,6 +82,7 @@ class Session:
         self.deadline = self.started + BUDGET
         self.check_deadline = self.deadline
         self.cache = {}
+        self.subjects = {}
 
     def read(self, command):
         remaining = min(self.deadline, self.check_deadline) - self.clock()
@@ -170,7 +171,8 @@ def keep_awake(s):
     rows = s.processes()
     by_pid = {r["pid"]: r for r in rows}
     evidence, actions = [], []
-    s.assertions()  # Validate the shared observation before admitting any PID action.
+    holders = s.assertions()  # Validate before admitting any PID action.
+    subjects = s.subjects.setdefault("keep_awake", [])
     owners = {
         int(match[1])
         for line in s.read(["pmset", "-g", "assertions"]).splitlines()
@@ -189,6 +191,9 @@ def keep_awake(s):
             parent = by_pid.get(row["ppid"])
             parent_executable = parent["executable"] if parent else t("caffeinate.parent_exited")
             evidence.append(f"PID {row['pid']}: {command}; PPID {row['ppid']}: {parent_executable}")
+            from ..caffeinate_view import provenance
+
+            subjects.append(provenance(row, by_pid, command, holders))
             if row["pid"] in owners and row["uid"] == os.getuid():
                 actions.append(
                     dict(
@@ -216,8 +221,13 @@ def assertions(s):
         row = rows.get(int(holder["pid"]))
         if holder["process"] in SYSTEM_OWNERS:
             continue
-        if row and row["executable"].startswith(SYSTEM_ROOTS):
-            # caffeinate is covered separately with its exact PID action.
+        if (
+            row
+            and row["executable"].startswith(SYSTEM_ROOTS)
+            and Path(row["executable"]).name != "caffeinate"
+        ):
+            # Preserve caffeinate assertions for readiness; its action is owned
+            # by keep_awake and presentation deduplicates the shared PID.
             continue
         evidence.append(holder["line"])
         action = s.app_action(row) if row else None
@@ -327,6 +337,7 @@ def high_cpu(s):
         cursor = by_pid[cursor]["ppid"]
         own.add(cursor)
     evidence, actions, seen = [], [], set()
+    subjects = s.subjects.setdefault("high_cpu", [])
     for row in sorted(rows, key=lambda r: r["cpu"], reverse=True):
         path = app_path(row["executable"])
         if (
@@ -343,6 +354,15 @@ def high_cpu(s):
         rule = identify(name=Path(path).stem if path else "", executable=row["executable"])
         category = rule["category"] if rule else t("health.uncategorized")
         evidence.append(f"PID {row['pid']}: {row['executable']}, %CPU={row['cpu']:g} ({category})")
+        subjects.append(
+            dict(
+                name=Path(path).stem if path else Path(row["executable"]).name,
+                pid=row["pid"],
+                cpu=row["cpu"],
+                executable=row["executable"],
+                category=category,
+            )
+        )
         action = s.app_action(row, "quit" if rule and rule["action"] == "quit" else "freeze")
         if action and action["path"] not in seen:
             seen.add(action["path"])
@@ -399,6 +419,8 @@ def collect(config=None, *, clock=None):
 
             record(None, row["title"], str(exc), kind="observation", store=False)
         row["elapsed_seconds"] = round(clock() - started, 4)
+        if key in s.subjects:
+            row["subjects"] = s.subjects[key]
         checks.append(row)
     result = dict(
         checks=checks,

@@ -35,6 +35,8 @@ from travel_mode.cli import main as product_main
 from travel_mode.i18n import set_language, t
 from travel_mode.system import apps, brightness, pmset, processes
 
+SETUP_TIMEOUT = 240  # Cold Swift compilation (120 s), signing (30 s), launch and TCC probes.
+
 
 def wait_for(predicate, message, timeout=30):
     deadline = time.monotonic() + timeout
@@ -102,8 +104,9 @@ class InteractiveHarness(Harness):
             if command_path("swiftc") is None:
                 self.skip("refusing-quit", "swiftc is unavailable; refusing fixture cannot be built")
             else:
-                e2e_refusal.create(self.root, self.runner)
+                e2e_refusal.create(self.root, self.runner, evidence=getattr(self, "evidence", self.root))
                 self.command(["open", "-g", "-j", str(self.runner.refusing)])
+                self.refusing_registered = True
                 self.wait(lambda: apps.app_running(str(self.runner.refusing)), "Refusing fixture started")
                 self.runner.observe()
                 result = self.runner(e2e_refusal.QUIT_EVENT, timeout=10)
@@ -444,6 +447,7 @@ def child(args):
     )
     harness.scenario = args.scenario
     harness.battery_measure = args.battery_measure
+    harness.evidence = args.evidence
     report = {
         "mode": "demo" if args.demo else "real",
         "interface": args.child,
@@ -466,6 +470,7 @@ def child(args):
                         sessions, "utc_now", lambda: (baseline + timedelta(seconds=clock.now)).isoformat()
                     )
                 )
+            primary_error = None
             try:
                 preflight(root, harness.state_file, harness.real_state)
                 set_language("en")
@@ -531,10 +536,20 @@ def child(args):
                 harness.assert_off()
                 if not args.battery_measure:
                     harness.brightness()
+            except BaseException as error:
+                primary_error = error
+                report["primary_error"] = f"{type(error).__name__}: {error}"
+                raise
             finally:
                 # Keep private failure/session evidence before fixture cleanup
                 # removes its isolated state directory. Never read host state.
-                for name in ("travel-mode.log", "travel-mode.log.1", "history.jsonl"):
+                for name in (
+                    "travel-mode.log",
+                    "travel-mode.log.1",
+                    "history.jsonl",
+                    "refusing-build.stdout",
+                    "refusing-build.stderr",
+                ):
                     source = root / name
                     if source.is_file():
                         target = evidence / name
@@ -547,7 +562,13 @@ def child(args):
                     report["session"] = getattr(harness, "session_report", None)
                     report["full_run_power_coverage"] = getattr(harness, "battery_coverage", None)
                     print("BATTERY DIAGNOSTICS: " + json.dumps(report["battery_measurement"]), flush=True)
-                harness.cleanup()
+                try:
+                    harness.cleanup()
+                except BaseException as error:
+                    report["cleanup_error"] = f"{type(error).__name__}: {error}"
+                    if primary_error is None:
+                        raise
+                    print(f"CLEANUP ALSO FAILED: {error}", file=sys.stderr, flush=True)
         report["status"] = "PASS"
     except BaseException as error:
         report["error"] = f"{type(error).__name__}: {error}"
@@ -619,8 +640,25 @@ class UISession(Session):
         plain = self.tmux("capture-pane", "-p")
         ansi = self.tmux("capture-pane", "-p", "-e")
         write_text(self.root / (name + ".txt"), plain)
+        write_text(self.root / (name + ".ansi"), ansi)
+        if name.startswith("failure"):
+            # Include scrollback, not only the last screen, before interrupting the child.
+            write_text(self.root / (name + "-terminal.txt"), self.tmux("capture-pane", "-p", "-S", "-"))
+            write_text(
+                self.root / (name + "-terminal.ansi"), self.tmux("capture-pane", "-p", "-e", "-S", "-")
+            )
         render(ansi, self.root / (name + ".png"), self.cols, self.rows)
         self.captures.append({"step": name, "screenshot": str(self.root / (name + ".png"))})
+
+    def wait_fixture_setup(self):
+        def ready():
+            result = self.root / "result.json"
+            if result.exists():
+                report = read_json(result, required={"status": str})
+                raise AssertionError(f"Fixture setup failed: {report.get('error', report['status'])}")
+            return (self.root / "capabilities.json").exists()
+
+        return wait_for(ready, "Fixture setup did not complete; inspect refusing-build.json", SETUP_TIMEOUT)
 
     def prompt(self, event):
         wanted = " ".join(event["prompt"].split())
@@ -845,6 +883,14 @@ def main(argv=None):
             "local ForceQuitApp covers shell fixture."
         )
         print("Refusing fixture: compile fixed AppKit .terminateCancel source in the temporary root using:")
+        print(
+            f"Fixture setup has a separate {SETUP_TIMEOUT} s deadline; "
+            f"cold compilation allows {e2e_refusal.COMPILE_TIMEOUT} s."
+        )
+        print(
+            "Build stdout/stderr and full failure-terminal scrollback are retained; "
+            "primary and cleanup errors are reported separately."
+        )
         plan_root = Path("/tmp/travel-mode-e2e-PLAN")
         print(shlex.join(e2e_refusal.compile_command(plan_root)))
         print(shlex.join(e2e_refusal.QUIT_EVENT))
@@ -886,18 +932,25 @@ def main(argv=None):
             demo_vm=args.demo_vm,
         )
         try:
+            session.wait_fixture_setup()
             driver(session)
-        except (RuntimeError, TimeoutError, AssertionError, OSError, EvidenceError):
+        except (RuntimeError, TimeoutError, AssertionError, OSError, EvidenceError) as primary:
+            write_json(evidence / "driver-error.json", {"error": f"{type(primary).__name__}: {primary}"})
             session.shot("failure")
             if not (evidence / "result.json").exists():
                 if interface == "tui":
                     session.keys("Escape")
                 session.tmux("send-keys", "q" if interface == "tui" else "C-c")
-                wait_for(
-                    lambda evidence=evidence: (evidence / "result.json").exists(),
-                    "Interrupted child did not finish fixture cleanup",
-                    session.timeout,
-                )
+                try:
+                    wait_for(
+                        lambda evidence=evidence: (evidence / "result.json").exists(),
+                        "Interrupted child did not finish fixture cleanup",
+                        session.timeout,
+                    )
+                except (RuntimeError, TimeoutError) as cleanup:
+                    write_json(evidence / "driver-cleanup-error.json", {"error": str(cleanup)})
+                    print(f"CLEANUP ALSO FAILED: {cleanup}", file=sys.stderr)
+            session.shot("failure-after-cleanup")
             raise
         finally:
             rows.extend(session.captures)

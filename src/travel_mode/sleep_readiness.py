@@ -22,7 +22,16 @@ def validate(value):
         raise ValueError("sleep_readiness: invalid items")
 
 
-def evaluate(sleep_disabled, holders=(), *, processes=(), error=None):
+def evaluate(
+    sleep_disabled,
+    holders=(),
+    *,
+    processes=(),
+    error=None,
+    caffeinate=(),
+    caffeinate_actions=(),
+    previous=None,
+):
     from .failures import log_path
     from .sessions import utc_now
     from .system.health import SYSTEM_OWNERS
@@ -52,8 +61,39 @@ def evaluate(sleep_disabled, holders=(), *, processes=(), error=None):
                 source=t("redesign.remote_source", name="UURemote"),
             )
         items.append(dict(level="red", message=message, action=dict(kind="sleep")))
+    from .caffeinate_view import describe, groups
+
+    caff_holders = [h for h in holders if h["process"] == "caffeinate" and h.get("pid")]
+    subjects = list(caffeinate)
+    for holder in caff_holders:
+        if not any(str(row["pid"]) == holder["pid"] for row in subjects):
+            subjects.append(dict(pid=int(holder["pid"]), started=None, source=None, remaining_seconds=None))
+    prior = [
+        member
+        for item in (previous or {}).get("items", [])
+        for member in item.get("caffeinate", {}).get("members", [])
+    ]
+    for group in groups(subjects, prior):
+        members = {str(m["pid"]) for m in group["members"]}
+        owned = [h for h in caff_holders if h["pid"] in members]
+        if not owned:
+            continue
+        system = any(h["scope"] == "system" for h in owned)
+        actions = [a for a in caffeinate_actions if str(a["process"]["pid"]) in members]
+        action = dict(actions[0], targets=actions) if len(actions) > 1 else actions[0] if actions else None
+        items.append(
+            dict(
+                level="red" if system else "amber",
+                message=describe(group, "system" if system else "idle"),
+                action=action,
+                holder=dict(owned[0]),
+                caffeinate=group,
+            )
+        )
     for holder in holders:
         if not holder.get("pid") or holder["process"] in SYSTEM_OWNERS:
+            continue
+        if holder["process"] == "caffeinate":
             continue
         system = holder["scope"] == "system"
         items.append(
@@ -86,11 +126,17 @@ def from_report(report):
 
     sleep = next(row for row in report["checks"] if row["id"] == "sleep_disabled")
     assertions = next(row for row in report["checks"] if row["id"] == "assertions")
+    keep_awake = next((row for row in report["checks"] if row["id"] == "keep_awake"), {})
     value = (
         None if sleep["status"] in {"unknown", "unavailable"} else "1" if sleep["status"] == "hit" else "0"
     )
     return evaluate(
-        value, sleep_blocking_assertions(assertions["evidence"]), error=sleep["error"] or assertions["error"]
+        value,
+        sleep_blocking_assertions(assertions["evidence"]),
+        error=sleep["error"] or assertions["error"],
+        caffeinate=keep_awake.get("subjects", ()),
+        caffeinate_actions=[a for a in keep_awake.get("actions", ()) if a["kind"] == "caffeinate"],
+        previous=cached(),
     )
 
 

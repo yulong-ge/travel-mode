@@ -252,6 +252,15 @@ async def test_tui_refresh_recompose_batch_uses_original_rows(action_ui, fake_ru
         assert replacement["descriptor"]["path"] == "/Replacement.app" and replacement["state"] == "planned"
 
 
+def caffeinate_button(app, pid):
+    return next(
+        button
+        for button in app.query(Button)
+        if getattr(button, "health_descriptor", {}).get("kind") == "caffeinate"
+        and button.health_descriptor["process"]["pid"] == pid
+    )
+
+
 async def test_tui_double_click_admits_one_mutation(action_ui, fake_runner):
     command = ("kill", "-TERM", "777")
     fake_runner.responses[command] = CmdResult("", "", 0)
@@ -263,7 +272,7 @@ async def test_tui_double_click_admits_one_mutation(action_ui, fake_runner):
         from tui_interaction import click_after_layout
 
         await click_after_layout(pilot, "#b-suggestions")
-        click = asyncio.create_task(pilot.click("#b-killcaff-777", times=2))
+        click = asyncio.create_task(pilot.click(caffeinate_button(app, 777), times=2))
         try:
             await entered(blocker)
             # Both physical clicks are posted by Pilot before it waits for idle.
@@ -283,7 +292,7 @@ async def test_tui_queued_duplicate_button_messages_are_rejected(action_ui, fake
         from tui_interaction import click_after_layout
 
         await click_after_layout(pilot, "#b-suggestions")
-        button = app.query_one("#b-killcaff-777", Button)
+        button = caffeinate_button(app, 777)
         button.press().press()
         await settled(app, pilot)
         assert fake_runner.calls.count(command) == 1
@@ -325,7 +334,7 @@ async def test_tui_caffeinate_failure_never_logs_success(action_ui, fake_runner)
         await click_after_layout(pilot, "#b-suggestions")
         messages = []
         app.logline = lambda *args: messages.append(args)
-        await app._dispatch_button(Button.Pressed(app.query_one("#b-killcaff-777")))
+        await app._dispatch_button(Button.Pressed(caffeinate_button(app, 777)))
         assert app.is_running and app._exception is None
         assert any("denied" in text and "travel-mode.log" in text for _, text in messages)
         assert not any(kind == "ok" for kind, _ in messages)

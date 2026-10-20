@@ -404,6 +404,7 @@ class Harness:
         self.graceful_attempted = True
         create_graceful(self.root, self.runner)
         self.command(["open", "-g", "-j", str(self.runner.graceful)])
+        self.graceful_registered = True
         self.wait(lambda: apps.app_running(str(self.runner.graceful)), "Background applet started")
         self.runner.observe()
         st = state.new_state()
@@ -705,9 +706,9 @@ class Harness:
                     self.pause(1)
 
         def unregister():
-            if self.graceful_attempted and self.runner.graceful.exists():
+            if getattr(self, "graceful_registered", False) and self.runner.graceful.exists():
                 self.command([LSREGISTER, "-u", str(self.runner.graceful)])
-            if self.runner.refusing.exists():
+            if getattr(self, "refusing_registered", False) and self.runner.refusing.exists():
                 self.command([LSREGISTER, "-u", str(self.runner.refusing)])
 
         # LIFO callbacks guarantee independent cleanup even for unexpected exception

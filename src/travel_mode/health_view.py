@@ -179,7 +179,37 @@ def presentation(report, *, scenario="away", session_seconds=None):
                 value=round(float(m[1]) * 100),
                 threshold=round(float(m[2]) * 100),
             )
-        elif key in {"keep_awake", "high_cpu"}:
+        elif key == "high_cpu":
+            subjects = row.get("subjects", [])
+            if not subjects:
+                # Older reports retain enough text to identify non-bundle commands.
+                subjects = []
+                from pathlib import Path
+
+                for line in row["evidence"]:
+                    match = re.search(r"PID \d+: (.+), %CPU=([\d.]+)", line)
+                    if match:
+                        app = re.search(r"([^/]+)\.app/", match[1])
+                        subjects.append(
+                            dict(name=app[1] if app else Path(match[1]).name, cpu=float(match[2]))
+                        )
+            names = [
+                t("health_view.cpu_process", name=s["name"] or t("health_view.unknown_process"), cpu=s["cpu"])
+                for s in subjects[:3]
+            ]
+            if not names:
+                names = [a["name"] for a in row["actions"] if a.get("name")]
+            conclusion = t(
+                "health_view.high_cpu_found" if status == "hit" else "health_view.high_cpu_clear",
+                names=t("admin.separator").join(names[:3]) or t("health_view.unknown_process"),
+            )
+        elif key == "keep_awake" and row.get("subjects"):
+            from .caffeinate_view import describe, groups
+
+            messages = [describe(group, group.get("scope") or "running") for group in groups(row["subjects"])]
+            conclusion = messages[0]
+            details.extend(messages[1:])
+        elif key == "keep_awake":
             names = list(dict.fromkeys(a["name"] for a in row["actions"] if a.get("name")))
             for line in row["evidence"]:
                 app = re.search(r"([^/]+)\.app/", line)
