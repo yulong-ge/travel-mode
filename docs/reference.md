@@ -270,6 +270,18 @@ and one pmset reading; nothing is sampled in between.
   within the session; partial segments are not extrapolated.
 - Action counts are top-level actions; restore counts accumulate across retries.
 
+The printed report uses local time, a readable duration and battery percentages, for example
+"10 月 17 日 16:26 – 10 月 20 日 09:01（2 天 16 小时 34 分）". Failures that a later retry fixed
+are listed as "failed, recovered after retry" rather than as failures. `off --verbose` and
+`history --verbose` add commands, exit codes, capacities in mAh and raw reasons; the JSON fields
+are unchanged. Older records that only stored a timeout are shown as "the first attempt did not
+complete".
+
+Power source for a session: the start and end observations plus the power-source events in the
+retained pmset log. macOS writes those events only when something changes, so a session with no
+events in its interval and battery at both ends counts as battery only; an AC event or an AC
+observation marks it as having been on AC; an unreadable log makes it unknown.
+
 Reports are appended to `history.jsonl` next to the state file (`[history] retain = 50`).
 `history` compares the current report with earlier ones of the same scenario, scope and power
 source; `difference_watts` in JSON is positive when power was lower. Reports contain local app and

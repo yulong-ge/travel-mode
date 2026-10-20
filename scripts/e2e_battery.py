@@ -108,12 +108,18 @@ def assert_report(report):
         raise AssertionError("Telemetry hardware must provide a whole-session accumulator mean.")
 
 
-def assert_battery_interval(started, ended):
+def assert_battery_interval(started, ended, *, start_observation=None, end_observation=None):
     from travel_mode.sessions import log_window
 
     # A session starts at its first Action, after the first measurement. Check
     # setup and that window too, including AC intervals between samples.
-    _, coverage = log_window(_read(["pmset", "-g", "log"], timeout=5), started, ended)
+    _, coverage = log_window(
+        _read(["pmset", "-g", "log"], timeout=5),
+        started,
+        ended,
+        start_observation=start_observation,
+        end_observation=end_observation,
+    )
     if coverage != "battery_only":
         raise AssertionError(f"Invalid battery run: full-run power coverage={coverage}.")
     return coverage

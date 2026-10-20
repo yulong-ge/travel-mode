@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "id": "report-wording-fixture",
+  "scenario": "work",
+  "started_at": "2026-10-17T08:26:50+00:00",
+  "ended_at": "2026-10-20T01:01:08+00:00",
+  "duration_seconds": 232458.0,
+  "start": {
+    "at": "2026-10-17T08:26:50+00:00",
+    "external": false,
+    "charging": false,
+    "percent": 100,
+    "remaining_mah": 4687,
+    "voltage_mv": 12000,
+    "errors": []
+  },
+  "end": {
+    "at": "2026-10-20T01:01:08+00:00",
+    "external": false,
+    "charging": false,
+    "percent": 100,
+    "remaining_mah": 4853,
+    "voltage_mv": 12000,
+    "errors": []
+  },
+  "percent_drop": null,
+  "mah_drop": null,
+  "average_watts": null,
+  "average_scope": null,
+  "average_source": null,
+  "power_status": "external_seen",
+  "measurement": null,
+  "actions": {
+    "attempted": 13,
+    "succeeded": 11,
+    "failed": 2
+  },
+  "restore": {
+    "restored": 14,
+    "failed": 0,
+    "failed_attempts": 1
+  },
+  "resurrected": [
+    {
+      "kind": "app",
+      "name": "Lark",
+      "path": "/Applications/Lark.app"
+    }
+  ],
+  "away": null,
+  "errors": [],
+  "failures": [
+    {
+      "at": "2026-10-17T08:26:50+00:00",
+      "scenario": "work",
+      "action": "退出: Lark",
+      "target": "/Applications/Lark.app",
+      "command": [
+        "osascript",
+        "-e",
+        "tell application id \"com.electron.lark\" to quit"
+      ],
+      "rc": 1,
+      "reason": "Lark 拒绝退出，可能正在显示确认框。处理后重试，或选择强制退出。",
+      "stdout": "",
+      "stderr": "Lark 拒绝退出，可能正在显示确认框。处理后重试，或选择强制退出。",
+      "kind": "action",
+      "recovered": true
+    },
+    {
+      "at": "2026-10-17T08:26:50+00:00",
+      "scenario": "work",
+      "action": "恢复项目: Spotlight 索引已恢复",
+      "target": "",
+      "command": [
+        "sudo",
+        "mdutil",
+        "-i",
+        "on",
+        "/"
+      ],
+      "rc": 124,
+      "reason": "命令失败：sudo mdutil -i on /（退出码 124）：timeout",
+      "stdout": "",
+      "stderr": "命令失败：sudo mdutil -i on /（退出码 124）：timeout",
+      "kind": "action"
+    }
+  ]
+}

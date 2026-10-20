@@ -221,7 +221,7 @@ def _run_restore(st, emit, only=None):
 
 
 @runtime._sudo_lifecycle
-def mode_off(force_off=False, dry_run=False):
+def mode_off(force_off=False, dry_run=False, *, verbose=False):
     runtime._prepare_dry_run(dry_run)
     c = __import__("rich.console", fromlist=["Console"]).Console()
 
@@ -267,7 +267,7 @@ def mode_off(force_off=False, dry_run=False):
 
     report = sessions.finish(st, n, fails)
     if report is not None:
-        for line in sessions.describe(report, sessions.read_history()):
+        for line in sessions.describe(report, sessions.read_history(), verbose=verbose):
             c.print(line, markup=False, highlight=False)
     state_target = state_path()
     if is_dry_run():

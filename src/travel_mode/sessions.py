@@ -112,7 +112,7 @@ def note(state, rows=(), *, external=False, save=save_state):
             save(state)
 
 
-def log_window(text, start, end):
+def log_window(text, start, end, *, start_observation=None, end_observation=None):
     """Keep exact recorded events; never extrapolate partial sleep segments."""
     selected, sources = [], []
     for line in text.splitlines():
@@ -132,10 +132,24 @@ def log_window(text, start, end):
             selected.append(line)
     sources.sort()
     anchors = [source for when, source in sources if when <= start]
-    external = (anchors and anchors[-1] == "ac") or any(
-        source == "ac" and when >= start for when, source in sources
+
+    # Endpoint observations take precedence over an older anchor. Only actual
+    # AC events within the interval, or an observed AC endpoint, imply exposure.
+    def observed_source(row):
+        if row is None:
+            return None
+        if row["external"] or row["charging"]:
+            return "ac"
+        if row["external"] is False and row["charging"] is False:
+            return "battery"
+        return None
+
+    initial = observed_source(start_observation) or (anchors[-1] if anchors else None)
+    final = observed_source(end_observation)
+    external = (
+        initial == "ac" or final == "ac" or any(source == "ac" and when >= start for when, source in sources)
     )
-    coverage = "external_seen" if external else "battery_only" if anchors else "unknown"
+    coverage = "external_seen" if external else "battery_only" if initial == "battery" else "unknown"
     return "\n".join(selected), coverage
 
 
@@ -201,7 +215,13 @@ def build_report(state, restored, failed):
     window = None
     try:
         text = _read(["pmset", "-g", "log"], timeout=5)
-        window, report["power_status"] = log_window(text, timestamp(start["at"]), timestamp(end["at"]))
+        window, report["power_status"] = log_window(
+            text,
+            timestamp(start["at"]),
+            timestamp(end["at"]),
+            start_observation=start,
+            end_observation=end,
+        )
     except (ReadError, ValueError) as exc:
         report["errors"].append(str(exc))
     measurement_external = (
@@ -213,7 +233,14 @@ def build_report(state, restored, failed):
             "charging",
         }
     )
-    if active["external_seen"] or end["external"] or end["charging"] or measurement_external:
+    if (
+        active["external_seen"]
+        or start["external"]
+        or start["charging"]
+        or end["external"]
+        or end["charging"]
+        or measurement_external
+    ):
         report["power_status"] = "external_seen"
     values = [start[k] is not None and end[k] is not None for k in ("percent", "remaining_mah", "voltage_mv")]
     if report["power_status"] == "battery_only" and all(values) and not start["errors"] and not end["errors"]:
@@ -228,7 +255,7 @@ def build_report(state, restored, failed):
                 report["average_scope"] = "session"
                 report["average_source"] = "capacity_delta"
         else:
-            report["power_status"] = "unknown"
+            report["errors"].append(t("report.capacity_increased"))
     if report["power_status"] == "battery_only" and "telemetry" in start and "telemetry" in end:
         from .system.battery import IntervalError, interval
 
@@ -550,103 +577,7 @@ def finish(state, restored, failed):
     return report
 
 
-def describe(report, peers=()):
-    unknown = t("session.unknown")
-    yield t(
-        "session.heading", scenario=t("scenario." + report["scenario"]) if report["scenario"] else unknown
-    )
-    if report.get("appended_scenarios"):
-        yield t(
-            "conflict.appended", scenarios=", ".join(t("scenario." + s) for s in report["appended_scenarios"])
-        )
-    yield t(
-        "session.times",
-        start=report["started_at"] or unknown,
-        end=report["ended_at"],
-        seconds=report["duration_seconds"] if report["duration_seconds"] is not None else unknown,
-    )
-    start = report["start"] or {}
-    end = report["end"]
-    yield t(
-        "session.readings",
-        start_percent=start.get("percent") if start.get("percent") is not None else unknown,
-        start_mah=start.get("remaining_mah") if start.get("remaining_mah") is not None else unknown,
-        end_percent=end["percent"] if end["percent"] is not None else unknown,
-        end_mah=end["remaining_mah"] if end["remaining_mah"] is not None else unknown,
-    )
-    if report["power_status"] != "battery_only":
-        yield t(
-            "session.external" if report["power_status"] == "external_seen" else "session.coverage_unknown"
-        )
-    if report["percent_drop"] is not None:
-        yield t("session.drain", percent=report["percent_drop"], mah=report["mah_drop"])
-    if report["average_watts"] is not None:
-        yield t(
-            "session.average",
-            watts=report["average_watts"],
-            scope=t("session.scope.telemetry")
-            if report.get("average_source") == "PowerTelemetryData.SystemLoad"
-            and report["average_scope"] == "session"
-            else t("session.scope." + report["average_scope"]),
-        )
-        if report.get("average_source") is not None:
-            yield t("measurement.power_source", source=report["average_source"])
-    else:
-        yield t("session.no_average")
-    if report["measurement"]:
-        from .measurement import comparison_description
-        from .measurement import describe as measurement_description
+def describe(report, peers=(), *, verbose=False):
+    from .session_presentation import describe as present
 
-        if report["measurement"]["before"]["available"] and (
-            "power_source" in report["measurement"]["before"]
-            or not report["measurement"]["after"]["available"]
-        ):
-            yield t("session.before_window") + ": " + measurement_description(report["measurement"]["before"])
-        if (
-            report["measurement"]["after"] is not None
-            and report["measurement"]["after"]["available"]
-            and "power_source" in report["measurement"]["after"]
-        ):
-            yield t("session.after_window") + ": " + measurement_description(report["measurement"]["after"])
-        yield comparison_description(report["measurement"])
-    counts = report["actions"]
-    yield t(
-        "session.actions",
-        attempted=counts["attempted"] if counts else unknown,
-        succeeded=counts["succeeded"] if counts else unknown,
-        failed=counts["failed"] if counts else unknown,
-    )
-    yield t("session.restore", **report["restore"])
-    for failure in report.get("failures", []):
-        yield t(
-            "failure.history_recovered" if failure.get("recovered") else "failure.history",
-            action=failure["action"],
-            reason=failure["reason"],
-            rc=failure["rc"] if failure["rc"] is not None else unknown,
-        )
-        if failure["command"]:
-            import shlex
-
-            yield t("failure.history_command", command=shlex.join(failure["command"]))
-    for row in report["resurrected"]:
-        from .resurrection import describe as resurrection_description
-
-        yield resurrection_description(row)
-    if report["away"]:
-        away = report["away"]
-        yield t(
-            "session.away",
-            percent=away["percent_drop"] if away["percent_drop"] is not None else unknown,
-            wakes=away["darkwake_count"],
-            reasons=", ".join(f"{key} ({value})" for key, value in away["reasons"].items()) or unknown,
-        )
-    comp = comparison(report, peers)
-    if comp:
-        yield t(
-            "session.compare" if comp["difference_watts"] >= 0 else "session.compare_higher",
-            scenario=report["scenario"] or unknown,
-            difference=abs(comp["difference_watts"]),
-            count=comp["count"],
-        )
-    for error in report["errors"]:
-        yield t("session.read_error", reason=error)
+    yield from present(report, peers, verbose=verbose)

@@ -178,7 +178,10 @@ async def test_measurement_read_failure_keeps_tui_action_and_report_available(
         failed = result[phase]
         assert failed["reason"] == "failed" and "timeout" in failed["error"]
         report = sessions.build_report(saved, 1, 0)
-        assert t("measurement.failed", reason=failed["error"]) in "\n".join(sessions.describe(report))
+        assert t("report.measure_failed") in "\n".join(sessions.describe(report))
+        assert t("measurement.failed", reason=failed["error"]) in "\n".join(
+            sessions.describe(report, verbose=True)
+        )
         assert not app._mutation_lock.locked()
 
 

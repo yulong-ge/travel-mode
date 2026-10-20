@@ -149,6 +149,29 @@ def test_session_with_ac_or_unknown_coverage_is_invalid(status):
         )
 
 
+def test_short_battery_run_without_power_change_events_is_valid(fake_runner):
+    fake_runner.responses[("pmset", "-g", "log")] = CmdResult("", "", 0)
+    observed = dict(external=False, charging=False)
+    assert (
+        assert_battery_interval(10, 190, start_observation=observed, end_observation=observed)
+        == "battery_only"
+    )
+
+
+def test_battery_run_ac_change_is_invalid_despite_battery_endpoints(fake_runner):
+    fake_runner.responses[("pmset", "-g", "log")] = CmdResult(
+        "2026-01-01 10:01:00 +0000 Using AC\n2026-01-01 10:02:00 +0000 Using Batt", "", 0
+    )
+    observed = dict(external=False, charging=False)
+    with pytest.raises(AssertionError, match="full-run power coverage=external_seen"):
+        assert_battery_interval(
+            sessions.timestamp("2026-01-01T10:00:00+00:00"),
+            sessions.timestamp("2026-01-01T10:03:00+00:00"),
+            start_observation=observed,
+            end_observation=observed,
+        )
+
+
 def test_busy_fixture_has_two_private_interpreters_and_no_sleep(tmp_path):
     create_fixtures(tmp_path, battery_measure=True)
     for directory in ("MacOS", "Helpers"):
@@ -159,8 +182,22 @@ def test_busy_fixture_has_two_private_interpreters_and_no_sleep(tmp_path):
         assert "sleep" not in (path / "loop").read_text()
 
 
-def test_battery_cli_round_trip_measures_only_fixture_freeze(battery_sandbox, monkeypatch):
+def without_log_events(monkeypatch, machine):
+    original = type(machine).__call__
+
+    def invoke(self, command, timeout=None, interactive=False):
+        if command == ["/usr/bin/pmset", "-g", "log"]:
+            return CmdResult("", "", 0)
+        return original(self, command, timeout, interactive)
+
+    monkeypatch.setattr(type(machine), "__call__", invoke)
+
+
+@pytest.mark.parametrize("empty_log", [False, True])
+def test_battery_cli_round_trip_measures_only_fixture_freeze(battery_sandbox, monkeypatch, empty_log):
     harness, guard, machine = battery_sandbox
+    if empty_log:
+        without_log_events(monkeypatch, machine)
     set_language("en")
     original = machine.power_text()
     harness.setup()
@@ -189,11 +226,16 @@ def test_battery_plan_contains_read_only_power_commands_and_quick_selection(caps
     assert QUICK_SELECTION == {"apps": True, "services": True, "power": False, "network": False}
 
 
-async def test_battery_tui_round_trip_uses_measured_fixture_only_quick_action(battery_sandbox):
+@pytest.mark.parametrize("empty_log", [False, True])
+async def test_battery_tui_round_trip_uses_measured_fixture_only_quick_action(
+    battery_sandbox, monkeypatch, empty_log
+):
     from travel_mode.tui.app import TravelApp
     from tui_interaction import click_after_layout
 
     harness, guard, machine = battery_sandbox
+    if empty_log:
+        without_log_events(monkeypatch, machine)
     set_language("en")
     harness.setup()
     original = machine.power_text()

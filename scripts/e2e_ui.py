@@ -70,7 +70,10 @@ class InteractiveHarness(Harness):
 
     def setup(self):
         if self.battery_measure:
-            e2e_battery.require_battery()
+            reading = e2e_battery.require_battery()
+            self.battery_start_observation = dict(
+                external=reading["external_connected"], charging=reading["is_charging"]
+            )
             self.battery_started = sessions.timestamp(sessions.utc_now())
             self.apps = fixture_paths(self.root, battery_measure=True)
         if self.agent_loaded():
@@ -290,12 +293,15 @@ class InteractiveHarness(Harness):
             self.wait(lambda: apps.app_running(str(self.runner.refusing)), "UI off restored refusing fixture")
         self.verify_power()
         if self.battery_measure:
-            e2e_battery.require_battery()
+            reading = e2e_battery.require_battery()
             self.session_report = sessions.read_history()[-1]
             e2e_battery.assert_comparison(self.runner, self.session_report["measurement"])
             e2e_battery.assert_report(self.session_report)
             self.battery_coverage = e2e_battery.assert_battery_interval(
-                self.battery_started, sessions.timestamp(sessions.utc_now())
+                self.battery_started,
+                sessions.timestamp(sessions.utc_now()),
+                start_observation=self.battery_start_observation,
+                end_observation=dict(external=reading["external_connected"], charging=reading["is_charging"]),
             )
             self.check(
                 True, "Battery-only report includes mAh endpoints, average watts and completed restore"

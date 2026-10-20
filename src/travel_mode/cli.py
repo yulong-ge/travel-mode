@@ -335,7 +335,7 @@ def _main(argv=None):
             print(t("session.history_empty"))
         else:
             for row in selected:
-                print("\n".join(sessions.describe(row, rows)))
+                print("\n".join(sessions.describe(row, rows, verbose=args.verbose)))
         return 0
     if args.cmd == "power":
         import json
@@ -380,7 +380,9 @@ def _main(argv=None):
             confirm_write(data)
         return 0
     if args.cmd in ("off", "restore"):
-        return mode_off(force_off=args.force, dry_run=args.dry_run)
+        return mode_off(
+            force_off=args.force, dry_run=args.dry_run, **({"verbose": True} if args.verbose else {})
+        )
     if args.cmd == "thaw":
         return thaw_processes(all_processes=args.all)
     if args.cmd == "check" or args.check:

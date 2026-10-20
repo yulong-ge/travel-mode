@@ -53,9 +53,7 @@ def test_session_capacity_math_and_window_source_coverage(session_machine):
     )
 
 
-@pytest.mark.parametrize(
-    "source", ["observed", "log", "capacity_increase", "no_log", "read_error", "missing"]
-)
+@pytest.mark.parametrize("source", ["observed", "log", "capacity_increase", "read_error", "missing"])
 def test_incomplete_or_charging_intervals_never_synthesize_discharge(source, session_machine, fake_runner):
     st, end = session_machine
     if source == "observed":
@@ -69,8 +67,6 @@ def test_incomplete_or_charging_intervals_never_synthesize_discharge(source, ses
         )
     if source == "capacity_increase":
         end["remaining_mah"] = 4500
-    if source == "no_log":
-        fake_runner.responses[("pmset", "-g", "log")] = CmdResult("", "", 0)
     if source == "read_error":
         fake_runner.responses[("pmset", "-g", "log")] = CmdResult("", "timeout", 124)
     if source == "missing":
@@ -79,7 +75,7 @@ def test_incomplete_or_charging_intervals_never_synthesize_discharge(source, ses
     report = sessions.build_report(st, 0, 0)
     assert report["average_watts"] is None
     assert report["percent_drop"] is None and report["mah_drop"] is None
-    assert "不完整" in "\n".join(sessions.describe(report)) or report["errors"]
+    assert "无法" in "\n".join(sessions.describe(report)) or report["errors"]
 
 
 def test_away_log_filters_session_bounds_and_does_not_bridge_partial_sleep(session_machine, fake_runner):
@@ -242,6 +238,7 @@ def test_measurement_scope_and_source_change_are_kept_separate(session_machine, 
             macos={"raw": "fixture", "minutes": None},
         )
 
+    st["session"]["start"]["external"] = None
     st["measurement"] = dict(before=window(12), after=window(6), saved_watts=6, extra_hours=3)
     fake_runner.responses[("pmset", "-g", "log")] = CmdResult("", "", 0)
     report = sessions.build_report(st, 0, 0)
@@ -260,7 +257,7 @@ def test_measurement_scope_and_source_change_are_kept_separate(session_machine, 
     from travel_mode.i18n import t
 
     text = "\n".join(sessions.describe(report))
-    assert t("session.before_window") in text and "12.00" in text
+    assert t("report.before", watts=12) in text and "12.00" in text
 
 
 def test_failed_actions_are_counted_and_pending_report_blocks_more_mutations(session_machine):

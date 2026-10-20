@@ -1,6 +1,9 @@
 """Reports and local history use committed frames and no host observations."""
 
 import asyncio
+import json
+import time
+from pathlib import Path
 
 import pytest
 from textual.widgets import Static
@@ -10,6 +13,27 @@ from travel_mode.i18n import set_language, t
 from travel_mode.tui.app import TravelApp
 from travel_mode.tui.session_screen import SessionScreen
 from tui_interaction import click_after_layout, modal_result
+
+
+@pytest.mark.parametrize("language", ["en", "zh"])
+@pytest.mark.parametrize("size", [(80, 24), (120, 36), (160, 45)])
+async def test_readable_history_dialog_shares_report_and_local_time(language, size, monkeypatch):
+    monkeypatch.setenv("TZ", "Asia/Shanghai")
+    time.tzset()
+    set_language(language)
+    report = json.loads((Path(__file__).parents[1] / "fixtures/session-wording.json").read_text())
+    sessions.append_history(report, 50)
+    app = TravelApp(scenario="work", measure=False)
+    async with app.run_test(size=size):
+        await app.wait_for_idle()
+        await app.show_history()
+        assert await app.screen.wait_for_refresh()
+        text = str(app.screen.query_one("#session-text", Static).content)
+        assert text == "\n".join(sessions.describe(report))
+        assert "16:26" in text and "09:01" in text
+        assert "mAh" not in text and "timeout" not in text and "osascript" not in text
+        assert app.screen.region.contains_region(app.screen.query_one("#session-close").region)
+        app.screen.dismiss()
 
 
 @pytest.mark.parametrize("language", ["en", "zh"])

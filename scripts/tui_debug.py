@@ -329,6 +329,7 @@ class DebugApp(TravelApp):
         Binding("f10", "demo_away", "", show=False),
         Binding("f11", "demo_administrator", "", show=False),
         Binding("f12", "demo_pending_restore", "", show=False),
+        Binding("ctrl+o", "demo_report", "", show=False),
     ]
     """TravelApp plus layout telemetry for the tmux debug harness."""
 
@@ -562,6 +563,21 @@ class DebugApp(TravelApp):
         self.push_screen(AdministratorScreen([(["mdutil", "-i", "on", "/"], t("admin.restore_spotlight"))]))
         self.call_after_refresh(self.write_layout)
 
+    def action_demo_report(self):
+        if getattr(self, "live_readonly", False):
+            return
+        import json
+
+        from travel_mode import sessions
+        from travel_mode.tui.session_screen import SessionScreen
+
+        # Public deterministic fixture only; never read a user's history.
+        report = json.loads((ROOT / "tests/fixtures/session-wording.json").read_text())
+        self.view_mode = "session"
+        self.update_primary()
+        self.push_screen(SessionScreen("\n".join(sessions.describe(report))))
+        self.call_after_refresh(self.write_layout)
+
     async def action_demo_pending_restore(self):
         if getattr(self, "live_readonly", False):
             return
@@ -783,6 +799,13 @@ def run_group(output: Path, cols: int, rows: int, language: str, args, results: 
             results.append(session.capture("scenario", "scenario"))
             session.keys("1", "Enter")
         session.wait_complete(active="plan")
+        if args.session_report:
+            session.keys("C-o")
+            from travel_mode.i18n import catalog
+
+            session.wait_text(catalog(language)["session.heading"].split("{scenario}")[0])
+            results.append(session.capture("session-report", "session"))
+            return
         if args.admin:
             session.keys("F12")
             session.wait_complete(active="session")
@@ -830,6 +853,7 @@ def main() -> int:
     parser.add_argument(
         "--admin", action="store_true", help="capture administrator confirmation and pending recovery"
     )
+    parser.add_argument("--session-report", action="store_true", help="capture the readable session report")
     parser.add_argument(
         "--all",
         action="store_true",
@@ -857,6 +881,8 @@ def main() -> int:
         parser.error("--live-readonly requires an explicit --config copy")
     if args.admin and args.live_readonly:
         parser.error("--admin requires demo fixtures")
+    if args.session_report and args.live_readonly:
+        parser.error("--session-report requires demo fixtures")
     if args.demo and args.live_readonly:
         parser.error("--demo and --live-readonly are mutually exclusive")
     if args.child:
