@@ -44,6 +44,7 @@ def command_started():
 SYSTEM_TOOLS = {
     **PRIVILEGED_PATHS,
     "ioreg": "/usr/sbin/ioreg",
+    "sysctl": "/usr/sbin/sysctl",
     "ps": "/bin/ps",
     "pgrep": "/usr/bin/pgrep",
     "pkill": "/usr/bin/pkill",
@@ -206,6 +207,8 @@ def _dry_run_readonly(cmd: list[str]) -> bool:
     if not cmd:
         return False
     base, args = cmd[0], cmd[1:]
+    if base == "sysctl":
+        return args == ["-n", "kern.sleeptime", "kern.waketime"]
     if base == "defaults":
         return args == ["read", "com.ameba.SwiftBar", "PluginDirectory"]
     if base == sys.executable:

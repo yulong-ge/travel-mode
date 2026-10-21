@@ -117,6 +117,12 @@ class Workflow:
 
                 message += t("redesign.result_details", path=log_path())
         self.main_query_one("#result-summary", Static).update(message)
+        return message
+
+    def publish_result_summary(self, *_):
+        message = self.update_result_summary()
+        if message != self.last_result:
+            self.logline("bad" if self.last_batch["failed"] else "ok", message)
 
     def update_primary(self):
         if self.scenario == "ask" or self._recomposing:

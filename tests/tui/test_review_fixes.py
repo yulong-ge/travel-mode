@@ -300,7 +300,7 @@ def test_assertion_holder_reason_matches_scenario(scenario, monkeypatch):
     )
     row = next(r for r in collect(scenario, {})["rows"] if r["descriptor"]["kind"] == "app")
     assert plan_view(row)["reason"] == t(
-        "redesign.work_assertion" if scenario == "work" else "setup.reason_assertion"
+        "redesign.work_assertion" if scenario == "work" else "redesign.quit_reason"
     )
 
 

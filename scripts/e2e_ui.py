@@ -70,6 +70,17 @@ class InteractiveHarness(Harness):
     battery_measure = False
     fixture_only_power = False
 
+    def verify_tui_on(self, app, evidence):
+        """Publish the original assertion to both driver and child, before off."""
+        try:
+            self.assert_on()
+        except AssertionError as error:
+            app.on_assertion_error = error
+            write_json(evidence / "on.json", {"status": "FAIL", "error": str(error)})
+            app.exit()
+        else:
+            write_json(evidence / "on.json", {"status": "PASS"})
+
     def setup(self):
         if self.battery_measure:
             reading = e2e_battery.require_battery()
@@ -524,6 +535,8 @@ def child(args):
                 else:
 
                     class ObservedApp(FixtureDebugApp):
+                        on_assertion_error = None
+
                         def on_descendant_focus(self, event):
                             self.call_after_refresh(self.write_layout)
 
@@ -536,11 +549,13 @@ def child(args):
                                 and not self._mutation_lock.locked()
                                 and self.refresh_complete
                             ):
-                                harness.assert_on()
-                                write_json(evidence / "on.json", {"status": "PASS"})
+                                harness.verify_tui_on(self, evidence)
                             return result
 
-                    ObservedApp(evidence / "layout.json").run()
+                    app = ObservedApp(evidence / "layout.json")
+                    app.run()
+                    if app.on_assertion_error is not None:
+                        raise app.on_assertion_error
                 harness.assert_off()
                 if not args.battery_measure:
                     harness.brightness()

@@ -463,7 +463,8 @@
                     "not_running",
                     "error"
                   ]
-                }
+                },
+                "modifying": {"type": "boolean"}
               }
             }
           },

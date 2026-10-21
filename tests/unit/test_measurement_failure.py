@@ -62,7 +62,7 @@ def test_measurement_failure_continues_cli_and_is_retained_in_session_report(
     report = sessions.build_report(saved, 1, 0)
     sessions.validate_report(report)
     assert report["measurement"] == result
-    assert t("report.measure_failed") in "\n".join(sessions.describe(report))
+    assert message in "\n".join(sessions.describe(report))
     assert message in "\n".join(sessions.describe(report, verbose=True))
     assert "NaN" not in json.dumps(report, allow_nan=False)
 

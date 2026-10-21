@@ -37,6 +37,24 @@ def test_setup_failure_surfaces_child_error_without_waiting_for_prompt(tmp_path)
         session.wait_fixture_setup()
 
 
+def test_tui_on_failure_reaches_driver_and_child_before_off(tmp_path, monkeypatch):
+    from harness_evidence import EvidenceError, acknowledged
+
+    harness = object.__new__(InteractiveHarness)
+    failure = AssertionError("battery target not applied")
+
+    def assert_on():
+        raise failure
+
+    monkeypatch.setattr(harness, "assert_on", assert_on)
+    exited = []
+    app = SimpleNamespace(on_assertion_error=None, exit=lambda: exited.append(True))
+    harness.verify_tui_on(app, tmp_path)
+    assert app.on_assertion_error is failure and exited == [True]
+    with pytest.raises(EvidenceError, match="battery target not applied"):
+        acknowledged(tmp_path / "on.json")
+
+
 def test_partial_refusing_bundle_not_unregistered_and_build_output_saved(sandbox, tmp_path, monkeypatch):
     harness, guard, machine = sandbox
     original = type(machine).__call__

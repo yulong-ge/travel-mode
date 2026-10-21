@@ -120,13 +120,18 @@ class Dispatch:
                     self._disable_mutation_button(button)
                 from travel_mode.failures import batch
 
+                summarize_rows = ev.button.id == "b-quick" or (
+                    self.view_mode == "result" and (ev.button.id or "").startswith(("retry-", "force-"))
+                )
                 try:
-                    with batch(self.logline):
+                    with batch(self.publish_result_summary if summarize_rows else self.logline):
                         if ev.button.id == "b-off":
                             await self._dispatch_button(ev)
                         else:
                             with mutation_scope(self.st, self.save):
                                 await self._dispatch_button(ev)
+                    if summarize_rows:
+                        self.publish_result_summary()
                 finally:
                     try:
                         self.flush_session_observations()

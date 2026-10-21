@@ -42,6 +42,9 @@ class FakeRunner:
 def _readonly_responses() -> dict[tuple[str, ...], CmdResult]:
     fixture = Path(__file__).parent / "fixtures"
     return {
+        ("sysctl", "-n", "kern.sleeptime", "kern.waketime"): CmdResult(
+            "{ sec = 0, usec = 0 }\n{ sec = 0, usec = 0 }\n", "", 0
+        ),
         ("ps", "-axo", "pid=,ppid=,uid=,stat=,%cpu=,lstart=,comm="): CmdResult(
             "900000 1 0 S 0.0 Thu Oct 15 12:00:00 2026 /System/Library/CoreServices/loginwindow", "", 0
         ),

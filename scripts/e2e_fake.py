@@ -136,6 +136,8 @@ class Machine:
             else:
                 self.loaded = cmd[1] == "load"
                 out = ""
+        elif cmd == ["sysctl", "-n", "kern.sleeptime", "kern.waketime"]:
+            return CmdResult("{ sec = 0, usec = 0 }\n{ sec = 0, usec = 0 }\n", "", 0)
         elif cmd == ["/usr/bin/pmset", "-g", "log"]:
             out = ""
         elif cmd == ["/usr/bin/pmset", "-g", "custom"]:

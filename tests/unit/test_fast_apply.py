@@ -153,9 +153,9 @@ def test_sleep_estimate_waits_for_fresh_post_wake_interval_and_is_shared():
     start, _initial, reading = interval_case("normal")
     active = dict(id="fixture", start=start, started_at=start["at"], external_seen=False)
     now = datetime.fromisoformat(start["at"]) + timedelta(hours=9)
-    sleep = (now - timedelta(hours=8)).strftime("%Y-%m-%d %H:%M:%S %z")
-    wake = (now - timedelta(seconds=5)).strftime("%Y-%m-%d %H:%M:%S %z")
-    events = f"{sleep} Sleep Entering Sleep using Batt\n{wake} Wake Wake from Normal Sleep\n"
+    sleep = (now - timedelta(hours=8)).timestamp()
+    wake = (now - timedelta(seconds=5)).timestamp()
+    events = live_power.sleep_events(f"{{ sec = {int(sleep)}, usec = 0 }}\n{{ sec = {int(wake)}, usec = 0 }}")
     cache = {}
     pending = live_power.estimate(active, reading, now, events, cache)
     assert pending["remaining_minutes"] is None
@@ -181,10 +181,8 @@ def test_sleep_estimate_waits_for_fresh_post_wake_interval_and_is_shared():
     view = session_view(dict(session=active), fresh, now=now + timedelta(seconds=30), estimate=result)
     assert t("menubar.wake_remaining", watts=9.8, duration=status.duration(220)) in view["lines"]
     # A later wake invalidates the earlier active-use estimate.
-    later_wake = (now + timedelta(seconds=70)).strftime("%Y-%m-%d %H:%M:%S %z")
-    next_result = live_power.estimate(
-        active, fresh, now + timedelta(seconds=80), events + f"{later_wake} Wake Full wake\n", cache
-    )
+    later_wake = (now + timedelta(seconds=70)).timestamp()
+    next_result = live_power.estimate(active, fresh, now + timedelta(seconds=80), (sleep, later_wake), cache)
     assert next_result["remaining_minutes"] is None
 
 

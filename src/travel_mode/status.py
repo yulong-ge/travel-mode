@@ -1,4 +1,4 @@
-"""Finite menu status with bounded source, telemetry and active-session log reads."""
+"""Finite menu status with bounded source, telemetry and kernel sleep-time reads."""
 
 import json
 import os

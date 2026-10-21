@@ -4,7 +4,6 @@ import fcntl
 import json
 import os
 import re
-from datetime import datetime
 
 from . import sessions
 from .automation import atomic_write
@@ -13,23 +12,23 @@ from .system import battery
 from .system.shell import _read
 
 
-def sleep_events(text, start, end):
-    """Use full Wake (not DarkWake) as the active-use boundary."""
-    sleep = wake = None
-    for line in text.splitlines():
-        match = re.match(r"(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\s+([+-]\d{4})\s+(Sleep|Wake)\s", line)
-        if not match:
-            continue
-        at = datetime.strptime(match[1] + match[2], "%Y-%m-%d %H:%M:%S%z").timestamp()
-        if start <= at <= end:
-            if match[3] == "Sleep":
-                sleep = max(at, sleep) if sleep is not None else at
-            else:
-                wake = max(at, wake) if wake is not None else at
-    return sleep, wake
+def sleep_events(text):
+    """Parse the two kernel timeval values, including the never-slept zero case."""
+    from .system.shell import ReadError
+
+    lines = text.strip().splitlines()
+    values = []
+    for line in lines:
+        match = re.fullmatch(r"\{\s*sec = (\d+), usec = (\d+)\s*\}.*", line)
+        if not match or int(match[2]) >= 1_000_000:
+            raise ReadError(f"sysctl kern.sleeptime/kern.waketime: invalid timeval: {line!r}")
+        values.append(int(match[1]) + int(match[2]) / 1_000_000)
+    if len(values) != 2:
+        raise ReadError("sysctl kern.sleeptime/kern.waketime: expected two timeval values")
+    return tuple(value or None for value in values)
 
 
-def estimate(active, reading, now, text, cache):
+def estimate(active, reading, now, events, cache):
     result = dict(average_watts=None, remaining_minutes=None, estimate_source=None, estimate_error=None)
     if (
         not reading.get("available")
@@ -47,7 +46,7 @@ def estimate(active, reading, now, text, cache):
         update_time=start.get("update_time"),
         power_source="PowerTelemetryData.SystemLoad",
     )
-    sleep, wake = sleep_events(text, started, at)
+    sleep, wake = (value if value is not None and started <= value <= at else None for value in events)
     overall = battery.interval(first, reading, seconds=at - started)
     if overall:
         result.update(average_watts=overall["average_watts"], estimate_source="session_telemetry")
@@ -76,8 +75,8 @@ def estimate(active, reading, now, text, cache):
 
 
 def observe(active, reading, now):
-    """One bounded log read; an atomic, process-locked wake baseline, no sampler."""
-    text = _read(["pmset", "-g", "log"], timeout=2)
+    """One immediate kernel read; a process-locked wake baseline, no sampler."""
+    events = sleep_events(_read(["sysctl", "-n", "kern.sleeptime", "kern.waketime"], timeout=2))
     path = _path().parent / "wake-estimate.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(path.with_suffix(".lock"), os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
@@ -103,7 +102,7 @@ def observe(active, reading, now):
             except (OSError, ValueError, TypeError, KeyError) as exc:
                 raise StateError(f"{path}: wake baseline: {exc}") from exc
         previous = json.dumps(cache, sort_keys=True)
-        result = estimate(active, reading, now, text, cache)
+        result = estimate(active, reading, now, events, cache)
         if json.dumps(cache, sort_keys=True) != previous:
             atomic_write(path, json.dumps(cache).encode())
         return result

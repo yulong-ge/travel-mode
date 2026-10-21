@@ -321,9 +321,7 @@ def collect(scenario, state):
             if app:
                 row["reason_key"] = (
                     "redesign.quit_reason"
-                    if scenario == "away"
-                    and app.get("reason", "freeze") == "freeze"
-                    and row["action"] == "quit"
+                    if row["action"] == "quit"
                     else "redesign.work_assertion"
                     if scenario == "work" and app.get("reason") == "assertion"
                     else "setup.reason_" + app.get("reason", "freeze")

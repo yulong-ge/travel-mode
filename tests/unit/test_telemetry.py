@@ -220,7 +220,7 @@ def test_default_two_updates_yield_one_lower_precision_interval(monkeypatch, lan
     validate(result, json.loads(Path("docs/json-schema/power.schema.json").read_text()))
     comparison = {"before": result, "after": result, "saved_watts": 0, "extra_hours": 0}
     measurement.validate_comparison(comparison)
-    assert t("measurement.single_interval") in measurement.comparison_description(comparison)
+    assert t("measurement.passive_single") in measurement.comparison_description(comparison)
     assert "180" in t("measurement.wait", seconds=settings.seconds, updates=settings.updates)
     with pytest.raises(ValueError, match="updates"):
         measurement.validate_settings(measurement.Settings(updates=1))

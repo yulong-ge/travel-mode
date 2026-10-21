@@ -146,6 +146,7 @@ def record(
     save=None,
     store=True,
     quit_status=None,
+    modifying=None,
 ):
     from .sessions import utc_now
 
@@ -164,6 +165,8 @@ def record(
     )
     if quit_status is not None:
         row["quit_status"] = quit_status
+    if modifying is not None:
+        row["modifying"] = modifying
     if _identity.get() is not None:
         row["identity"] = _identity.get()
     if state and "session" in state:
@@ -189,7 +192,10 @@ def validate(rows):
         if (
             not isinstance(row, dict)
             or not keys <= row.keys()
-            or row.keys() - keys - {"recovered", "session_id", "counts", "quit_status", "identity"}
+            or row.keys()
+            - keys
+            - {"recovered", "session_id", "counts", "quit_status", "identity", "modifying"}
+            or ("modifying" in row and type(row["modifying"]) is not bool)
             or row["scenario"] not in (None, "work", "away")
             or any(
                 not isinstance(row[k], str) or len(row[k]) > 2000
@@ -269,6 +275,22 @@ def session_receipts(state):
             rows[match] = row
             matched.add(match)
     return rows[-MAX_FAILURES:]
+
+
+def is_action_failure(row):
+    """Keep legacy read-worker diagnostics without presenting them as mutations."""
+    if row.get("modifying") is False or row["kind"] in {"observation", "warning"}:
+        return False
+    if row.get("identity") or mutation(row["command"]):
+        return True
+    from .i18n import catalog
+
+    for language in ("en", "zh"):
+        prefix, suffix = catalog(language)["failure.worker"].split("{group}")
+        if row["action"].startswith(prefix) and row["action"].endswith(suffix):
+            group = row["action"][len(prefix) : len(row["action"]) - len(suffix)]
+            return group == "batch"
+    return True
 
 
 def notify(kind, text):
@@ -389,12 +411,7 @@ def probe(state, label, function, *args, save, emit):
             return function(*args)
         except (CommandError, ReadError, SudoReadError) as exc:
             sessions.begin(state)
-            if "session" in state:
-                counts = state["session"]["actions"]
-                counts["attempted"] += 1
-                counts["failed"] += 1
-            row = record(state, label, str(exc), commands)
+            row = record(state, label, str(exc), commands, modifying=False)
             save(state)
-            result(False, label)
             emit("bad", message(row))
             return None

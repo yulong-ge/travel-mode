@@ -54,6 +54,70 @@ def test_session_capacity_math_and_window_source_coverage(session_machine):
     )
 
 
+def test_legacy_read_worker_failure_does_not_count_or_appear_as_failed_action(session_machine):
+    from travel_mode import failures
+    from travel_mode.i18n import t
+
+    st, _ = session_machine
+    st["session"]["actions"] = dict(attempted=26, succeeded=25, failed=1)
+    row = failures.record(st, t("failure.worker", group="battery"), "old read error", kind="internal")
+    report = sessions.build_report(st, 0, 0)
+    assert report["actions"] == dict(attempted=25, succeeded=25, failed=0)
+    text = "\n".join(sessions.describe(report))
+    assert t("report.actions", **report["actions"]) in text
+    assert row["action"] not in text
+    assert row["action"] in "\n".join(sessions.describe(report, verbose=True))
+    # Reading archived reports predating this fix applies the same projection.
+    legacy = {**report, "actions": st["session"]["actions"], "failures": [row]}
+    assert t("report.actions", **report["actions"]) in "\n".join(sessions.describe(legacy))
+    assert row["action"] in failures.log_path().read_text()
+
+
+def test_power_log_timeout_is_read_once_with_longer_budget_and_restore_still_finishes(
+    session_machine, monkeypatch
+):
+    from travel_mode.flows.restore import mode_off
+    from travel_mode.system import shell
+
+    st, _ = session_machine
+    calls = []
+    runner = shell.get_runner()
+
+    def timed_out(command, timeout=None, interactive=False):
+        if command == ["pmset", "-g", "log"]:
+            calls.append(timeout)
+            return CmdResult("", "timeout", 124)
+        return runner(command, timeout, interactive)
+
+    shell.set_runner(timed_out)
+    state.save_state(st)
+    assert mode_off() == 0 and not state._path().exists()
+    assert calls == [10]
+    report = sessions.read_history()[-1]
+    text = "\n".join(sessions.describe(report))
+    assert "无法读取电源记录" in text and "睡眠记录读取超时" in text
+    assert report["power_status"] == "unknown"
+
+
+def test_old_measurement_uses_noise_threshold_in_session_and_report(session_machine):
+    from travel_mode.measurement import comparison_description
+    from travel_mode.tui.session_view import session_view
+
+    st, _ = session_machine
+    st["measurement"] = dict(
+        before=dict(available=True, average_watts=8.82, interval_count=1, capacity_source="BatteryData"),
+        after=dict(available=True, average_watts=8.54, interval_count=1, capacity_source="BatteryData"),
+        saved_watts=0.28,
+        extra_hours=0.18,
+    )
+    expected = "执行前 8.8 W → 执行后 8.5 W，差异在测量误差范围内（单次数据，精度较低）。"
+    assert comparison_description(st["measurement"]) == expected
+    assert expected in session_view(st)["lines"]
+    text = "\n".join(sessions.describe(sessions.build_report(st, 0, 0)))
+    assert expected in text
+    assert "0.28" not in text and "BatteryData" not in text and "0.18" not in text
+
+
 @pytest.mark.parametrize("source", ["observed", "log", "capacity_increase", "read_error", "missing"])
 def test_incomplete_or_charging_intervals_never_synthesize_discharge(source, session_machine, fake_runner):
     st, end = session_machine

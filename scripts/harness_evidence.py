@@ -62,7 +62,9 @@ def acknowledged(path):
         return False
     value = read_json(path, required={"status": str})
     if value["status"] != "PASS":
-        raise EvidenceError(f"{path}: acknowledgement status is {value['status']!r}")
+        raise EvidenceError(
+            f"{path}: acknowledgement status is {value['status']!r}: {value.get('error', '')}"
+        )
     return True
 
 

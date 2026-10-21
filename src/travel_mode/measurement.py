@@ -418,43 +418,25 @@ def finish(before, settings, state, save, emit, *, clock=None, cancelled=None):
 
 
 def comparison_description(result):
-    if result.get("mode") == "passive":
-        before, after = result["before"], result["after"]
-        if after is None:
-            return t("measurement.passive_wait")
-        if not before["available"]:
-            return t("measurement.passive_before_unavailable", after=after["average_watts"])
-        difference = before["average_watts"] - after["average_watts"]
-        small = abs(difference) < max(1, before["average_watts"] * 0.1)
-        key = "measurement.passive_noise" if small else "measurement.passive_comparison"
-        single = before["interval_count"] == after["interval_count"] == 1
-        return t(
-            key,
-            before=before["average_watts"],
-            after=after["average_watts"],
-            saved=difference,
-            precision=t("measurement.passive_single") if single else "",
-        )
-    if not result["before"]["available"]:
-        return describe(result["before"])
-    if not result["after"]["available"]:
-        return describe(result["after"])
-    description = t(
-        "measurement.comparison",
-        before=result["before"]["average_watts"],
-        after=result["after"]["average_watts"],
-        saved=result["saved_watts"],
-        extra=result["extra_hours"],
+    before, after = result["before"], result["after"]
+    if after is None:
+        return t("measurement.passive_wait") if result.get("mode") == "passive" else describe(before)
+    if not after["available"]:
+        return (
+            t("report.before", watts=before["average_watts"]) + " " if before["available"] else ""
+        ) + describe(after)
+    if not before["available"]:
+        return t("measurement.passive_before_unavailable", after=after["average_watts"])
+    difference = before["average_watts"] - after["average_watts"]
+    small = abs(difference) < max(1, before["average_watts"] * 0.1)
+    single = before.get("interval_count") == after.get("interval_count") == 1
+    return t(
+        "measurement.passive_noise" if small else "measurement.passive_comparison",
+        before=before["average_watts"],
+        after=after["average_watts"],
+        saved=difference,
+        precision=t("measurement.passive_single") if single else "",
     )
-    sources = [row.get("capacity_source") for row in (result["before"], result["after"])]
-    if all(sources):
-        source = sources[0] if sources[0] == sources[1] else " -> ".join(sources)
-        description += " " + t("battery.capacity_source", source=source)
-    if result["before"].get("power_source") is not None:
-        description += " " + t("measurement.power_source", source=result["before"]["power_source"])
-    if any(row.get("interval_count") == 1 for row in (result["before"], result["after"])):
-        description += " " + t("measurement.single_interval")
-    return description
 
 
 def validate_comparison(value):

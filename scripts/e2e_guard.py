@@ -210,6 +210,7 @@ class GuardRunner:
         allowed |= cmd in [
             ["/usr/bin/pmset", "-g", kind] for kind in ("custom", "cap", "ps", "assertions", "batt", "log")
         ]
+        allowed |= cmd == ["sysctl", "-n", "kern.sleeptime", "kern.waketime"]
         allowed |= (
             len(cmd) == 5
             and cmd[:4] == ["lsappinfo", "info", "-only", "pid,bundleid"]

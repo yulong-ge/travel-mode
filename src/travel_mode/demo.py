@@ -31,6 +31,8 @@ def _configure_demo() -> None:
     class DemoRunner:
         def __call__(self, command, timeout=None, interactive=False):
             cmd = tuple(command)
+            if cmd == ("sysctl", "-n", "kern.sleeptime", "kern.waketime"):
+                return CmdResult("{ sec = 0, usec = 0 }\n{ sec = 0, usec = 0 }\n", "", 0)
             if list(command) == native_command("displays"):
                 return CmdResult('[{"id": 99, "builtin": false}]', "", 0)
             if list(command) == native_command("brightness"):
@@ -263,10 +265,16 @@ def _configure_health_sources():
                 rows = [
                     (900000, 1, 0, "/System/Library/CoreServices/loginwindow"),
                     (self.child, 900101, 0, "/usr/bin/caffeinate"),
-                    (900101, 1, 0, "/opt/demo/bin/claude"),
+                    (900101, 1, 0, "claude --fixture-worker"),
                     (900200, 1, 85, "/opt/demo/bin/render-worker"),
                     (900201, 1, 65, "/opt/demo/bin/sync-worker"),
                     (900202, 1, 55, "/opt/demo/bin/build-worker"),
+                    (
+                        900203,
+                        1,
+                        25,
+                        "/System/Library/Frameworks/CoreServices.framework/Frameworks/Metadata.framework/Support/mds",
+                    ),
                 ]
                 return CmdResult(
                     "\n".join(

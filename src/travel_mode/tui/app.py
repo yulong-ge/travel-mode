@@ -159,7 +159,8 @@ class TravelApp(Workflow, Lifecycle, Dispatch, Capabilities, App):
                 from travel_mode import sessions
 
                 sessions.begin(self.st)
-            if "session" in self.st:
+            modifying = self._mutation_action is not None and action is None
+            if "session" in self.st and modifying:
                 counts = self.st["session"]["actions"]
                 counts["attempted"] += 1
                 counts["failed"] += 1
@@ -171,6 +172,7 @@ class TravelApp(Workflow, Lifecycle, Dispatch, Capabilities, App):
                     error=error,
                     kind="state" if isinstance(error, StateError) else "action" if expected else "internal",
                     save=self.save if "session" in self.st else None,
+                    modifying=modifying,
                 )
             except StateError as log_error:
                 message = t(

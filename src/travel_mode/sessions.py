@@ -203,6 +203,14 @@ def build_report(state, restored, failed):
                 )
             ):
                 report["actions"] = dict(counts)
+    report["actions"] = action_counts(report["actions"], receipts)
+    if "failures" in report:
+        from .failures import is_action_failure
+
+        report["failures"] = [
+            dict(row, modifying=False) if not is_action_failure(row) and row["kind"] != "warning" else row
+            for row in receipts
+        ]
     if not active:
         report["errors"].append(t("session.missing_start"))
         return report
@@ -214,7 +222,7 @@ def build_report(state, restored, failed):
     report["errors"].extend(start["errors"])
     window = None
     try:
-        text = _read(["pmset", "-g", "log"], timeout=5)
+        text = _read(["pmset", "-g", "log"], timeout=10)
         window, report["power_status"] = log_window(
             text,
             timestamp(start["at"]),
@@ -315,6 +323,28 @@ def build_report(state, restored, failed):
             reasons=reasons,
         )
     return report
+
+
+def action_counts(counts, receipts):
+    """Project out old read-worker increments without modifying stored history."""
+    from .failures import is_action_failure
+
+    if counts is None:
+        return None
+    result = dict(counts)
+    for row in receipts:
+        # New observations carry modifying=False and never increment counts.
+        if (
+            "modifying" not in row
+            and row.get("counts")
+            and not is_action_failure(row)
+            and row["kind"] != "warning"
+            and result["attempted"]
+            and result["failed"]
+        ):
+            result["attempted"] -= 1
+            result["failed"] -= 1
+    return result
 
 
 def validate_active(active):

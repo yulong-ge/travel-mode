@@ -26,6 +26,10 @@ def resources(action):
         return {("app", spec.name), *(("target", p) for p in (*spec.system_daemons, *spec.user_agents))}
     if callable(getattr(action, "command", None)):
         command = action.command()
+        if command[:1] == ["pmset"]:
+            # Battery/AC/global settings share one preferences store. Concurrent
+            # read-modify-write requests can overwrite another domain's change.
+            return {("pmset",)}
         if command[:2] in (["launchctl", "load"], ["launchctl", "unload"]):
             return {("target", command[-1])}
         if command[:1] == ["open"]:
@@ -73,7 +77,7 @@ def execute_batch(executor, actions, context, completed=None, ordered=False, clo
     from ..system.sudo import confirm_batch
 
     confirm_batch(actions)
-    if not ordered:
+    if not ordered and executor.batch_workers > 1:
         waves = []
         remaining = list(enumerate(actions))
         while remaining:
@@ -262,6 +266,7 @@ def execute_batch(executor, actions, context, completed=None, ordered=False, clo
                 str(errors[0]),
                 error=errors[0],
                 kind="state" if isinstance(errors[0], StateError) else "internal",
+                modifying=True,
             )
             if not isinstance(errors[0], StateError):
                 save(state)

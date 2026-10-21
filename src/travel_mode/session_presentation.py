@@ -142,23 +142,16 @@ def describe(report, peers=(), *, verbose=False):
         else:
             yield t("session.no_average")
     measurement = report["measurement"]
-    if measurement and measurement.get("mode") == "passive":
+    if measurement:
         from .measurement import comparison_description
 
         yield comparison_description(measurement)
-    elif measurement:
-        before, after = measurement["before"], measurement["after"]
-        if before["available"]:
-            yield t("report.before", watts=before["average_watts"])
-        if after and after["available"]:
-            yield t("report.after", watts=after["average_watts"])
-        if measurement.get("saved_watts") is not None:
-            yield t("report.saving", watts=measurement["saved_watts"])
-        if not before["available"] or (after and not after["available"]):
-            yield t("report.measure_failed")
-    counts = report["actions"]
+    from .failures import is_action_failure
+    from .sessions import action_counts
+
+    counts = action_counts(report["actions"], report.get("failures", []))
     yield t("report.actions", **counts) if counts else t("report.actions_unknown")
-    failures = [failure_view(row, report) for row in report.get("failures", []) if row["kind"] != "warning"]
+    failures = [failure_view(row, report) for row in report.get("failures", []) if is_action_failure(row)]
     for row in failures:
         if not row["restoring"]:
             yield t("report.failed_item", name=row["name"], reason=t("report.reason." + row["reason"])) + (
@@ -198,9 +191,28 @@ def describe(report, peers=(), *, verbose=False):
             count=comp["count"],
         )
     if report["errors"]:
-        yield t("report.read_unavailable")
+        yield t(
+            "report.read_unavailable",
+            readings=t("admin.separator").join(
+                dict.fromkeys(reading_problem(error) for error in report["errors"])
+            ),
+        )
     if verbose:
         yield from diagnostics(report)
+
+
+def reading_problem(error):
+    if "pmset -g log" in error:
+        return t(
+            "report.power_log_timeout"
+            if "timeout" in error.lower() or "124" in error
+            else "report.power_log_failed"
+        )
+    if "ioreg" in error or "battery" in error.lower():
+        return t("report.battery_read_failed")
+    if "pmset -g batt" in error:
+        return t("report.percent_read_failed")
+    return error
 
 
 def diagnostics(report):

@@ -506,6 +506,12 @@ class DebugApp(TravelApp):
             saved_watts=None if index == 0 else before - after,
             extra_hours=None,
         )
+        if index == 1:
+            # An old saved session must render through the current threshold too.
+            self.st["measurement"].pop("mode")
+            self.st["measurement"]["before"]["average_watts"] = 8.82
+            self.st["measurement"]["after"]["average_watts"] = 8.54
+            self.st["measurement"].update(saved_watts=0.28, extra_hours=0.18)
         self.update_session()
         self.main_query_one("#body").scroll_home(animate=False, immediate=True)
         self.call_after_refresh(self.write_layout)
@@ -553,10 +559,7 @@ class DebugApp(TravelApp):
             )
         )
         await self.render_plan()
-        self.logline(
-            "bad",
-            t("failure.quit_refused", name=failure["name"]) if len(app_rows) > 1 else t("redesign.row_done"),
-        )
+        self.publish_result_summary()
         self.main_query_one("#body").scroll_home(animate=False, immediate=True)
         self.call_after_refresh(self.write_layout)
 
@@ -627,6 +630,29 @@ class DebugApp(TravelApp):
 
         # Public deterministic fixture only; never read a user's history.
         report = json.loads((ROOT / "tests/fixtures/session-wording.json").read_text())
+        report["measurement"] = dict(
+            before=dict(available=True, average_watts=8.82, interval_count=1),
+            after=dict(available=True, average_watts=8.54, interval_count=1),
+            saved_watts=0.28,
+            extra_hours=0.18,
+        )
+        report["errors"] = ["pmset -g log: timeout (124)"]
+        report["failures"].append(
+            dict(
+                at=report["ended_at"],
+                scenario="work",
+                action=t("failure.worker", group="battery"),
+                target="",
+                command=[],
+                rc=None,
+                reason="old read error",
+                stdout="",
+                stderr="",
+                kind="internal",
+                counts=dict(attempted=14, succeeded=11, failed=3),
+            )
+        )
+        report["actions"] = dict(attempted=14, succeeded=11, failed=3)
         self.view_mode = "session"
         self.update_primary()
         self.push_screen(SessionScreen("\n".join(sessions.describe(report))))

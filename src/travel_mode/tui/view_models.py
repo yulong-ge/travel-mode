@@ -101,6 +101,11 @@ def plan_view(row):
     else:
         action = t("redesign.row_done")
     reason = t(row["reason_key"]) if row.get("reason_key") else row["reason"]
+    if kind == "app":
+        if row["action"] in {"quit", "force"}:
+            reason = t("redesign.quit_reason")
+        elif row["action"] == "freeze" and row.get("reason_key") == "redesign.quit_reason":
+            reason = t("setup.reason_freeze")
     if state == "warning":
         reason = t(row["warning_key"], name=row["name"]) if row.get("warning_key") else row["result"]
         reason = reason.removeprefix(row["name"]).strip()

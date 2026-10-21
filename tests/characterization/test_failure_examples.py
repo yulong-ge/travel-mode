@@ -79,7 +79,8 @@ async def test_tui_google_drive_refusal_example(machine, scenario, language):
         text = "\n".join(line.text for line in app.query_one("#log", RichLog).lines) + "\n"
         assert app.is_running and app._exception is None and "Traceback" not in text
         assert "Google Drive" in text
-        assert ("travel-mode.log" in text) is (scenario == "work")
+        # Forced away fallback is a warning; final UI summaries link its details too.
+        assert "travel-mode.log" in text
         assert ("910001" in machine["processes"]) is (scenario == "work")
         assert str(machine["plist"]) in state.load_state()["unloaded_svcs"]
         if scenario == "away":

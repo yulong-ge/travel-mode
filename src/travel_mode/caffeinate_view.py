@@ -18,7 +18,9 @@ def provenance(row, by_pid, command, holders):
         chain.append(identity)
         executable = parent["executable"]
         app = re.match(r"(.+?\.app)/Contents/", executable)
-        name = Path(app[1]).stem if app else Path(executable).name
+        # macOS comm can contain a process title (for example CLI arguments).
+        # Keep the exact identity for PID safety, but never present those arguments.
+        name = Path(app[1]).stem if app else Path(executable).name.split()[0]
         if source is None and name not in WRAPPERS:
             source = dict(name="Claude Code" if name == "claude" else name, **identity)
         parent = by_pid.get(parent["ppid"])

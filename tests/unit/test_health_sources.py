@@ -19,6 +19,22 @@ def test_caffeinate_follows_parent_chain_and_estimates_remaining(fake_runner):
     assert len(subject["parent_chain"]) == 2
 
 
+def test_caffeinate_process_title_does_not_expose_arguments(fake_runner):
+    from travel_mode.system.health import PROCESS_COMMAND
+    from travel_mode.system.shell import CmdResult
+
+    populate(fake_runner)
+    response = fake_runner.responses[tuple(PROCESS_COMMAND)]
+    fake_runner.responses[tuple(PROCESS_COMMAND)] = CmdResult(
+        response.stdout.replace("/opt/demo/bin/claude", "claude --fixture-worker"), "", 0
+    )
+    report = collect()
+    text = "\n".join(r["message"] for r in sleep_readiness.from_report(report)["items"])
+    assert "Claude Code" in text and "--fixture-worker" not in text
+    subject = next(r for r in report["checks"] if r["id"] == "keep_awake")["subjects"][0]
+    assert subject["source"]["executable"] == "claude --fixture-worker"
+
+
 def test_caffeinate_unknown_parent_is_explicit_not_guessed(fake_runner):
     populate(fake_runner, parent=False)
     set_language("zh")

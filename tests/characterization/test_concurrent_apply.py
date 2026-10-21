@@ -9,6 +9,7 @@ from travel_mode.failures import log_path
 from travel_mode.i18n import set_language, t
 from travel_mode.system import shell
 from travel_mode.tui.app import TravelApp
+from tui_interaction import click_after_layout
 from tui_plan import app_item, select_plan
 
 
@@ -69,6 +70,10 @@ async def test_partial_completion_is_visible_before_the_quit_batch_finishes(mach
         await app.wait_for_idle()
         assert app_item(app, "Quit Demo")["state"] == "done"
         assert not app.main_query_one("#b-complete").disabled
+        assert (
+            str(app.main_query_one("#result-summary").content)
+            in app.main_query_one("#last-result").full_text().plain
+        )
         assert str(app.main_query_one("#result-summary").content) == t(
             "redesign.result_summary", ok=2, failed=0
         )
@@ -79,3 +84,41 @@ async def test_partial_completion_is_visible_before_the_quit_batch_finishes(mach
             assert str(app.main_query_one("#result-summary").content) == t(
                 "redesign.result_summary", **counts
             ) + t("redesign.result_details", path=log_path())
+
+
+async def test_grouped_power_and_refusal_use_same_row_counts_in_summary_and_footer(machine, monkeypatch):
+    from travel_mode.system.shell import CmdResult
+
+    app = TravelApp(scenario="work", measure=False)
+    original = shell.get_runner()
+
+    def refused(command, timeout=None, interactive=False):
+        if command[0] == "osascript":
+            return CmdResult("", "User canceled (-128)", 1)
+        return original(command, timeout, interactive)
+
+    class Clock:
+        now = 0
+
+        def monotonic(self):
+            return self.now
+
+        def sleep(self, seconds):
+            self.now += seconds
+
+    clock = Clock()
+    monkeypatch.setattr("travel_mode.system.apps.QuitClock", lambda: clock)
+    async with app.run_test(size=(120, 36)) as pilot:
+        await app.wait_for_idle()
+        ids = {r["id"] for r in app.plan_items if r["descriptor"].get("domain") == "-c"}
+        assert len(ids) == 2
+        ids.add(app_item(app, "Quit Demo")["id"])
+        await select_plan(app, ids=ids)
+        shell.set_runner(refused)
+        await click_after_layout(pilot, "#b-quick")
+        await app.wait_for_idle()
+        assert app.last_batch == dict(ok=2, failed=1)
+        assert app.st["session"]["actions"] == dict(attempted=2, succeeded=1, failed=1)
+        summary = str(app.main_query_one("#result-summary").content)
+        assert summary in app.main_query_one("#last-result").full_text().plain
+        assert "-128" in str(app.st["action_failures"])

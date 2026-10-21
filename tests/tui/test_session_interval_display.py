@@ -66,6 +66,9 @@ async def test_interval_worker_errors_are_not_internal_but_program_errors_keep_t
     app = TravelApp(scenario="away", measure=False)
     async with app.run_test(size=(120, 45)):
         await app.wait_for_idle()
+        sessions.begin(app.st)
+        app.save()
+        counts = dict(app.st["session"]["actions"])
 
         async def unavailable():
             raise battery.IntervalError(reason)
@@ -89,3 +92,5 @@ async def test_interval_worker_errors_are_not_internal_but_program_errors_keep_t
         assert "LookupError" in rows[0]["traceback"]
         assert "travel-mode.log" in str(app.query_one("#last-result", Static).content)
         assert app.is_running and app._exception is None
+        assert app.st["session"]["actions"] == counts
+        assert rows[0]["modifying"] is False
