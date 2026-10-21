@@ -33,6 +33,15 @@
     "batt_prof": "",
     "brightness": "",
     "bt_off": "",
+    "confirmed_pauses": [
+      {
+        "command": "<ROOT>/Applications/Freeze Demo.app/Contents/MacOS/Freeze Demo",
+        "kind": "pid",
+        "path": "<ROOT>/Applications/Freeze Demo.app",
+        "pid": 910002,
+        "started": "Thu Oct 15 12:00:00 2026"
+      }
+    ],
     "frozen_apps": [
       "<ROOT>/Applications/Freeze Demo.app"
     ],

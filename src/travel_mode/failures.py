@@ -310,10 +310,10 @@ def reporter(emit):
         _reporter.reset(token)
 
 
-def result(ok, name):
+def result(ok, name, units=1):
     batch = _batch.get()
     if batch is not None:
-        batch["success" if ok else "failed"].append(name)
+        batch["success" if ok else "failed"].extend([name] * units)
 
 
 @contextmanager
@@ -356,10 +356,10 @@ def batch(emit=None):
                 "failure.summary",
                 n=len(values["success"]),
                 m=len(values["failed"]),
-                names=", ".join(values["failed"]),
+                names=", ".join(dict.fromkeys(values["failed"])),
             )
             (emit or notify)("bad", text)
-        elif values["warnings"]:
+        elif values["success"] or values["warnings"]:
             (emit or notify)("ok", t("failure.summary_success", n=len(values["success"])))
 
 

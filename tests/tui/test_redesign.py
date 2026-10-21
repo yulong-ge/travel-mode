@@ -1,5 +1,7 @@
 """The interface commits one list and one primary action per screen."""
 
+import asyncio
+
 import pytest
 from textual.widgets import Checkbox, TabbedContent
 
@@ -38,7 +40,7 @@ async def test_plan_filters_preserve_selection_and_drawer_is_explicit(fake_runne
 
 
 @pytest.mark.parametrize("key,scenario", [("1", "work"), ("2", "away")])
-async def test_scenario_cards_need_enter_to_confirm(key, scenario, fake_runner):
+async def test_scenario_cards_need_enter_to_confirm(key, scenario, fake_runner, monkeypatch):
     app = TravelApp(scenario="ask", measure=False)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.press("d")
@@ -54,9 +56,18 @@ async def test_scenario_cards_need_enter_to_confirm(key, scenario, fake_runner):
         assert app.scenario == scenario and app.refresh_complete
         await pilot._wait_for_screen()
         assert app.focused.id == "body"
+        body = app.query_one("#body")
+        scrolled = asyncio.Event()
+        scroll_end = body.scroll_end
+
+        def tracked_scroll_end(**kwargs):
+            scroll_end(**kwargs, on_complete=scrolled.set)
+
+        monkeypatch.setattr(body, "scroll_end", tracked_scroll_end)
         await pilot.press("end")
+        await asyncio.wait_for(scrolled.wait(), 30)
         assert await app.screen.wait_for_refresh()
-        assert app.query_one("#body").scroll_y == app.query_one("#body").max_scroll_y
+        assert body.scroll_y == body.max_scroll_y
 
 
 @pytest.mark.parametrize(

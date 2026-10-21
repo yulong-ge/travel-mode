@@ -12,8 +12,17 @@ from .state import StateError
 from .system import launchd, process_control
 
 
+def was_paused(state, row):
+    return any(
+        receipt["kind"] == row["kind"]
+        and receipt["path"] == row["path"]
+        and (row["kind"] != "pid" or receipt["pid"] == row["pid"])
+        for receipt in state.get("confirmed_pauses", [])
+    )
+
+
 def detect(state):
-    if not state:
+    if not state or not state.get("confirmed_pauses"):
         return []
     result = []
     if state.get("unloaded_svcs"):
@@ -26,18 +35,25 @@ def detect(state):
                     raise ValueError(t("resurrection.invalid_label"))
             except (OSError, ValueError, KeyError, TypeError, ExpatError) as exc:
                 raise StateError(f"{path}: unloaded_svcs.Label: {exc}") from exc
-            if label in loaded:
-                result.append({"kind": "agent", "path": path, "name": label})
+            candidate = {"kind": "agent", "path": path, "name": label}
+            if label in loaded and was_paused(state, candidate):
+                result.append(candidate)
     if not state.get("quit_apps") and not state.get("frozen_pids"):
         return result
     rows = process_control.process_table()
     for path in dict.fromkeys(state.get("quit_apps", [])):
         prefixes = process_control._prefixes(path)
-        if any(row.command.startswith(prefixes) for row in rows):
+        if was_paused(state, dict(kind="app", path=path)) and any(
+            row.command.startswith(prefixes) for row in rows
+        ):
             result.append({"kind": "app", "path": path, "name": Path(path).stem})
     for receipt in state.get("frozen_pids", []):
         row = next((row for row in rows if process_control._same_process(row, receipt)), None)
-        if row is not None and not row.stat.startswith("T"):
+        if (
+            row is not None
+            and not row.stat.startswith("T")
+            and dict(kind="pid", **receipt) in state["confirmed_pauses"]
+        ):
             result.append(
                 {"kind": "pid", "path": receipt["path"], "name": Path(receipt["path"]).stem, "pid": row.pid}
             )

@@ -17,6 +17,7 @@ class Action:
     risk: ClassVar[str] = "safe"
     description: ClassVar[str]
     requires_journal: ClassVar[bool] = True
+    plan_units: ClassVar[int] = 1
 
     def describe(self):
         return t(self.description, v0=getattr(self, "name", getattr(self, "path", "")), v1="", v2="")

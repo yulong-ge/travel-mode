@@ -88,9 +88,9 @@
     "scenario": "away",
     "session": {
       "actions": {
-        "attempted": 3,
+        "attempted": 7,
         "failed": 0,
-        "succeeded": 3
+        "succeeded": 7
       },
       "external_seen": true,
       "id": "fixture-session",

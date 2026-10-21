@@ -90,6 +90,9 @@ def begin(state):
 def note(state, rows=(), *, external=False, save=save_state):
     if is_dry_run() or not state or "session" not in state:
         return
+    from .resurrection import was_paused
+
+    rows = [row for row in rows if was_paused(state, row)]
     from .state import STATE_LOCK
 
     with STATE_LOCK:
@@ -155,6 +158,7 @@ def log_window(text, start, end, *, start_observation=None, end_observation=None
 
 def build_report(state, restored, failed):
     from .flows.report import parse_darkwake_reasons, parse_sleep_segments
+    from .resurrection import was_paused
 
     active = state.get("session")
     end = observe()
@@ -180,7 +184,7 @@ def build_report(state, restored, failed):
             failed=failed,
             failed_attempts=(active["restore_failures"] if active else 0) + failed,
         ),
-        resurrected=active["resurrected"] if active else [],
+        resurrected=[row for row in active["resurrected"] if was_paused(state, row)] if active else [],
         away=None,
         errors=list(end["errors"]),
     )

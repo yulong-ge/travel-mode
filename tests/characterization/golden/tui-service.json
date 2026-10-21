@@ -23,6 +23,12 @@
     "batt_prof": "",
     "brightness": "",
     "bt_off": "",
+    "confirmed_pauses": [
+      {
+        "kind": "agent",
+        "path": "<ROOT>/Library/LaunchAgents/org.demo.worker.plist"
+      }
+    ],
     "frozen_apps": [],
     "frozen_pids": [],
     "pending_commands": [],

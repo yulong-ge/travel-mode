@@ -210,7 +210,7 @@ returns **insufficient samples**, without a number. AC power, charging or no bat
   `--measure`, using the bounded blocking window above. A short comparison does not prove
   causality.
 - **Remaining time.** The session screen and `status` share one calculation. If the Mac slept
-  during the session (Sleep/Wake events in the pmset log; DarkWake does not count as a wake), only
+  during the session (`sysctl kern.sleeptime` and `kern.waketime`, read instantly), only
   complete intervals after the last wake are used, labelled "at the average since waking". Until
   such an interval exists, the session average including sleep is shown without a remaining time.
 - **TUI.** While open, the TUI reads ioreg every 30 seconds and labels the value as a cached
@@ -291,7 +291,10 @@ complete".
 Power source for a session: the start and end observations plus the power-source events in the
 retained pmset log. macOS writes those events only when something changes, so a session with no
 events in its interval and battery at both ends counts as battery only; an AC event or an AC
-observation marks it as having been on AC; an unreadable log makes it unknown.
+observation marks it as having been on AC; an unreadable log makes it unknown. The log is read
+once, when `off` writes the report, with a 10-second limit (reading it takes about 3 seconds on the
+tested Mac); a timeout is reported as "power records could not be read" and does not affect the
+restore. `status` and the TUI never read it.
 
 Reports are appended to `history.jsonl` next to the state file (`[history] retain = 50`).
 `history` compares the current report with earlier ones of the same scenario, scope and power

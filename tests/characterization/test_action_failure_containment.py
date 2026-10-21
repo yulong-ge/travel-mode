@@ -63,6 +63,7 @@ async def test_state_write_error_stops_remaining_modifications_without_exiting(
 ):
     original = state.save_state
     modifications = []
+    from travel_mode.actions.journal import preparing_command
     from travel_mode.system import shell
 
     runner = shell.get_runner()
@@ -90,7 +91,10 @@ async def test_state_write_error_stops_remaining_modifications_without_exiting(
         await select_plan(app)
 
         def broken(st, *args, **kwargs):
-            if st.get("batt_prof") and (not after_mutation or modifications):
+            battery_command = (preparing_command.get() or [])[:3] == ["sudo", "pmset", "-b"]
+            battery_changed = any(cmd[:3] == ["sudo", "pmset", "-b"] for cmd in modifications)
+            fail_write = battery_changed if after_mutation else battery_command
+            if fail_write:
                 raise state.StateError("fixture write denied before pmset")
             return original(st, *args, **kwargs)
 

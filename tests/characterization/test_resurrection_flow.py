@@ -22,6 +22,11 @@ def paused_snapshot(machine):
             }
         ],
     )
+    snapshot["confirmed_pauses"] = [
+        dict(kind="agent", path=str(machine["plist"])),
+        dict(kind="app", path=machine["paths"]["Quit Demo"]),
+        dict(kind="pid", **snapshot["frozen_pids"][0]),
+    ]
     state.save_state(snapshot)
     return snapshot
 

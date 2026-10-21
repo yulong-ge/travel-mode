@@ -152,7 +152,10 @@ def force_kill(path, *, whole_bundle=False, sudo=False):
         return True
     if targets:
         time.sleep(1)
-    return not app_processes(path, whole_bundle=whole_bundle, main_only=not whole_bundle)
+    exited = not app_processes(path, whole_bundle=whole_bundle, main_only=not whole_bundle)
+    if targets and exited:
+        journal.confirm_pause("app", path)
+    return exited
 
 
 def freeze_app(path, state=None, save=None):
@@ -174,7 +177,8 @@ def freeze_app(path, state=None, save=None):
     journal.record_change("frozen_apps", path)
     for process in targets:
         journal.record_change("frozen_pids", process.receipt(path))
-        _signal(process, "-STOP")
+        if _signal(process, "-STOP"):
+            journal.confirm_pause("pid", **process.receipt(path))
     return True
 
 

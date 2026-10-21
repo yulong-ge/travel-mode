@@ -43,6 +43,9 @@ class Executor:
             from ..system.shell import ReadError, SudoReadError, is_dry_run
             from ..system.sudo import SudoCredentialError
 
+            units = action.plan_units
+            if type(units) is not int or units < 1:
+                raise ValueError(f"{type(action).__name__}: plan_units must be positive")
             counted = self.count_actions and ctx.state is not None and not is_dry_run()
             if counted:
                 if "session_report_pending" in ctx.state:
@@ -52,13 +55,13 @@ class Executor:
                     journal.persist()  # Fail before any mutation if recovery storage is unavailable.
                     sessions.begin(ctx.state)
                     counts = ctx.state["session"]["actions"]
-                    counts["attempted"] += 1
+                    counts["attempted"] += units
                     started = True
                     journal.persist()
                 except StateError as exc:
                     if started:
-                        counts["failed"] += 1
-                    failures.result(False, failures.action_name(action))
+                        counts["failed"] += units
+                    failures.result(False, failures.action_name(action), units)
                     failures.record(
                         ctx.state, failures.action_name(action), str(exc), error=exc, kind="state"
                     )
@@ -88,8 +91,8 @@ class Executor:
                     reason = str(exc)
                 except Exception as exc:
                     if counted:
-                        counts["failed"] += 1
-                    failures.result(False, failures.action_name(action))
+                        counts["failed"] += units
+                    failures.result(False, failures.action_name(action), units)
                     if isinstance(exc, StateError) and callable(getattr(action, "command", None)):
                         intended = (["sudo"] if getattr(action, "sudo", False) else []) + action.command()
                         if not any(row["command"] == intended for row in commands):
@@ -139,27 +142,21 @@ class Executor:
                 )
                 else []
             )
-            # An exhausted quit strategy is one failed action with both causes.
-            # A successful fallback completes both admitted steps successfully.
-            extra_steps = getattr(result, "attempts", 1) - 1 + len(recovered) if ok else 0
+            # Count user-visible plan rows, independent of command batching or fallback steps.
             if counted:
-                counts["attempted"] += extra_steps
-                counts["succeeded"] += extra_steps
-                counts["succeeded" if ok else "failed"] += 1
+                counts["succeeded" if ok else "failed"] += units
                 try:
                     journal.persist()
                 except StateError as exc:
                     if ok:
-                        counts["succeeded"] -= 1
-                        counts["failed"] += 1
-                    failures.result(False, label)
+                        counts["succeeded"] -= units
+                        counts["failed"] += units
+                    failures.result(False, label, units)
                     failures.record(
                         ctx.state, label, str(exc), commands, error=exc, kind="state", target=target
                     )
                     raise
-            failures.result(ok, label)
-            for _ in range(extra_steps):
-                failures.result(True, label)
+            failures.result(ok, label, units)
             if ok and (
                 getattr(result, "forced", False) or getattr(result, "helpers_remaining", False) or recovered
             ):

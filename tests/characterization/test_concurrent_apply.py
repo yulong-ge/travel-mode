@@ -118,7 +118,17 @@ async def test_grouped_power_and_refusal_use_same_row_counts_in_summary_and_foot
         await click_after_layout(pilot, "#b-quick")
         await app.wait_for_idle()
         assert app.last_batch == dict(ok=2, failed=1)
-        assert app.st["session"]["actions"] == dict(attempted=2, succeeded=1, failed=1)
+        counts = dict(attempted=3, succeeded=2, failed=1)
+        assert app.st["session"]["actions"] == counts
         summary = str(app.main_query_one("#result-summary").content)
         assert summary in app.main_query_one("#last-result").full_text().plain
         assert "-128" in str(app.st["action_failures"])
+        from travel_mode import sessions
+
+        report = sessions.build_report(app.st, 0, 0)
+        assert report["actions"] == counts
+        assert t("report.actions", **counts) in "\n".join(sessions.describe(report))
+        assert report["resurrected"] == []
+        from travel_mode import resurrection
+
+        assert not any(row["path"] == machine["paths"]["Quit Demo"] for row in resurrection.detect(app.st))

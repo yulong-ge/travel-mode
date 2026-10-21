@@ -42,6 +42,12 @@
     "batt_prof": "",
     "brightness": "",
     "bt_off": "",
+    "confirmed_pauses": [
+      {
+        "kind": "app",
+        "path": "<ROOT>/Applications/Network Demo.app"
+      }
+    ],
     "frozen_apps": [],
     "frozen_pids": [],
     "power_origin": {

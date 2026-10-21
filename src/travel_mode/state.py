@@ -121,6 +121,26 @@ def load_state(path=None):
         raise StateError(t("safety.invalid_receipt", path=target, field="frozen_pids"))
     if "frozen_pids" in raw:
         result["frozen_pids"] = receipts
+    if "confirmed_pauses" in raw:
+        pauses = raw["confirmed_pauses"]
+        if not isinstance(pauses, list) or any(
+            not isinstance(item, dict)
+            or not isinstance(item.get("kind"), str)
+            or item.get("kind") not in {"app", "agent", "pid"}
+            or not isinstance(item.get("path"), str)
+            or not item["path"]
+            or (
+                set(item) != {"kind", "path", "pid", "started", "command"}
+                or type(item["pid"]) is not int
+                or item["pid"] <= 0
+                or any(not isinstance(item[k], str) or not item[k] for k in ("started", "command"))
+                if item.get("kind") == "pid"
+                else set(item) != {"kind", "path"}
+            )
+            for item in pauses
+        ):
+            raise StateError(t("safety.invalid_receipt", path=target, field="confirmed_pauses"))
+        result["confirmed_pauses"] = pauses
     if "legacy_frozen_apps" in raw:
         legacy = raw["legacy_frozen_apps"]
         if not isinstance(legacy, list) or any(not isinstance(item, str) or not item for item in legacy):

@@ -154,7 +154,12 @@ def grace_quit(path, name):
     from .app_snapshot import live_process_scope
 
     with live_process_scope():
-        return _grace_quit(path, name)
+        result = _grace_quit(path, name)
+        if result and result.command:
+            from ..actions.journal import confirm_pause
+
+            confirm_pause("app", path)
+        return result
 
 
 def _grace_quit(path, name):

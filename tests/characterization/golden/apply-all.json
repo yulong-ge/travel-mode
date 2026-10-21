@@ -531,6 +531,36 @@
     "batt_prof": "lowpowermode 0 sleep 1 displaysleep 10 hibernatemode 3",
     "brightness": "0.8",
     "bt_off": "1",
+    "confirmed_pauses": [
+      {
+        "kind": "agent",
+        "path": "<ROOT>/org.demo.daemon.plist"
+      },
+      {
+        "kind": "app",
+        "path": "<ROOT>/Applications/Remote Demo.app"
+      },
+      {
+        "kind": "app",
+        "path": "<ROOT>/Applications/Quit Demo.app"
+      },
+      {
+        "kind": "app",
+        "path": "<ROOT>/Applications/Freeze Demo.app"
+      },
+      {
+        "kind": "app",
+        "path": "<ROOT>/Applications/Ask Demo.app"
+      },
+      {
+        "kind": "agent",
+        "path": "<ROOT>/Library/LaunchAgents/org.demo.worker.plist"
+      },
+      {
+        "kind": "app",
+        "path": "<ROOT>/Applications/Network Demo.app"
+      }
+    ],
     "frozen_apps": [],
     "frozen_pids": [],
     "pending_commands": [],
@@ -550,9 +580,9 @@
     "saved_at": "<TIME>",
     "session": {
       "actions": {
-        "attempted": 16,
+        "attempted": 20,
         "failed": 0,
-        "succeeded": 16
+        "succeeded": 20
       },
       "external_seen": true,
       "id": "fixture-session",

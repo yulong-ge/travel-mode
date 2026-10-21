@@ -110,6 +110,16 @@
     "batt_prof": "",
     "brightness": "",
     "bt_off": "",
+    "confirmed_pauses": [
+      {
+        "kind": "agent",
+        "path": "<ROOT>/org.demo.daemon.plist"
+      },
+      {
+        "kind": "app",
+        "path": "<ROOT>/Applications/Remote Demo.app"
+      }
+    ],
     "frozen_apps": [],
     "frozen_pids": [],
     "pending_commands": [],

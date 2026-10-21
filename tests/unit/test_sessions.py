@@ -252,6 +252,7 @@ def test_history_cli_json_limit_and_no_observation(session_machine, darwin_platf
 
 def test_resurrection_and_external_observations_survive_roundtrip(session_machine):
     st, _ = session_machine
+    st["confirmed_pauses"] = [dict(kind="app", path="/Applications/Worker.app")]
     state.save_state(st)
     row = dict(kind="app", name="Worker", path="/Applications/Worker.app")
     sessions.note(st, [row, row], external=True)

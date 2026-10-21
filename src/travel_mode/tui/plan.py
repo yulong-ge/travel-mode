@@ -417,7 +417,7 @@ def execution_units(rows, scenario, state, save):
             if key in values and values[key] != value and member["id"] != "deep-sleep":
                 continue
             values[key] = value
-        yield unit, SetPowerProfile([token for pair in values.items() for token in pair], domain)
+        yield unit, SetPowerProfile([token for pair in values.items() for token in pair], domain, len(unit))
 
 
 def covers(row, descriptor):

@@ -15,6 +15,7 @@ All notable changes follow Keep a Changelog.
 
 ### Fixed
 
+- Sleep detection reads `kern.sleeptime`/`kern.waketime` instead of the slow pmset log, which timed out on real hardware; power-setting writes for different domains run one after another (in parallel they raced); result counts, quit reasons and caffeinate sources are shown correctly.
 - A retry that succeeded is now marked as recovered even when the action label is long; failures are matched by action type and exact target.
 - The session screen no longer reports an internal error in the first minute of a session; it waits for new battery data.
 - Session reports and history use local time, readable durations and percentages; failures fixed by a later retry are listed as recovered; commands, exit codes and mAh moved to `--verbose`.

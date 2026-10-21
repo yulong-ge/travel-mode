@@ -147,7 +147,7 @@ async def test_tui_fault_representative_admits_continues_retries_and_restores(
     if family == "password":
         index = next(i for i, c in enumerate(plan) if c[:2] == ("sudo", "pmset"))
     elif family in {"command", "refused"}:
-        index = next(i for i, c in enumerate(plan) if c[0] == "osascript")
+        index = next(i for i, c in enumerate(plan) if c[0] == "osascript" and "org.demo.app910001" in c[4])
     else:
         index = next(i for i, c in enumerate(plan) if c[:2] == ("kill", "-STOP"))
     target = plan[index]

@@ -85,6 +85,6 @@ async def test_tui_google_drive_refusal_example(machine, scenario, language):
         assert str(machine["plist"]) in state.load_state()["unloaded_svcs"]
         if scenario == "away":
             assert not state.load_state().get("action_failures")
-            assert state.load_state()["session"]["actions"] == dict(attempted=6, succeeded=6, failed=0)
+            assert state.load_state()["session"]["actions"] == dict(attempted=8, succeeded=8, failed=0)
             assert sum("Google Drive" in line for line in text.splitlines()) == 1
         evidence(machine, "tui", scenario, language, text)

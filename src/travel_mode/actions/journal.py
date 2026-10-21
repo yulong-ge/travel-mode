@@ -63,6 +63,15 @@ def record_change(key, value):
     persist()
 
 
+def confirm_pause(kind, path, **identity):
+    """Success evidence is separate from recovery intent written before commands."""
+    from ..system.shell import is_dry_run
+
+    if is_dry_run() or active_state() is None:
+        return
+    record_change("confirmed_pauses", dict(kind=kind, path=path, **identity))
+
+
 def prepare_command(command):
     """Persist scoped command intent. Failed/time-out commands remain uncertain and recoverable."""
     state = active_state()
@@ -120,6 +129,9 @@ def prepare_command(command):
 
 def complete_command(command, rc):
     if rc == 0:
+        bare = command[1:] if command[:1] == ["sudo"] else command
+        if bare[:2] == ["launchctl", "unload"]:
+            confirm_pause("agent", bare[2])
         state = active_state()
         if state and command in state.get("pending_commands", []):
             state["pending_commands"].remove(command)

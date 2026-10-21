@@ -18,8 +18,13 @@ class EnableSleep(Command):
 class SetPowerProfile(Command):
     values: list
     domain: str = "-b"
+    visible_rows: int | None = None
     description = "impl.applying_recommended_power_settings"
     sudo = True
+
+    @property
+    def plan_units(self):
+        return self.visible_rows if self.visible_rows is not None else len(self.values) // 2
 
     def command(self):
         from ..i18n import t

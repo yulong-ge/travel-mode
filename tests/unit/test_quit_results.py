@@ -140,7 +140,8 @@ def test_quit_fallback_has_one_final_outcome_and_preserves_both_errors(monkeypat
     report = sessions.build_report(loaded, 0, 0)
     if force_ok:
         assert not loaded.get("action_failures") and not report.get("failures")
-        assert loaded["session"]["actions"] == dict(attempted=2, succeeded=2, failed=0)
+        # The fallback is a second command for the same visible app row.
+        assert loaded["session"]["actions"] == dict(attempted=1, succeeded=1, failed=0)
         assert len([row for row in messages if row[0] == "warn"]) == 1
         assert not any(kind == "bad" for kind, _ in messages)
         assert "retry" not in messages[0][1].lower()

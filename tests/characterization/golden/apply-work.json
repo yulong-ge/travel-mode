@@ -160,6 +160,23 @@
     "batt_prof": "lowpowermode 0",
     "brightness": "",
     "bt_off": "",
+    "confirmed_pauses": [
+      {
+        "kind": "app",
+        "path": "<ROOT>/Applications/Quit Demo.app"
+      },
+      {
+        "command": "<ROOT>/Applications/Freeze Demo.app/Contents/MacOS/Freeze Demo",
+        "kind": "pid",
+        "path": "<ROOT>/Applications/Freeze Demo.app",
+        "pid": 910002,
+        "started": "Thu Oct 15 12:00:00 2026"
+      },
+      {
+        "kind": "agent",
+        "path": "<ROOT>/Library/LaunchAgents/org.demo.worker.plist"
+      }
+    ],
     "frozen_apps": [
       "<ROOT>/Applications/Freeze Demo.app"
     ],
@@ -185,9 +202,9 @@
     "scenario": "work",
     "session": {
       "actions": {
-        "attempted": 5,
+        "attempted": 6,
         "failed": 0,
-        "succeeded": 5
+        "succeeded": 6
       },
       "external_seen": true,
       "id": "fixture-session",
