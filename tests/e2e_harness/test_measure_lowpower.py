@@ -246,10 +246,9 @@ def test_main_rollback_failure_is_loud_and_nonzero(tmp_path, monkeypatch, capsys
     machine.restore_mismatch = True
     shell.set_runner(machine)
     monkeypatch.setattr(experiment.sys, "platform", "darwin")
-    monkeypatch.setattr(experiment.tempfile, "mkdtemp", lambda **kwargs: str(tmp_path / "evidence"))
     monkeypatch.setattr(experiment.state, "load_state", lambda path=None: None)
     monkeypatch.setattr(experiment.measurement, "Clock", FakeClock)
-    assert experiment.main([]) == 1
+    assert experiment.main(["--output", str(tmp_path / "evidence")]) == 1
     assert "ROLLBACK FAILED" in capsys.readouterr().err
 
 

@@ -99,6 +99,10 @@ that item is reported as "unable to confirm (requires sudo)" and the command exi
 Messages describe planned actions ("will quit", "will freeze N processes"). A preview does not
 prove that the real run will succeed. Before/after power measurement is skipped.
 
+The temporary directory is printed so the planned state can be inspected. The five most recent
+dry-run directories are kept; creating a new one removes older ones that carry the tool's
+ownership marker, and nothing else. Demo mode removes its directory when it exits.
+
 ## Sudo and tool paths
 
 Sudo is requested only for actions that need it: power writes, global sleep repair, system

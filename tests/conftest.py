@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from travel_mode.system.shell import CmdResult, set_runner, subprocess_runner
 from user_data_snapshot import assert_unchanged, snapshot_user_data
 
 REAL_HOME = Path.home()
+pytest_plugins = ["temp_dir_guard"]
 
 
 class FakeRunner:
@@ -222,6 +224,10 @@ def isolated_user_paths(real_user_data_guard, hermetic_environment, tmp_path, mo
     monkeypatch.setenv("TRAVEL_MODE_CONFIG", str(tmp_path / "config.toml"))
     monkeypatch.setenv("TRAVEL_MODE_STATE", str(tmp_path / "state.json"))
     monkeypatch.setenv("HOME", str(tmp_path))
+    temporary = tmp_path
+    monkeypatch.setenv("TMPDIR", str(temporary))
+    # tempfile caches its first chosen directory; TMPDIR alone is insufficient.
+    monkeypatch.setattr(tempfile, "tempdir", str(temporary))
     for variable, directory in {
         "XDG_CONFIG_HOME": "xdg-config",
         "XDG_STATE_HOME": "xdg-state",

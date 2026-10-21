@@ -12,7 +12,6 @@ import re
 import shlex
 import shutil
 import sys
-import tempfile
 import time
 from contextlib import ExitStack
 from datetime import datetime, timedelta, timezone
@@ -27,6 +26,7 @@ from e2e_guard import GuardRunner, LocalBackend
 from e2e_isolation import write_fixture_config
 from e2e_local import Harness, create_fixtures, fixture_paths, preflight, print_plan, product_environment
 from harness_evidence import EvidenceError, acknowledged, read_json, read_layout, write_json, write_text
+from harness_temporary import DIAGNOSTICS, fixture_directory
 from terminal_render import render
 from tui_debug import ROOT, DebugApp, Session, isolated_env
 
@@ -566,32 +566,28 @@ def child(args):
             finally:
                 # Keep private failure/session evidence before fixture cleanup
                 # removes its isolated state directory. Never read host state.
-                for name in (
-                    "travel-mode.log",
-                    "travel-mode.log.1",
-                    "history.jsonl",
-                    "refusing-build.stdout",
-                    "refusing-build.stderr",
-                ):
-                    source = root / name
-                    if source.is_file():
-                        target = evidence / name
-                        shutil.copyfile(source, target)
-                        target.chmod(0o600)
-                if args.battery_measure:
-                    report["battery_measurement"] = e2e_battery.evidence(
-                        runner, getattr(harness, "comparison", None)
-                    )
-                    report["session"] = getattr(harness, "session_report", None)
-                    report["full_run_power_coverage"] = getattr(harness, "battery_coverage", None)
-                    print("BATTERY DIAGNOSTICS: " + json.dumps(report["battery_measurement"]), flush=True)
                 try:
-                    harness.cleanup()
-                except BaseException as error:
-                    report["cleanup_error"] = f"{type(error).__name__}: {error}"
-                    if primary_error is None:
-                        raise
-                    print(f"CLEANUP ALSO FAILED: {error}", file=sys.stderr, flush=True)
+                    for name in DIAGNOSTICS:
+                        source = root / name
+                        if source.is_file():
+                            target = evidence / name
+                            shutil.copyfile(source, target)
+                            target.chmod(0o600)
+                    if args.battery_measure:
+                        report["battery_measurement"] = e2e_battery.evidence(
+                            runner, getattr(harness, "comparison", None)
+                        )
+                        report["session"] = getattr(harness, "session_report", None)
+                        report["full_run_power_coverage"] = getattr(harness, "battery_coverage", None)
+                        print("BATTERY DIAGNOSTICS: " + json.dumps(report["battery_measurement"]), flush=True)
+                finally:
+                    try:
+                        harness.cleanup()
+                    except BaseException as error:
+                        report["cleanup_error"] = f"{type(error).__name__}: {error}"
+                        if primary_error is None:
+                            raise
+                        print(f"CLEANUP ALSO FAILED: {error}", file=sys.stderr, flush=True)
         report["status"] = "PASS"
     except BaseException as error:
         report["error"] = f"{type(error).__name__}: {error}"
@@ -955,44 +951,44 @@ def main(argv=None):
             continue
         evidence = output / f"{scenario}-{interface}"
         evidence.mkdir()
-        fixture = Path(tempfile.mkdtemp(prefix="travel-mode-e2e-ui-"))
-        session = UISession(
-            evidence,
-            fixture,
-            interface,
-            args.demo,
-            scenario,
-            battery_measure=args.battery_measure,
-            demo_vm=args.demo_vm,
-        )
-        try:
-            session.wait_fixture_setup()
-            driver(session)
-        except (RuntimeError, TimeoutError, AssertionError, OSError, EvidenceError) as primary:
-            write_json(evidence / "driver-error.json", {"error": f"{type(primary).__name__}: {primary}"})
-            session.shot("failure")
-            if not (evidence / "result.json").exists():
-                if interface == "tui":
-                    session.keys("Escape")
-                session.tmux("send-keys", "q" if interface == "tui" else "C-c")
-                try:
-                    wait_for(
-                        lambda evidence=evidence: (evidence / "result.json").exists(),
-                        "Interrupted child did not finish fixture cleanup",
-                        session.timeout,
-                    )
-                except (RuntimeError, TimeoutError) as cleanup:
-                    write_json(evidence / "driver-cleanup-error.json", {"error": str(cleanup)})
-                    print(f"CLEANUP ALSO FAILED: {cleanup}", file=sys.stderr)
-            session.shot("failure-after-cleanup")
-            raise
-        finally:
-            rows.extend(session.captures)
-            write_json(output / "screenshots.json", rows)
-            # No kill-server while the child may own live fixtures: allow its
-            # try/finally cleanup to finish before destroying the dedicated server.
-            if (evidence / "result.json").exists():
-                session.close()
+        with fixture_directory(evidence, "travel-mode-e2e-ui-") as fixture:
+            session = UISession(
+                evidence,
+                fixture,
+                interface,
+                args.demo,
+                scenario,
+                battery_measure=args.battery_measure,
+                demo_vm=args.demo_vm,
+            )
+            try:
+                session.wait_fixture_setup()
+                driver(session)
+            except (RuntimeError, TimeoutError, AssertionError, OSError, EvidenceError) as primary:
+                write_json(evidence / "driver-error.json", {"error": f"{type(primary).__name__}: {primary}"})
+                session.shot("failure")
+                if not (evidence / "result.json").exists():
+                    if interface == "tui":
+                        session.keys("Escape")
+                    session.tmux("send-keys", "q" if interface == "tui" else "C-c")
+                    try:
+                        wait_for(
+                            lambda evidence=evidence: (evidence / "result.json").exists(),
+                            "Interrupted child did not finish fixture cleanup",
+                            session.timeout,
+                        )
+                    except (RuntimeError, TimeoutError) as cleanup:
+                        write_json(evidence / "driver-cleanup-error.json", {"error": str(cleanup)})
+                        print(f"CLEANUP ALSO FAILED: {cleanup}", file=sys.stderr)
+                session.shot("failure-after-cleanup")
+                raise
+            finally:
+                rows.extend(session.captures)
+                write_json(output / "screenshots.json", rows)
+                # No kill-server while the child may own live fixtures: allow its
+                # try/finally cleanup to finish before destroying the dedicated server.
+                if (evidence / "result.json").exists():
+                    session.close()
     print("| Step | Screenshot |\n| --- | --- |")
     for row in rows:
         print(f"| {row['step']} | {row['screenshot']} |")

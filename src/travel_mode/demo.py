@@ -3,21 +3,22 @@
 from __future__ import annotations
 
 import os
+from contextlib import contextmanager
+from pathlib import Path
 
 from travel_mode.system import apps, launchd
 
 
-def _configure_demo() -> None:
+def _configure_demo(directory=None) -> None:
     """Install deterministic fixture data for screenshots and UI smoke checks."""
-    import tempfile
-    from pathlib import Path
-
+    from .paths import state_path
     from .state import set_state_path_override
     from .system.health import PROCESS_COMMAND, native_command
     from .system.shell import CmdResult, set_runner
 
     fixture = Path(__file__).parent.parent.parent / "tests" / "fixtures"
-    demo_root = Path(tempfile.mkdtemp(prefix="travel-mode-demo-", dir="/tmp"))
+    # CLI owns the demo lifecycle root; do not allocate a second, orphaned tree.
+    demo_root = Path(directory) if directory is not None else state_path().parent
     demo_state = demo_root / "state.json"
     demo_config = demo_root / "config.toml"
     demo_config.write_text(
@@ -98,6 +99,31 @@ def _configure_demo() -> None:
             return CmdResult("", "", 0)
 
     set_runner(DemoRunner())
+
+
+@contextmanager
+def environment(parent=None):
+    """Debug/script entry points own their fixtures even when startup or the UI fails."""
+    import tempfile
+
+    from . import state
+    from .system import shell
+
+    variables = ("TRAVEL_MODE_CONFIG", "TRAVEL_MODE_STATE")
+    previous = {key: os.environ.get(key) for key in variables}
+    override, runner = state._STATE_PATH_OVERRIDE, shell.get_runner()
+    with tempfile.TemporaryDirectory(prefix="travel-mode-demo-", dir=parent) as directory:
+        try:
+            _configure_demo(directory)
+            yield Path(directory)
+        finally:
+            shell.set_runner(runner)
+            state.set_state_path_override(override)
+            for key, value in previous.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
 
 
 def setup_rows():

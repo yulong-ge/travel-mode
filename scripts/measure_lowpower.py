@@ -8,7 +8,6 @@ import json
 import math
 import shlex
 import sys
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -255,6 +254,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plan", action="store_true")
     parser.add_argument("--lang", choices=("en", "zh"), default="en")
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     set_language(args.lang)
     if args.plan:
@@ -262,7 +262,8 @@ def main(argv=None):
         return 0
     if sys.platform != "darwin":
         raise ExperimentError(t("lowpower.macos_only"))
-    output = Path(tempfile.mkdtemp(prefix="travel-mode-lowpower-", dir="/tmp"))
+    output = args.output or Path("/tmp/lowpower-measurements") / datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    output.mkdir(parents=True, exist_ok=False)
     try:
         report = run_experiment(output)
     except (

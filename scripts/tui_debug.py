@@ -711,32 +711,35 @@ class DebugApp(TravelApp):
 
 def child(args) -> int:
     """No real write-capable runner is installed in either debug mode."""
+    from contextlib import ExitStack
+
     from travel_mode.i18n import set_language
     from travel_mode.system.shell import ReadOnlyRunner, set_runner
 
-    if args.live_readonly:
-        set_runner(ReadOnlyRunner())
-        # Explicit read-only discovery roots; HOME remains isolated for every write.
-        from travel_mode.system.launchd import svc_scan
+    with ExitStack() as demo_scope:
+        if args.live_readonly:
+            set_runner(ReadOnlyRunner())
+            # Explicit read-only discovery roots; HOME remains isolated for every write.
+            from travel_mode.system.launchd import svc_scan
 
-        apps.APP_DIRS = ["/Applications", str(Path(args.host_home) / "Applications")]
-        launchd.svc_scan = lambda config=None: svc_scan(
-            config or config_api.load_config(),
-            directories=(Path(args.host_home) / "Library/LaunchAgents", Path("/Library/LaunchAgents")),
-        )
-    else:
-        from travel_mode.demo import _configure_demo, _configure_demo_views
+            apps.APP_DIRS = ["/Applications", str(Path(args.host_home) / "Applications")]
+            launchd.svc_scan = lambda config=None: svc_scan(
+                config or config_api.load_config(),
+                directories=(Path(args.host_home) / "Library/LaunchAgents", Path("/Library/LaunchAgents")),
+            )
+        else:
+            from travel_mode.demo import _configure_demo_views, environment
 
-        _configure_demo()
-        _configure_demo_views()
-    set_language(args.lang)
-    if args.setup:
-        setup_debug_app(Path(args.telemetry)).run()
-    else:
-        app = DebugApp(Path(args.telemetry))
-        app.live_readonly = args.live_readonly
-        app.run()
-    return 0
+            demo_scope.enter_context(environment(Path(args.telemetry).parent))
+            _configure_demo_views()
+        set_language(args.lang)
+        if args.setup:
+            setup_debug_app(Path(args.telemetry)).run()
+        else:
+            app = DebugApp(Path(args.telemetry))
+            app.live_readonly = args.live_readonly
+            app.run()
+        return 0
 
 
 def setup_debug_app(telemetry):

@@ -9,7 +9,6 @@ import shlex
 import shutil
 import subprocess
 import sys
-import tempfile
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -289,10 +288,13 @@ def enable_dry_run(real: Runner | None = None) -> Path:
     global _runner, _dry_run, _dry_run_state_dir
     if _dry_run:
         return _dry_run_state_dir  # type: ignore[return-value]
+    from ..temporary import retained_dry_run_directory
+
+    directory = retained_dry_run_directory()
     _dry_run = True
     _dry_run_commands.clear()
     _dry_run_unknowns.clear()
-    _dry_run_state_dir = Path(tempfile.mkdtemp(prefix="travel-mode-dry-run-"))
+    _dry_run_state_dir = directory
     _runner = DryRunRunner(real or _runner)
     return _dry_run_state_dir
 

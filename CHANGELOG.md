@@ -15,6 +15,7 @@ All notable changes follow Keep a Changelog.
 
 ### Fixed
 
+- Temporary directories no longer pile up: dry-run keeps the five most recent, demo mode and the e2e/stress scripts remove theirs (also on failure), and the test suite fails if it leaves any `travel-mode-*` directory in the system temp folder. About 7,500 leftovers had accumulated on the development Mac.
 - Sleep detection reads `kern.sleeptime`/`kern.waketime` instead of the slow pmset log, which timed out on real hardware; power-setting writes for different domains run one after another (in parallel they raced); result counts, quit reasons and caffeinate sources are shown correctly.
 - A retry that succeeded is now marked as recovered even when the action label is long; failures are matched by action type and exact target.
 - The session screen no longer reports an internal error in the first minute of a session; it waits for new battery data.

@@ -7,7 +7,6 @@ import os
 import plistlib
 import shlex
 import sys
-import tempfile
 import time
 from pathlib import Path
 from unittest.mock import patch
@@ -106,11 +105,19 @@ def child(root):
     return cli.main(sys.argv[1:])
 
 
-def run():
+def run(output=None):
+    from harness_temporary import fixture_directory
+
     from travel_mode.system.platform import ensure_macos
 
     ensure_macos()
-    root = Path(tempfile.mkdtemp(prefix="travel-mode-event-e2e-"))
+    output = output or Path("/tmp/tui-event-e2e") / str(time.time_ns())
+    output.mkdir(parents=True, exist_ok=False)
+    with fixture_directory(output, "travel-mode-event-e2e-") as root:
+        return run_fixture(root, output)
+
+
+def run_fixture(root, output):
     (root / "config.toml").write_text('[automation]\non_battery="off"\non_ac="off"\n')
     helper = root / "event-helper"
     helper.write_text(
@@ -162,18 +169,19 @@ def run():
             finally:
                 shell.set_runner(original)
                 write_json(root / "guard.json", guard.calls)
-    print("Test agent removed; retained evidence: " + str(root))
+    print("Test agent removed; retained evidence: " + str(output))
     return 0
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plan", action="store_true")
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     if args.plan:
         plan()
         return 0
-    return run()
+    return run(args.output)
 
 
 if __name__ == "__main__":

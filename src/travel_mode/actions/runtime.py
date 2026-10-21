@@ -68,7 +68,8 @@ def command_lifecycle(argv, dispatch):
         import tempfile
         from pathlib import Path
 
-        directory = Path(tempfile.mkdtemp(prefix="travel-mode-demo-input-"))
+        temporary = tempfile.TemporaryDirectory(prefix="travel-mode-demo-")
+        directory = Path(temporary.name)
     try:
         for relative, source in sources.items():
             if source.exists():
@@ -86,11 +87,15 @@ def command_lifecycle(argv, dispatch):
 
         return (result or 1) if dry_run and dry_run_unknowns() else result
     finally:
-        disable_dry_run()
-        set_runner(previous_runner)
-        state.set_state_path_override(previous_override)
-        for name, value in previous_env.items():
-            if value is None:
-                os.environ.pop(name, None)
-            else:
-                os.environ[name] = value
+        try:
+            disable_dry_run()
+            set_runner(previous_runner)
+            state.set_state_path_override(previous_override)
+            for name, value in previous_env.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+        finally:
+            if not dry_run:
+                temporary.cleanup()

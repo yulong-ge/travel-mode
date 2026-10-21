@@ -37,6 +37,7 @@ from e2e_guard import (
 )
 from e2e_isolation import discovery_scope, write_fixture_config
 from harness_evidence import write_json
+from harness_temporary import fixture_directory, owned_fixture, preserve_diagnostics
 
 from travel_mode import state
 from travel_mode.actions.apps import ForceQuitApp, FreezeApp, QuitApp, UnloadAgent
@@ -87,8 +88,8 @@ def preflight(root, state_file, real_state):
     if real_state.exists():
         raise RuntimeError(f"Active user state exists; refusing e2e: {real_state}")
     root = root.resolve()
-    if not root.is_relative_to(Path(tempfile.gettempdir()).resolve()) or not root.name.startswith(
-        "travel-mode-e2e-"
+    if not root.name.startswith("travel-mode-e2e-") or not (
+        root.is_relative_to(Path(tempfile.gettempdir()).resolve()) or owned_fixture(root)
     ):
         raise ValueError(f"Fixture root must be a dedicated temporary directory: {root}")
     if not state_file.resolve().is_relative_to(root):
@@ -757,7 +758,11 @@ class Harness:
                 self.power()
                 self.brightness()
             finally:
-                self.cleanup()
+                try:
+                    if hasattr(self, "evidence"):
+                        preserve_diagnostics(self.root, self.evidence)
+                finally:
+                    self.cleanup()
         self.check(not self.runner.tripped, "No guard violations")
         print("PASS: local e2e (see SKIP lines for unavailable power stage)")
 
@@ -946,15 +951,20 @@ def main(argv=None):
     if real_state.exists():
         print(f"FAIL: Active user state exists: {real_state}", file=sys.stderr)
         return 1
-    root = Path(tempfile.mkdtemp(prefix="travel-mode-e2e-")).resolve()
-    paths = fixture_paths(root)
-    executables = [str(app / "Contents/MacOS/loop") for app in paths]
-    runner = GuardRunner(LocalBackend(executables), root, paths, root / "agent.plist")
     evidence = args.output or Path("/tmp/travel-mode-e2e-evidence") / datetime.now().strftime(
         "%Y%m%d-%H%M%S-%f"
     )
     evidence.mkdir(parents=True, exist_ok=False)
+    with fixture_directory(evidence) as root:
+        return run_local(root, real_state, evidence)
+
+
+def run_local(root, real_state, evidence):
+    paths = fixture_paths(root)
+    executables = [str(app / "Contents/MacOS/loop") for app in paths]
+    runner = GuardRunner(LocalBackend(executables), root, paths, root / "agent.plist")
     harness = Harness(root, runner, real_state, brightness_loader=brightness.NativeBrightness.load)
+    harness.evidence = evidence
     report = dict(status="FAIL")
     try:
         harness.run()
