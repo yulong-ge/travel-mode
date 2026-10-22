@@ -6,6 +6,7 @@ import argparse
 import os
 import sys
 
+import travel_mode
 import travel_mode.flows.apply as flow_apply
 import travel_mode.flows.check as flow_check
 import travel_mode.flows.report as flow_report
@@ -104,7 +105,7 @@ def _main(argv=None):
     parser.add_argument("--demo", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--launch-event", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--all", action="store_true", help=t("cli.thaw_resume_all_stopped_app_processes"))
-    parser.add_argument("--version", action="version", version="travel-mode 1.1.0")
+    parser.add_argument("--version", action="version", version=f"travel-mode {travel_mode.__version__}")
     args = parser.parse_args(argv)
     if args.config_cmd is not None and args.cmd not in {
         "config",

@@ -24,10 +24,12 @@
 ## 安装
 
 ```bash
-uv tool install git+https://github.com/yulong-ge/travel-mode
+uv tool install git+https://github.com/yulong-ge/travel-mode@v1.2.0
 # 或者
-pipx install git+https://github.com/yulong-ge/travel-mode
+pipx install git+https://github.com/yulong-ge/travel-mode@v1.2.0
 ```
+
+去掉 `@v1.2.0` 即安装 `main` 上的最新开发版本。
 
 需要 macOS 和 Python 3.10–3.13。可选：安装 `blueutil` 后可以控制蓝牙。
 
@@ -219,8 +221,10 @@ pause = ["sync", "backup", "updater"]
 
 已在一台 MacBook Pro（M1 Pro，macOS 27）上，用临时创建的测试 app 和后台服务，分别在接电和电池供电下验证：
 正常退出与强制退出、冻结与恢复、LaunchAgent 卸载与重新加载、电池与接电的电源设置、`hibernatemode`、修复禁止睡眠、
-`thaw`、亮度、命令行和界面的完整流程、功耗测量、会话报告，以及电源事件自动触发。尚未在真机上验证：Wi-Fi、蓝牙、
-Spotlight、立即关屏、结束 `caffeinate`。CI 在 macOS 上用 Python 3.10–3.13 运行测试，并在 macOS
+`thaw`、亮度、命令行和界面的完整流程、功耗测量、会话报告，以及电源事件自动触发。1.2.0 发布前，在这台 Mac 上：
+受保护的端到端测试在接电时通过了两个场景的命令行和界面路径（结束后电源设置逐项读回一致）；电池测试中冻结一个高负载测试
+app 约节省 10 W；还通过界面恢复了一次真实会话，包括输入管理员密码的步骤。Spotlight 的恢复已在真机验证，关闭索引尚未
+验证。尚未在真机上验证：Wi-Fi、蓝牙、立即关屏、结束 `caffeinate`。CI 在 macOS 上用 Python 3.10–3.13 运行测试，并在 macOS
 云端机器上运行受保护的端到端测试。其它 Mac 机型和 macOS 版本尚未测试。
 
 各项行为、限制和退出码的完整说明见[技术参考](docs/reference.md)（英文）。

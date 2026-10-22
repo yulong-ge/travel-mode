@@ -30,10 +30,12 @@ The tool only runs while you use it. It installs no background service unless yo
 ## Install
 
 ```bash
-uv tool install git+https://github.com/yulong-ge/travel-mode
+uv tool install git+https://github.com/yulong-ge/travel-mode@v1.2.0
 # or
-pipx install git+https://github.com/yulong-ge/travel-mode
+pipx install git+https://github.com/yulong-ge/travel-mode@v1.2.0
 ```
+
+Drop `@v1.2.0` to install the latest development version from `main`.
 
 Requires macOS and Python 3.10–3.13. Optional tools: `blueutil` for Bluetooth control.
 
@@ -254,8 +256,12 @@ after you confirm (`--all` skips the question). Without a state file,
 Verified on a MacBook Pro (M1 Pro, macOS 27) with temporary test apps and agents, on AC and on
 battery: graceful and forced quit, freeze and resume, LaunchAgent unload and reload, battery and
 AC power settings, `hibernatemode`, sleep repair, `thaw`, brightness, CLI and TUI flows, power
-measurement, session reports and power-source automation. Not verified on hardware: Wi-Fi,
-Bluetooth, Spotlight, display sleep, `caffeinate` termination. CI runs the tests on Python
+measurement, session reports and power-source automation. For 1.2.0 the guarded end-to-end run
+passed on that Mac for both scenarios through both the CLI and the TUI on AC power (power settings
+read back identical afterwards), the battery run measured about 10 W saved by freezing a busy test
+app, and a real session was restored through the TUI, including the administrator-password step.
+Spotlight restore was verified on hardware; turning indexing off was not. Not verified on
+hardware: Wi-Fi, Bluetooth, display sleep, `caffeinate` termination. CI runs the tests on Python
 3.10–3.13 on macOS and a guarded end-to-end run on a macOS runner. Other Mac models and
 macOS versions have not been tested.
 

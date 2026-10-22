@@ -4,6 +4,8 @@ All notable changes follow Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-21
+
 ### Changed
 
 - Applying no longer waits for a power measurement: the TUI records the "before" value passively while you review the plan and fills in "after" on the session screen; small differences are shown as within measurement error. The CLI measures only with `--measure`.
