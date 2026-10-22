@@ -28,10 +28,9 @@ def bundle_for(pid: str) -> str | None:
         return None
     if rc:
         raise RuntimeError(t("json.command_failed", command=f"ps -p {pid}", rc=rc, detail=output))
-    path = output.strip()
-    if ".app/" not in path:
-        return None
-    return path.split(".app/", 1)[0] + ".app"
+    from ..system.app_bundle import bundle_for_executable
+
+    return bundle_for_executable(output.strip())
 
 
 def suggest_data(samples: int = 3) -> dict:

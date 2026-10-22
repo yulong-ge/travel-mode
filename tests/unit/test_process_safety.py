@@ -1,6 +1,7 @@
 """Process control regressions use an in-memory process table only."""
 
 import os
+import plistlib
 import re
 import time
 
@@ -282,16 +283,21 @@ def test_new_freeze_preserves_merged_legacy_restore_scope(tmp_path):
     assert runner.rows[883]["stat"] == "T"
 
 
-def test_thaw_all_selects_stopped_app_processes(monkeypatch, capsys):
+def test_thaw_all_selects_stopped_app_processes(monkeypatch, capsys, tmp_path):
     commands = []
+    bundle = tmp_path / "Demo.App"
+    (bundle / "Contents").mkdir(parents=True)
+    (bundle / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundlePackageType": "APPL"}))
+    pseudo = tmp_path / "Az.App"
+    pseudo.mkdir()
 
     def fake_runner(cmd, timeout=None, interactive=False):
         commands.append(cmd)
         if cmd[:3] == ["ps", "-axo", "pid,stat,comm"]:
             return CmdResult(
-                "PID STAT COMMAND\n123 T /Applications/Demo.app/Contents/MacOS/Demo\n"
+                f"PID STAT COMMAND\n123 T {bundle}/Contents/MacOS/Demo\n"
                 "456 S /Applications/Other.app/Contents/MacOS/Other\n"
-                "789 T /usr/bin/tool\n",
+                f"789 T /usr/bin/tool\n790 T {pseudo}/Contents/MacOS/module\n",
                 "",
                 0,
             )
@@ -304,4 +310,5 @@ def test_thaw_all_selects_stopped_app_processes(monkeypatch, capsys):
     set_runner(fake_runner)
     assert flow_thaw.thaw_processes(all_processes=True) == 0
     assert ["kill", "-CONT", "123"] in commands
+    assert not any(cmd[:2] == ["kill", "-CONT"] and cmd[-1] == "790" for cmd in commands)
     assert "123" in capsys.readouterr().out

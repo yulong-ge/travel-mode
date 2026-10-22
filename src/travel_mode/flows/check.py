@@ -76,6 +76,10 @@ def mode_check(verbose=False):
     from ..system.shell import optional_tool_paths
 
     console = Console()
+    errors = [row["error"] for row in report["checks"] if row["error"]]
+    for error in dict.fromkeys(errors):
+        Console(stderr=True).print(error, markup=False, highlight=False)
+    failed = bool(errors)
     if verbose:
         console.rule(t("shell.optional_tools"))
         for tool, path in optional_tool_paths().items():
@@ -106,11 +110,12 @@ def mode_check(verbose=False):
             if preview["satisfied"]:
                 console.print(t("preview.satisfied", names=", ".join(preview["satisfied"])), markup=False)
     except ReadError as exc:
-        Console().print(t("health.legacy_failed", reason=str(exc)), markup=False, highlight=False)
+        Console(stderr=True).print(t("health.legacy_failed", reason=str(exc)), markup=False, highlight=False)
+        failed = True
     console.rule(t("health.title"))
     for line in lines(report, verbose=verbose):
         console.print(line, markup=False, highlight=False)
-    return 0
+    return int(failed)
 
 
 def _mode_check():

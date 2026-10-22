@@ -1,0 +1,21 @@
+{
+  "SPDisplaysDataType" : [
+
+  ],
+  "SPPowerDataType" : [
+    {
+      "_name" : "sppower_information",
+      "AC Power" : {
+        "Current Power Source" : "TRUE",
+        "Disk Sleep Timer" : 0,
+        "Display Sleep Timer" : 0,
+        "Sleep On Power Button" : "Yes",
+        "System Sleep Timer" : 0
+      }
+    },
+    {
+      "_name" : "sppower_hwconfig_information",
+      "sppower_ups_installed" : "FALSE"
+    }
+  ]
+}

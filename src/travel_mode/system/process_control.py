@@ -41,7 +41,7 @@ def process_table() -> list[Process]:
 
 def _prefixes(path, whole_bundle=False):
     value = Path(path)
-    if not value.is_absolute() or value.suffix != ".app":
+    if not value.is_absolute() or value.suffix.casefold() != ".app":
         raise ValueError(t("safety.app_path_absolute", path=repr(path)))
     paths = tuple(dict.fromkeys((str(value), str(value.resolve()))))
     if whole_bundle:

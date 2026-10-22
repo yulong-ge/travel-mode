@@ -1,6 +1,8 @@
 """Generic process observations shared by provenance and interface regressions."""
 
 import os
+import plistlib
+from pathlib import Path
 
 from travel_mode.system.health import PROCESS_COMMAND
 from travel_mode.system.shell import CmdResult
@@ -17,7 +19,10 @@ def populate(runner, *, child=900100, parent=True, load=False, awake_app=False):
     if parent:
         rows += [process(900102, 900101, "/bin/sh"), process(900101, 1, "/opt/demo/bin/claude")]
     if awake_app:
-        rows += [process(900300, 1, "/Applications/Amphetamine.app/Contents/MacOS/Amphetamine")]
+        bundle = Path.home() / "Applications/Amphetamine.app"
+        (bundle / "Contents").mkdir(parents=True, exist_ok=True)
+        (bundle / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundlePackageType": "APPL"}))
+        rows += [process(900300, 1, f"{bundle}/Contents/MacOS/Amphetamine")]
     if load:
         rows += [
             process(900200 + i, 1, f"/opt/demo/bin/worker-{i}", cpu) for i, cpu in enumerate((85, 65, 55, 45))

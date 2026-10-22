@@ -76,7 +76,9 @@ def machine(contract_root, tmp_paths, darwin_platform, monkeypatch):
     for i, (name, path) in enumerate(paths.items(), 910001):
         contents = Path(path) / "Contents"
         (contents / "MacOS").mkdir(parents=True)
-        (contents / "Info.plist").write_bytes(plistlib.dumps({"CFBundleIdentifier": f"org.demo.app{i}"}))
+        (contents / "Info.plist").write_bytes(
+            plistlib.dumps({"CFBundlePackageType": "APPL", "CFBundleIdentifier": f"org.demo.app{i}"})
+        )
         processes[str(i)] = ["S", f"{path}/Contents/MacOS/{name}"]
     plist = agents / "org.demo.worker.plist"
     plist.write_bytes(plistlib.dumps({"Label": "org.demo.worker"}))
@@ -146,7 +148,12 @@ def machine(contract_root, tmp_paths, darwin_platform, monkeypatch):
     )
     processes["919999"] = ["S", "/usr/bin/caffeinate"]
     processes["919998"] = ["S", "/usr/bin/caffeinate"]  # User's process: no assertion.
-    processes["919997"] = ["S", "/Applications/Terminal.app/Contents/MacOS/Terminal"]
+    terminal = root / "Protected/Terminal.app"
+    (terminal / "Contents").mkdir(parents=True)
+    (terminal / "Contents/Info.plist").write_bytes(
+        plistlib.dumps({"CFBundlePackageType": "APPL", "CFBundleIdentifier": "com.apple.Terminal"})
+    )
+    processes["919997"] = ["S", f"{terminal}/Contents/MacOS/Terminal"]
     fake = FakeRunner(responses)
     loaded = {"org.demo.worker", "org.demo.daemon"}
 

@@ -13,7 +13,7 @@ from travel_mode.system.shell import CmdResult
 
 def bundle(path, **metadata):
     (path / "Contents").mkdir(parents=True)
-    (path / "Contents/Info.plist").write_bytes(plistlib.dumps(metadata))
+    (path / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundlePackageType": "APPL", **metadata}))
     return str(path)
 
 
@@ -95,14 +95,14 @@ def test_extra_app_search_directories_resolve_nonstandard_bundle(tmp_path, monke
     from travel_mode.system.apps import app_path
 
     root = tmp_path / "custom-apps"
-    bundle = root / "Extra Demo.app"
-    bundle.mkdir(parents=True)
+    extra_bundle = root / "Extra Demo.app"
+    bundle(extra_bundle)
     monkeypatch.setenv("TRAVEL_MODE_APP_DIRS", str(root))
-    assert app_path("Extra Demo") == str(bundle)
+    assert app_path("Extra Demo") == str(extra_bundle)
     from travel_mode.system.app_snapshot import snapshot_scope
 
     with snapshot_scope() as snapshot:
-        assert snapshot.index.find("Extra Demo") == str(bundle)
+        assert snapshot.index.find("Extra Demo") == str(extra_bundle)
 
 
 @pytest.mark.parametrize("value", ["", "relative", "/absolute:", ":/absolute"])

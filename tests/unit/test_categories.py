@@ -94,7 +94,9 @@ def test_app_scanning_discovers_bundle_id_once_and_respects_ignore(fake_runner, 
     root = tmp_path / "Applications"
     path = root / "Renamed Product.app"
     (path / "Contents").mkdir(parents=True)
-    (path / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleIdentifier": "com.google.drivefs"}))
+    (path / "Contents/Info.plist").write_bytes(
+        plistlib.dumps({"CFBundlePackageType": "APPL", "CFBundleIdentifier": "com.google.drivefs"})
+    )
     monkeypatch.setattr(apps, "APP_DIRS", [str(root)])
     fake_runner.responses[("ps", "-axo", "pid=,%cpu=,command=")] = CmdResult(
         f"900001 0.5 {path}/Contents/MacOS/Google Drive", "", 0

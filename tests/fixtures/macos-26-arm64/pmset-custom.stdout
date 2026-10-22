@@ -1,0 +1,9 @@
+AC Power:
+ Sleep On Power Button 1
+ standby              0
+ powernap             1
+ ttyskeepawake        1
+ displaysleep         0
+ sleep                0
+ tcpkeepalive         1
+ disksleep            0

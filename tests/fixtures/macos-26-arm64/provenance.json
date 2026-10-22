@@ -1,0 +1,320 @@
+{
+  "source": "Supplied clean-machine-readonly artifact, main 449c753",
+  "runner_image": "macos-26-arm64",
+  "runner_image_source": "User supplied runner label",
+  "runner_image_version": null,
+  "os": {
+    "name": "macOS",
+    "version": "26.6.2",
+    "build": "25G83"
+  },
+  "observed_capture_time": "2026-10-22T05:12:28Z",
+  "capture_time_source": "First line of pmset-assertions.stdout; exact per-command capture times were not recorded by the original collector",
+  "transformations": [],
+  "files": {
+    "backup.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "backup.stdout": {
+      "sha256": "eb13ad8bfd129ba04a374ece9dd4e28048ff2c08815473196a07ceab9e7fe74e",
+      "bytes": 80
+    },
+    "foreground-asn.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "foreground-asn.stdout": {
+      "sha256": "1ebe11a606443430ca3e4f73d463b10c5e2ad5190e67d3c074bce9b6e2b4f4fe",
+      "bytes": 16
+    },
+    "foreground-info.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "foreground-info.stdout": {
+      "sha256": "ef63dace11a90fd229e72873b66d62eee98fffea5605edcfa96e2ac8fe68f650",
+      "bytes": 50
+    },
+    "ioreg-battery.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "ioreg-battery.stdout": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "launchctl-list.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "launchctl-list.stdout": {
+      "sha256": "9467245c7b5e7ff9c32a8b6f39370823ffa854eeee1a1eb85a2372fb475c599c",
+      "bytes": 16882
+    },
+    "pmset-assertions.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "pmset-assertions.stdout": {
+      "sha256": "69c8d19484efb3e217e98f3a94ebbb982103661affe8f9c86913c23951576e43",
+      "bytes": 1729
+    },
+    "pmset-battery.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "pmset-battery.stdout": {
+      "sha256": "14726fc52ddf54b166819a66551cc819147724eae55b3e45b20676b0545c7234",
+      "bytes": 28
+    },
+    "pmset-capabilities.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "pmset-capabilities.stdout": {
+      "sha256": "668e5d692ed936b2d79291f82b21a03c96f41282d4f3f3f7be97f91c5df5278b",
+      "bytes": 107
+    },
+    "pmset-current.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "pmset-current.stdout": {
+      "sha256": "96899a18bc5016010a3fa38d673a1f22f2af82b5afacdf789f28672776d57a85",
+      "bytes": 313
+    },
+    "pmset-custom.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "pmset-custom.stdout": {
+      "sha256": "7f084b237939bdff8346389cc4aa2bcb483431ab1d5c251ded3bae7fd065dab4",
+      "bytes": 203
+    },
+    "pmset-log.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "pmset-log.stdout": {
+      "sha256": "7c1940b7655ecd5f37ec2e0a47ba37a7ad985b91b8d083a56215d6b699307b37",
+      "bytes": 15443
+    },
+    "pmset-source.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "pmset-source.stdout": {
+      "sha256": "14726fc52ddf54b166819a66551cc819147724eae55b3e45b20676b0545c7234",
+      "bytes": 28
+    },
+    "profiler.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "profiler.stdout": {
+      "sha256": "ee2b24ad19659a37a7e6100828ab5730d0f3a0ea570c4f9227f4d911a23b1505",
+      "bytes": 427
+    },
+    "ps-health.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "ps-health.stdout": {
+      "sha256": "6e2bb790889dc37738054712d1ad2a678e2a4e1a772751dd12bf0e4e1371fca5",
+      "bytes": 68896
+    },
+    "ps-identities.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "ps-identities.stdout": {
+      "sha256": "07a2207e472065ee169ef664a66170e6571f4f764bbec93c5045ca21750969c2",
+      "bytes": 62752
+    },
+    "sleep-times.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "sleep-times.stdout": {
+      "sha256": "ccc2ca8c4fb93ca101b3c8405014c24e7df96afe18e27e89a9fba327213b1143",
+      "bytes": 94
+    },
+    "spotlight.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "spotlight.stdout": {
+      "sha256": "242c20ea9e71bff4dff1fb6bcdd485ccf5865ebe572b850eff6a0ad5d1c100a5",
+      "bytes": 23
+    },
+    "version.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "version.stdout": {
+      "sha256": "cd5d6399b3785b04ceaae75045a9ca9f80f0bbc3526eff9d0c36b170ed1ec348",
+      "bytes": 65
+    },
+    "wifi-ports.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "wifi-ports.stdout": {
+      "sha256": "231d8315b33e6e686153260775f636681b42b323fa1137d4cd0d4473058582bb",
+      "bytes": 201
+    }
+  },
+  "commands": {
+    "version": {
+      "command": [
+        "sw_vers"
+      ],
+      "rc": 0
+    },
+    "pmset-current": {
+      "command": [
+        "pmset",
+        "-g"
+      ],
+      "rc": 0
+    },
+    "pmset-custom": {
+      "command": [
+        "pmset",
+        "-g",
+        "custom"
+      ],
+      "rc": 0
+    },
+    "pmset-capabilities": {
+      "command": [
+        "pmset",
+        "-g",
+        "cap"
+      ],
+      "rc": 0
+    },
+    "pmset-battery": {
+      "command": [
+        "pmset",
+        "-g",
+        "batt"
+      ],
+      "rc": 0
+    },
+    "pmset-source": {
+      "command": [
+        "pmset",
+        "-g",
+        "ps"
+      ],
+      "rc": 0
+    },
+    "pmset-assertions": {
+      "command": [
+        "pmset",
+        "-g",
+        "assertions"
+      ],
+      "rc": 0
+    },
+    "pmset-log": {
+      "command": [
+        "pmset",
+        "-g",
+        "log"
+      ],
+      "rc": 0
+    },
+    "ioreg-battery": {
+      "command": [
+        "ioreg",
+        "-rn",
+        "AppleSmartBattery"
+      ],
+      "rc": 0
+    },
+    "launchctl-list": {
+      "command": [
+        "launchctl",
+        "list"
+      ],
+      "rc": 0
+    },
+    "ps-identities": {
+      "command": [
+        "ps",
+        "-axo",
+        "pid=,ppid=,stat=,lstart=,comm="
+      ],
+      "rc": 0
+    },
+    "ps-health": {
+      "command": [
+        "ps",
+        "-axo",
+        "pid=,ppid=,uid=,stat=,%cpu=,lstart=,comm="
+      ],
+      "rc": 0
+    },
+    "sleep-times": {
+      "command": [
+        "sysctl",
+        "-n",
+        "kern.sleeptime",
+        "kern.waketime"
+      ],
+      "rc": 0
+    },
+    "foreground-asn": {
+      "command": [
+        "lsappinfo",
+        "front"
+      ],
+      "rc": 0
+    },
+    "foreground-info": {
+      "command": [
+        "lsappinfo",
+        "info",
+        "-only",
+        "pid,bundleid",
+        "ASN:0x0-0xd00d:"
+      ],
+      "rc": 0
+    },
+    "profiler": {
+      "command": [
+        "system_profiler",
+        "-json",
+        "SPDisplaysDataType",
+        "SPPowerDataType"
+      ],
+      "rc": 0
+    },
+    "backup": {
+      "command": [
+        "tmutil",
+        "status"
+      ],
+      "rc": 0
+    },
+    "wifi-ports": {
+      "command": [
+        "networksetup",
+        "-listallhardwareports"
+      ],
+      "rc": 0
+    },
+    "spotlight": {
+      "command": [
+        "mdutil",
+        "-s",
+        "/"
+      ],
+      "rc": 0
+    }
+  },
+  "failures": []
+}

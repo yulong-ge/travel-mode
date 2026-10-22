@@ -1404,3 +1404,8 @@
 "setup.foreground_blocked" = "Cannot determine the foreground app. No apps will be modified until a recheck succeeds. Reason: {reason}"
 "setup.reason_foreground_unknown" = "Foreground app unavailable; all app changes blocked"
 "setup.short_foreground_unknown" = "App changes blocked"
+"apps.discovery" = "Application discovery"
+"apps.bundle_directory" = "Expected an absolute application bundle directory"
+"apps.bundle_type" = "CFBundlePackageType is not APPL: {value}"
+"apps.bundle_executable" = "Missing APPL type and an executable CFBundleExecutable in Contents/MacOS"
+"apps.bundle_invalid" = "Skipped application candidate {path}: {reason}"

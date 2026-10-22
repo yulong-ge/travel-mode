@@ -9,6 +9,7 @@ from xml.parsers.expat import ExpatError
 
 from ..i18n import t
 from ..structured import read_command
+from .app_bundle import discover_bundle
 
 CONFIDENCE = {"path": 3, "associated": 2, "bundle-id-prefix": 1}
 
@@ -50,14 +51,14 @@ def _installed_apps(roots: tuple[Path, ...], warnings: list[dict]) -> list[dict]
         # 不进入 app 的内部 Helpers/Frameworks，防止把内嵌子程序当作独立 app。
         for directory, children, _ in os.walk(root, onerror=_walk_error):
             path = Path(directory)
-            if path.suffix != ".app":
+            if path.suffix.casefold() != ".app":
                 continue
             children[:] = []
             resolved = path.resolve()
             if resolved in seen:
                 continue
             seen.add(resolved)
-            info = _read_plist(path / "Contents/Info.plist", warnings)
+            info = discover_bundle(path, warnings)
             if info is None:
                 continue
             bundle_id = info.get("CFBundleIdentifier")

@@ -403,8 +403,16 @@ def _main(argv=None):
 
             from .structured import check_data
 
-            print(json.dumps(check_data(), ensure_ascii=False))
-            return int(bool(reapply_failed))
+            data = check_data()
+            print(json.dumps(data, ensure_ascii=False))
+            errors = [row["error"] for row in data["health"]["checks"] if row["error"]]
+            if data.get("audit_error"):
+                errors.append(data["audit_error"])
+            if data.get("app_safety"):
+                errors.append(data["app_safety"]["message"])
+            for error in dict.fromkeys(errors):
+                print(error, file=sys.stderr)
+            return int(bool(reapply_failed or errors))
         return (mode_check(verbose=True) if args.verbose else mode_check()) or int(bool(reapply_failed))
     if args.cmd == "report" or args.report:
         if args.dry_run:
@@ -505,7 +513,15 @@ def _handled_main(argv=None):
             elif "menubar" in arguments:
                 preview = menubar_preview_scope()
         with preview:
-            return command_lifecycle(arguments, _main)
+            from .system.app_bundle import observation_scope
+
+            with observation_scope() as observations:
+                try:
+                    return command_lifecycle(arguments, _main)
+                finally:
+                    if "--verbose" in arguments:
+                        for row in observations.values():
+                            print(row["error"], file=sys.stderr)
     except (SudoersError, StatusError, MenubarError) as exc:
         if os.environ.get("TRAVEL_MODE_DEBUG") == "1":
             raise

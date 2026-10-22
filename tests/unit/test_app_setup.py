@@ -28,7 +28,7 @@ def installed(tmp_path, fake_runner):
         path = tmp_path / "Applications" / f"{name}.app"
         (path / "Contents").mkdir(parents=True)
         (path / "Contents/Info.plist").write_bytes(
-            plistlib.dumps({"CFBundleIdentifier": "org.fixture." + str(pid)})
+            plistlib.dumps({"CFBundlePackageType": "APPL", "CFBundleIdentifier": "org.fixture." + str(pid)})
         )
         rows.append(f"{pid} 0.0 {path}/Contents/MacOS/{name}")
     fake_runner.responses[("ps", "-axo", "pid=,%cpu=,command=")] = CmdResult("\n".join(rows), "", 0)
@@ -243,8 +243,8 @@ def test_setup_fault_injection_preserves_original_and_logs(tmp_path, fake_runner
 
             monkeypatch.setattr(os, "fsync", once)
     assert setup.run(yes=True) == 1
-    output = capsys.readouterr().out
-    assert "Traceback" not in output and "travel-mode.log" in output
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err and "travel-mode.log" in captured.err
     assert path.read_text() == original
     assert not list(tmp_path.glob(".apps-*"))
     assert (tmp_path / "travel-mode.log").exists()
@@ -343,7 +343,13 @@ def test_scenario_choice_for_installed_filename_beats_bundle_display_alias(tmp_p
     path = tmp_path / "Applications/Renamed Browser.app"
     (path / "Contents").mkdir(parents=True)
     (path / "Contents/Info.plist").write_bytes(
-        plistlib.dumps({"CFBundleIdentifier": "com.google.Chrome", "CFBundleDisplayName": "Google Chrome"})
+        plistlib.dumps(
+            {
+                "CFBundlePackageType": "APPL",
+                "CFBundleIdentifier": "com.google.Chrome",
+                "CFBundleDisplayName": "Google Chrome",
+            }
+        )
     )
     (tmp_path / "config.toml").write_text(
         f'[apps]\npolicy="{policy}"\n[apps.away]\nquit=["Renamed Browser"]\n'
@@ -470,7 +476,9 @@ def test_setup_discovery_excludes_protected_apps(tmp_path, fake_runner, monkeypa
     )
     path = tmp_path / "Applications" / f"{name}.app"
     (path / "Contents").mkdir(parents=True)
-    (path / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleIdentifier": bid}))
+    (path / "Contents/Info.plist").write_bytes(
+        plistlib.dumps({"CFBundlePackageType": "APPL", "CFBundleIdentifier": bid})
+    )
     snapshot_cmd = ("ps", "-axo", "pid=,%cpu=,command=")
     fake_runner.responses[snapshot_cmd] = CmdResult(
         fake_runner.responses[snapshot_cmd].stdout + f"\n910009 0.0 {path}/Contents/MacOS/Fixture", "", 0

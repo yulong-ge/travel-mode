@@ -6,6 +6,7 @@ All notable changes follow Keep a Changelog.
 
 ### Fixed
 
+- Apps are recognized by their bundle structure (`Contents/Info.plist`, type `APPL` or a declared executable), so folders that only end in `.app` (for example a PowerShell module `Az.App`) are skipped; one odd entry no longer aborts setup, check or suggest, and errors go to stderr. Parsers are tested against raw command output recorded on a clean macOS 26 runner.
 - The app audit no longer fails on Macs whose `lsappinfo` prints quoted keys (seen on macOS 26): both observed layouts are parsed, and if the foreground app cannot be identified, app actions are blocked while the rest of the check still works. The clean-machine CI job reports the real error and collects raw command output from each runner.
 
 ### Changed

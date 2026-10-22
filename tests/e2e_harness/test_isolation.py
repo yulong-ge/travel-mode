@@ -36,7 +36,9 @@ def dirty_machine(sandbox, tmp_path, monkeypatch):
     for i, (name, bid) in enumerate(FOREIGN.items(), 701):
         bundle = foreign / (name + ".app")
         (bundle / "Contents/MacOS").mkdir(parents=True)
-        (bundle / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleIdentifier": bid}))
+        (bundle / "Contents/Info.plist").write_bytes(
+            plistlib.dumps({"CFBundlePackageType": "APPL", "CFBundleIdentifier": bid})
+        )
         machine.rows[i] = ("S", "Thu Oct 15 12:00:00 2026", str(bundle / "Contents/MacOS" / name))
     machine.rows[799] = ("S", "Thu Oct 15 12:00:00 2026", "/usr/bin/caffeinate")
     extra = FakeRunner(

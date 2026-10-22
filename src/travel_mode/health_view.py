@@ -6,6 +6,10 @@ from copy import deepcopy
 from .i18n import t
 
 
+def caffeinate_evidence(text):
+    return bool(re.search(r"(?m)^PID \d+:\s+(?:/usr/bin/)?caffeinate(?:\s|;|$)", text))
+
+
 def display_checks(report):
     owners = {}
     action_owners = set()
@@ -217,7 +221,7 @@ def presentation(report, *, scenario="away", session_seconds=None):
                 app = re.search(r"([^/]+)\.app/", line)
                 if app and app[1] not in names:
                     names.append(app[1])
-                elif "caffeinate" in line and "caffeinate" not in names:
+                elif caffeinate_evidence(line) and "caffeinate" not in names:
                     names.append("caffeinate")
             conclusion = t(
                 "health_view." + key + ("_found" if status == "hit" else "_clear"),
@@ -237,7 +241,7 @@ def presentation(report, *, scenario="away", session_seconds=None):
             state, advisory = "normal", False
         icon = "?" if state == "unavailable" else "▲" if state == "action" or advisory else "✓"
         display_actions = row["actions"][:1] if state != "unavailable" else []
-        hint_key = "caffeinate" if key == "keep_awake" and "caffeinate" in raw else key
+        hint_key = "caffeinate" if key == "keep_awake" and caffeinate_evidence(raw) else key
         if state == "action" and not display_actions:
             conclusion = t(
                 "health_view.with_advice",

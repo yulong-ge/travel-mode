@@ -22,7 +22,9 @@ def international(tmp_path, fake_runner):
     for name, bid in products.items():
         path = tmp_path / "Applications" / (name + ".app")
         (path / "Contents").mkdir(parents=True)
-        (path / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleIdentifier": bid}))
+        (path / "Contents/Info.plist").write_bytes(
+            plistlib.dumps({"CFBundlePackageType": "APPL", "CFBundleIdentifier": bid})
+        )
     agents = tmp_path / "Library/LaunchAgents"
     agents.mkdir(parents=True)
     for label in ("homebrew.mxcl.syncthing", "com.apple.protected", "org.example.idle", "org.example.busy"):
@@ -95,7 +97,11 @@ def test_international_network_registry_discovers_installed_identities_without_d
         names.add(name)
         info = tmp_path / "Applications" / (name + ".app") / "Contents/Info.plist"
         info.parent.mkdir(parents=True)
-        info.write_bytes(plistlib.dumps({"CFBundleIdentifier": next(iter(rule["bundle_ids"]), "")}))
+        info.write_bytes(
+            plistlib.dumps(
+                {"CFBundlePackageType": "APPL", "CFBundleIdentifier": next(iter(rule["bundle_ids"]), "")}
+            )
+        )
     assert {row["name"] for row in network_scan()} == names
     selected = onboarding.choices(onboarding.scan())
     assert set(selected["network"]) == names

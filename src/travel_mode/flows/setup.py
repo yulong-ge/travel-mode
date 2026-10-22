@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 
 from .. import app_policy, onboarding
 from ..config import load_config, preview_app_choices, write_app_choices
@@ -101,7 +102,7 @@ def run(*, yes=False, dry_run=False, input_fn=None):
             print(save(selected, completed=True, adaptive=True))
         return 0
     except Exception as exc:  # noqa: BLE001 - UI boundary logs and explicitly presents every failure
-        print(failure(exc))
+        print(failure(exc), file=sys.stderr)
         return 1
 
 
@@ -137,4 +138,4 @@ class Remember:
             if text:
                 print(text)
         except Exception as exc:  # noqa: BLE001 - UI boundary logs and explicitly presents every failure
-            print(failure(exc))
+            print(failure(exc), file=sys.stderr)

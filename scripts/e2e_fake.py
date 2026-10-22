@@ -96,7 +96,9 @@ class Machine:
         elif cmd[:1] == ["osacompile"]:
             app = Path(cmd[3])
             (app / "Contents/MacOS").mkdir(parents=True)
-            (app / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleExecutable": "applet"}))
+            (app / "Contents/Info.plist").write_bytes(
+                plistlib.dumps({"CFBundlePackageType": "APPL", "CFBundleExecutable": "applet"})
+            )
             return CmdResult("", "", 0)
         elif cmd[:1] == ["codesign"] or (cmd and cmd[0].endswith("/lsregister")):
             out = ""

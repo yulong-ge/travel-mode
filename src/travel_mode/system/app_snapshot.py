@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import plistlib
 import re
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -10,7 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..i18n import t
-from .shell import run_rc
+from .app_bundle import discover_bundle
+from .shell import ReadError, run_rc
 
 
 @dataclass(frozen=True)
@@ -27,42 +27,45 @@ class AppIndex:
         self.alias_paths: dict[str, list[str]] = {}
         self.prefixes: list[str] = []
         self.spotlight_paths: list[str] = []
+        self.metadata: dict[str, dict] = {}
         paths = []
+        checked = set()
+
+        def admit(path):
+            value = str(path)
+            if value not in checked:
+                checked.add(value)
+                info = discover_bundle(path)
+                if info is not None:
+                    self.metadata[value] = info
+                    paths.append(value)
+            return value in self.metadata
+
         # 保留目录优先级、一级精确匹配和二级匹配的顺序。
         for directory in directories:
             root = Path(directory)
-            direct = sorted(root.glob("*.app"))
-            nested = sorted(root.glob("*/*.app"))
+            direct = sorted(p for p in root.glob("*") if p.suffix.casefold() == ".app")
+            nested = sorted(p for p in root.glob("*/*") if p.suffix.casefold() == ".app")
             for path in (*direct, *nested):
-                if path.is_dir():
+                if admit(path):
                     self.exact.setdefault(path.stem, str(path))
-                    paths.append(str(path))
-            self.prefixes.extend(str(path) for path in sorted((*direct, *nested)))
+            self.prefixes.extend(
+                str(path) for path in sorted((*direct, *nested)) if str(path) in self.metadata
+            )
         output, rc = run_rc(["mdfind", 'kMDItemContentType == "com.apple.application-bundle"'], timeout=5)
         if rc:
-            raise RuntimeError(
+            raise ReadError(
                 t("json.command_failed", command="mdfind application index", rc=rc, detail=output)
             )
         for line in output.splitlines():
             path = Path(line.strip())
-            if path.suffix.lower() == ".app" and path.is_dir():
-                paths.append(str(path))
+            if path.suffix.casefold() == ".app" and admit(path):
                 self.spotlight_paths.append(str(path))
         self.paths = tuple(dict.fromkeys(paths))
         for value in self.paths:
             path = Path(value)
             self._add_alias(path.stem, value)
-            plist = path / "Contents/Info.plist"
-            try:
-                with plist.open("rb") as stream:
-                    info = plistlib.load(stream)
-            except FileNotFoundError:
-                # 无 Info.plist 的 bundle 仍可用文件名匹配（与 app_bid 一致）。
-                continue
-            except (plistlib.InvalidFileException, ValueError) as exc:
-                raise ValueError(f"Cannot index application metadata {plist}: {exc}") from exc
-            if not isinstance(info, dict):
-                raise ValueError(f"Application metadata must be a dictionary: {plist}")
+            info = self.metadata[value]
             for key in ("CFBundleDisplayName", "CFBundleName", "CFBundleIdentifier"):
                 alias = info.get(key)
                 if isinstance(alias, str) and alias:
@@ -105,9 +108,7 @@ class AppSnapshot:
         index = AppIndex(directories)
         output, rc = run_rc(["ps", "-axo", "pid=,%cpu=,command="], timeout=5)
         if rc:
-            raise RuntimeError(
-                t("json.command_failed", command="ps application snapshot", rc=rc, detail=output)
-            )
+            raise ReadError(t("json.command_failed", command="ps application snapshot", rc=rc, detail=output))
         processes = []
         for line in output.splitlines():
             parts = line.strip().split(None, 2)

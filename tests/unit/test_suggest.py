@@ -42,7 +42,7 @@ def _write_plist(path, value):
 def _write_app(root, name, bundle_id):
     info = root / f"{name}.app" / "Contents" / "Info.plist"
     info.parent.mkdir(parents=True)
-    _write_plist(info, {"CFBundleIdentifier": bundle_id, "CFBundleName": name})
+    _write_plist(info, {"CFBundlePackageType": "APPL", "CFBundleIdentifier": bundle_id, "CFBundleName": name})
     return info.parent.parent
 
 

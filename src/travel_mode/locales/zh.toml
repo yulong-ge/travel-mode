@@ -1404,3 +1404,8 @@
 "setup.foreground_blocked" = "无法确定前台 app，因此本次不会对任何 app 执行修改，直到重新检查成功。原因：{reason}"
 "setup.reason_foreground_unknown" = "无法确定前台 app；已阻止所有 app 修改"
 "setup.short_foreground_unknown" = "已阻止 app 修改"
+"apps.discovery" = "应用发现"
+"apps.bundle_directory" = "需要应用 bundle 的绝对目录路径"
+"apps.bundle_type" = "CFBundlePackageType 不是 APPL：{value}"
+"apps.bundle_executable" = "缺少 APPL 类型，且 Contents/MacOS 下没有声明的可执行 CFBundleExecutable"
+"apps.bundle_invalid" = "已跳过应用候选 {path}：{reason}"

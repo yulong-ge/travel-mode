@@ -1,0 +1,88 @@
+PM ASL data store: /var/log/powermanagement
+
+Time stamp                Domain              	Message                                                                    	Duration  	Delay     
+==========                ======              	=======                                                                    	========  	=====     
+UUID: (null)
+2026-10-22 05:09:22 +0000 Start               	powerd process is started                                                  	          
+2026-10-22 05:09:22 +0000 Assertions          	Summary- [System: No Assertions] Using AC          
+2026-10-22 05:09:23 +0000 Notification        	Display is turned on                                                       	          
+2026-10-22 05:09:23 +0000 Assertions          	PID 99(powerd) Created UserIsActive "com.apple.powerd.ws.initialize" 00:00:00  id:0x0x900008001 [System: PrevIdle DeclUser kDisp]          
+2026-10-22 05:09:27 +0000 Assertions          	PID 161(WindowServer) Created UserIsActive "com.apple.iohideventsystem.queue.tickle.nxevent service:IOHIDSystem pid:346 process:Dock" 00:00:00  id:0x0x900008028 [System: PrevIdle DeclUser kDisp]          
+2026-10-22 05:09:33 +0000 Assertions          	PID 300(addonsd) Created NoDisplaySleepAssertion "Anka sleeplessness" 00:00:00  id:0x0x500008044 [System: PrevIdle PrevDisp DeclUser kDisp]          
+2026-10-22 05:09:34 +0000 Assertions          	PID 300(addonsd) Created NetworkClientActive "Anka sleeplessness" 00:00:00  id:0x0x110000805f [System: PrevIdle PrevDisp DeclUser NetAcc kCPU kDisp]          
+2026-10-22 05:09:50 +0000 Assertions          	PID 659(CloudTelemetryService) Created SystemIsActive "NSURLSessionTask D7AC11C3-19EC-4C81-B47A-068842443C9D" 00:00:00  id:0x0xc000080ab [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:50 +0000 Assertions          	PID 369(cloudd) Created SystemIsActive "NSURLSessionTask C8CDAED0-3D8E-43F9-95F9-2F369C1BA79C" 00:00:00  id:0x0xc000080ac [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:51 +0000 Assertions          	PID 659(CloudTelemetryService) Created SystemIsActive "NSURLSessionTask F1C87F0F-89C5-4A39-A2D4-48CCF7196C38" 00:00:00  id:0x0xc000080ae [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:51 +0000 Assertions          	PID 659(CloudTelemetryService) Created SystemIsActive "NSURLSessionTask F0D5F5DD-B3FA-4D28-BEC2-CEFE690BD198" 00:00:00  id:0x0xc000080b0 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:52 +0000 Assertions          	PID 664(CloudTelemetryService) Created SystemIsActive "NSURLSessionTask D6BA34AC-E569-46C6-A5D9-13988EC75C8B" 00:00:00  id:0x0xc000080b4 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:52 +0000 Assertions          	PID 664(CloudTelemetryService) Created SystemIsActive "NSURLSessionTask 6A1AF3FB-82CC-4184-B1DA-C004A21D85D1" 00:00:00  id:0x0xc000080b6 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:52 +0000 Assertions          	PID 664(CloudTelemetryService) Created SystemIsActive "NSURLSessionTask 7A0C0EAC-4EE8-4E33-BBCD-98DE80CF550A" 00:00:00  id:0x0xc000080b8 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:52 +0000 Assertions          	PID 664(CloudTelemetryService) Created SystemIsActive "NSURLSessionTask CB939001-B0B7-4C51-A847-F63E8A691882" 00:00:00  id:0x0xc000080b9 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:53 +0000 Assertions          	PID 369(cloudd) Created SystemIsActive "NSURLSessionTask E5A311A4-F251-4BAC-B1DD-97D299AE3621" 00:00:00  id:0x0xc000080ba [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:53 +0000 Assertions          	PID 369(cloudd) Created SystemIsActive "NSURLSessionTask CBFFC65D-C477-45F9-A424-99C895B9AD49" 00:00:00  id:0x0xc000080bb [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:53 +0000 Assertions          	PID 369(cloudd) Created SystemIsActive "NSURLSessionTask 2E654F3C-17A3-4338-8673-3200F742647D" 00:00:00  id:0x0xc000080cb [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:54 +0000 Assertions          	PID 659(CloudTelemetryService) Released SystemIsActive "NSURLSessionTask D7AC11C3-19EC-4C81-B47A-068842443C9D" 00:00:03  id:0x0xc000080ab [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:54 +0000 Assertions          	PID 199(cloudd) Created SystemIsActive "NSURLSessionTask A41BB6DB-BE9D-4760-870B-D3A6A8E79EB2" 00:00:00  id:0x0xc000080cd [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:54 +0000 Assertions          	PID 659(CloudTelemetryService) Released SystemIsActive "NSURLSessionTask F1C87F0F-89C5-4A39-A2D4-48CCF7196C38" 00:00:03  id:0x0xc000080ae [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:54 +0000 Assertions          	PID 659(CloudTelemetryService) Released SystemIsActive "NSURLSessionTask F0D5F5DD-B3FA-4D28-BEC2-CEFE690BD198" 00:00:03  id:0x0xc000080b0 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:54 +0000 Assertions          	PID 199(cloudd) Created SystemIsActive "NSURLSessionTask 6E866B12-3616-443F-94D4-8DF975812C64" 00:00:00  id:0x0xc000080cf [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:55 +0000 Assertions          	PID 369(cloudd) Released SystemIsActive "NSURLSessionTask C8CDAED0-3D8E-43F9-95F9-2F369C1BA79C" 00:00:04  id:0x0xc000080ac [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:55 +0000 Assertions          	PID 664(CloudTelemetryService) Released SystemIsActive "NSURLSessionTask D6BA34AC-E569-46C6-A5D9-13988EC75C8B" 00:00:03  id:0x0xc000080b4 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:55 +0000 Assertions          	PID 664(CloudTelemetryService) Released SystemIsActive "NSURLSessionTask 6A1AF3FB-82CC-4184-B1DA-C004A21D85D1" 00:00:03  id:0x0xc000080b6 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:55 +0000 Assertions          	PID 664(CloudTelemetryService) Released SystemIsActive "NSURLSessionTask 7A0C0EAC-4EE8-4E33-BBCD-98DE80CF550A" 00:00:03  id:0x0xc000080b8 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:56 +0000 Assertions          	PID 664(CloudTelemetryService) Released SystemIsActive "NSURLSessionTask CB939001-B0B7-4C51-A847-F63E8A691882" 00:00:03  id:0x0xc000080b9 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:56 +0000 Assertions          	PID 369(cloudd) Released SystemIsActive "NSURLSessionTask CBFFC65D-C477-45F9-A424-99C895B9AD49" 00:00:03  id:0x0xc000080bb [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:56 +0000 Assertions          	PID 369(cloudd) Released SystemIsActive "NSURLSessionTask E5A311A4-F251-4BAC-B1DD-97D299AE3621" 00:00:03  id:0x0xc000080ba [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:56 +0000 Assertions          	PID 369(cloudd) Released SystemIsActive "NSURLSessionTask 2E654F3C-17A3-4338-8673-3200F742647D" 00:00:03  id:0x0xc000080cb [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:57 +0000 Assertions          	PID 199(cloudd) Released SystemIsActive "NSURLSessionTask A41BB6DB-BE9D-4760-870B-D3A6A8E79EB2" 00:00:03  id:0x0xc000080cd [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:09:57 +0000 Assertions          	PID 199(cloudd) Released SystemIsActive "NSURLSessionTask 6E866B12-3616-443F-94D4-8DF975812C64" 00:00:03  id:0x0xc000080cf [System: PrevIdle PrevDisp DeclUser NetAcc kCPU kDisp]          
+2026-10-22 05:10:08 +0000 Assertions          	PID 369(cloudd) Created SystemIsActive "NSURLSessionTask 98AD9F60-0CE6-4EC8-AD76-58DFFE7AD1F5" 00:00:00  id:0x0xc000080e4 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:10:12 +0000 Assertions          	PID 369(cloudd) Released SystemIsActive "NSURLSessionTask 98AD9F60-0CE6-4EC8-AD76-58DFFE7AD1F5" 00:00:03  id:0x0xc000080e4 [System: PrevIdle PrevDisp DeclUser NetAcc kCPU kDisp]          
+2026-10-22 05:10:13 +0000 Assertions          	PID 972(nfcd) Created SystemIsActive "nfcd[Load Stack]" 00:00:00  id:0x0xc000080eb [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:10:13 +0000 Assertions          	PID 972(nfcd) Released SystemIsActive "nfcd[Load Stack]" 00:00:00  id:0x0xc000080eb [System: PrevIdle PrevDisp DeclUser NetAcc kCPU kDisp]          
+2026-10-22 05:10:16 +0000 Assertions          	PID 369(cloudd) Created SystemIsActive "NSURLSessionTask 7446AB30-1922-48BC-B902-E8B8FE094915" 00:00:00  id:0x0xc000080ef [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:10:16 +0000 Assertions          	PID 199(cloudd) Created SystemIsActive "NSURLSessionTask 5DF6BBF4-D3D6-4C02-A69F-55042C0F6C78" 00:00:00  id:0x0xc000080f1 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:10:16 +0000 Assertions          	PID 199(cloudd) Created SystemIsActive "NSURLSessionTask 7DFBED51-74E7-40AC-B485-E3C7E9309A08" 00:00:00  id:0x0xc000080f3 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:10:17 +0000 Assertions          	PID 199(cloudd) Created SystemIsActive "NSURLSessionTask 9C529CDA-1F7B-4A31-B779-0E17A46CD0FD" 00:00:00  id:0x0xc00008101 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:10:17 +0000 Assertions          	PID 199(cloudd) Created SystemIsActive "NSURLSessionTask 4C45ACD4-1E86-424C-BDA2-40EC2D5A8249" 00:00:00  id:0x0xc00008102 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:10:17 +0000 Assertions          	PID 661(financed) Created NetworkClientActive "Wallet Refreshing Orders" 00:00:00  id:0x0x1100008103 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:10:17 +0000 Assertions          	PID 661(financed) Released NetworkClientActive "Wallet Refreshing Orders" 00:00:00  id:0x0x1100008103 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:10:18 +0000 Assertions          	PID 199(cloudd) Created SystemIsActive "NSURLSessionTask C3DA28C9-43F5-4645-8C31-E357219A98F8" 00:00:00  id:0x0xc00008105 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:10:18 +0000 Assertions          	PID 199(cloudd) Created SystemIsActive "NSURLSessionTask 57528C27-04EB-4488-9C8D-0F757A4B827A" 00:00:00  id:0x0xc00008107 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:10:19 +0000 Assertions          	PID 369(cloudd) Released SystemIsActive "NSURLSessionTask 7446AB30-1922-48BC-B902-E8B8FE094915" 00:00:03  id:0x0xc000080ef [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:10:20 +0000 Assertions          	PID 199(cloudd) Released SystemIsActive "NSURLSessionTask 5DF6BBF4-D3D6-4C02-A69F-55042C0F6C78" 00:00:03  id:0x0xc000080f1 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:10:20 +0000 Assertions          	PID 199(cloudd) Released SystemIsActive "NSURLSessionTask 7DFBED51-74E7-40AC-B485-E3C7E9309A08" 00:00:03  id:0x0xc000080f3 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:10:20 +0000 Assertions          	PID 199(cloudd) Released SystemIsActive "NSURLSessionTask 9C529CDA-1F7B-4A31-B779-0E17A46CD0FD" 00:00:03  id:0x0xc00008101 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:10:20 +0000 Assertions          	PID 199(cloudd) Released SystemIsActive "NSURLSessionTask 4C45ACD4-1E86-424C-BDA2-40EC2D5A8249" 00:00:03  id:0x0xc00008102 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:10:21 +0000 Assertions          	PID 199(cloudd) Released SystemIsActive "NSURLSessionTask C3DA28C9-43F5-4645-8C31-E357219A98F8" 00:00:03  id:0x0xc00008105 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:10:21 +0000 Assertions          	PID 199(cloudd) Released SystemIsActive "NSURLSessionTask 57528C27-04EB-4488-9C8D-0F757A4B827A" 00:00:03  id:0x0xc00008107 [System: PrevIdle PrevDisp DeclUser NetAcc kCPU kDisp]          
+2026-10-22 05:10:49 +0000 Assertions          	PID 462(mds_stores) Released BackgroundTask "com.apple.metadata.mds_stores.power" 00:01:00  id:0x0xb0000809f [System: PrevIdle PrevDisp DeclUser NetAcc kCPU kDisp]          
+2026-10-22 05:11:47 +0000 Assertions          	PID 114(mds) Released BackgroundTask "com.apple.metadata.mds.power" 00:02:00  id:0x0xb0000809a [System: PrevIdle PrevDisp DeclUser NetAcc kCPU kDisp]          
+2026-10-22 05:12:15 +0000 Assertions          	PID 659(CloudTelemetryService) Created SystemIsActive "NSURLSessionTask F55DF36D-2151-4B9A-BC34-4BEA2C0FD9A7" 00:00:00  id:0x0xc00008127 [System: PrevIdle PrevDisp DeclUser SysAct NetAcc kCPU kDisp]          
+2026-10-22 05:12:18 +0000 Assertions          	PID 659(CloudTelemetryService) Released SystemIsActive "NSURLSessionTask F55DF36D-2151-4B9A-BC34-4BEA2C0FD9A7" 00:00:03  id:0x0xc00008127 [System: PrevIdle PrevDisp DeclUser NetAcc kCPU kDisp]          
+
+2026-10-22 05:12:28 +0000 : Showing all currently held IOKit power assertions
+Assertion status system-wide:
+   BackgroundTask                 0
+   PreventDiskIdle                1
+   ApplePushServiceTask           0
+   UserIsActive                   1
+   PreventUserIdleDisplaySleep    1
+   SoftwareUpdateTask             0
+   PreventSystemSleep             0
+   ExternalMedia                  0
+   PreventUserIdleSystemSleep     1
+   NetworkClientActive            1
+Listed by owning process:
+   pid 161(WindowServer): [0x0000000a00098028] 00:03:00 UserIsActive named: "com.apple.iohideventsystem.queue.tickle.nxevent service:IOHIDSystem pid:346 process:Dock"  
+   pid 462(mds_stores): [0x00000094000b8113] 00:00:41 BackgroundTask named: "com.apple.metadata.mds_stores.power"  
+   pid 300(addonsd): [0x000000100001804f] 00:02:54 PreventUserIdleSystemSleep named: "Anka sleeplessness"  
+   pid 300(addonsd): [0x0000001000058044] 00:02:54 NoDisplaySleepAssertion named: "Anka sleeplessness"  
+   pid 300(addonsd): [0x00000010000f805e] 00:02:54 PreventDiskIdle named: "Anka sleeplessness"  
+   pid 300(addonsd): [0x000000110011805f] 00:02:53 NetworkClientActive named: "Anka sleeplessness"  
+   pid 114(mds): [0x000000b8000b8129] 00:00:05 BackgroundTask named: "com.apple.metadata.mds.power"  
+   pid 99(powerd): [0x0000000600018000] 00:03:04 PreventUserIdleSystemSleep named: "Powerd - Prevent sleep while display is on"  
+   pid 99(powerd): [0x0000000600098001] 00:03:04 UserIsActive named: "com.apple.powerd.ws.initialize"  
+Kernel Assertions: 0x4=USB
+   id=501  level=255 0x4=USB creat= description=com.apple.usb.externaldevice.0ca00000 owner=Virtual USB Digitizer
+   id=502  level=255 0x4=USB creat= description=com.apple.usb.externaldevice.0c900000 owner=Virtual USB Keyboard

@@ -1,0 +1,25 @@
+2026-10-22 05:12:28 +0000 
+Assertion status system-wide:
+   BackgroundTask                 0
+   PreventDiskIdle                1
+   ApplePushServiceTask           0
+   UserIsActive                   1
+   PreventUserIdleDisplaySleep    1
+   SoftwareUpdateTask             0
+   PreventSystemSleep             0
+   ExternalMedia                  0
+   PreventUserIdleSystemSleep     1
+   NetworkClientActive            1
+Listed by owning process:
+   pid 161(WindowServer): [0x0000000a00098028] 00:03:00 UserIsActive named: "com.apple.iohideventsystem.queue.tickle.nxevent service:IOHIDSystem pid:346 process:Dock"  
+   pid 462(mds_stores): [0x00000094000b8113] 00:00:41 BackgroundTask named: "com.apple.metadata.mds_stores.power"  
+   pid 300(addonsd): [0x000000100001804f] 00:02:54 PreventUserIdleSystemSleep named: "Anka sleeplessness"  
+   pid 300(addonsd): [0x0000001000058044] 00:02:54 NoDisplaySleepAssertion named: "Anka sleeplessness"  
+   pid 300(addonsd): [0x00000010000f805e] 00:02:54 PreventDiskIdle named: "Anka sleeplessness"  
+   pid 300(addonsd): [0x000000110011805f] 00:02:53 NetworkClientActive named: "Anka sleeplessness"  
+   pid 114(mds): [0x000000b8000b8129] 00:00:05 BackgroundTask named: "com.apple.metadata.mds.power"  
+   pid 99(powerd): [0x0000000600018000] 00:03:04 PreventUserIdleSystemSleep named: "Powerd - Prevent sleep while display is on"  
+   pid 99(powerd): [0x0000000600098001] 00:03:04 UserIsActive named: "com.apple.powerd.ws.initialize"  
+Kernel Assertions: 0x4=USB
+   id=501  level=255 0x4=USB creat= description=com.apple.usb.externaldevice.0ca00000 owner=Virtual USB Digitizer
+   id=502  level=255 0x4=USB creat= description=com.apple.usb.externaldevice.0c900000 owner=Virtual USB Keyboard

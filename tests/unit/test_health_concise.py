@@ -178,3 +178,15 @@ def test_manual_advice_is_second_sentence_without_a_separate_label(language, key
             else "▲ External display connected; this increases energy use. Disconnect it when not needed."
         )
         assert lines[0] == expected
+
+
+def test_bundle_location_cannot_create_a_second_caffeinate_source():
+    row = finding(
+        "keep_awake",
+        evidence=["Amphetamine: PID 42, /tmp/caffeinate-fixture/Amphetamine.app"],
+        actions=[dict(kind="quit", name="Amphetamine", path="/tmp/caffeinate-fixture/Amphetamine.app")],
+    )
+    result = health_view.presentation(report(row))[0]
+    assert "Amphetamine" in result["summary"]
+    assert "caffeinate" not in result["summary"]
+    assert result["display_actions"] == row["actions"]

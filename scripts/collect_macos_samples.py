@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 from travel_mode.system import shell
@@ -21,6 +23,7 @@ COMMANDS = {
     "pmset-log": ["pmset", "-g", "log"],
     "ioreg-battery": ["ioreg", "-rn", "AppleSmartBattery"],
     "launchctl-list": ["launchctl", "list"],
+    "application-index": ["mdfind", 'kMDItemContentType == "com.apple.application-bundle"'],
     "ps-identities": ["ps", "-axo", "pid=,ppid=,stat=,lstart=,comm="],
     "ps-health": ["ps", "-axo", "pid=,ppid=,uid=,stat=,%cpu=,lstart=,comm="],
     "sleep-times": ["sysctl", "-n", "kern.sleeptime", "kern.waketime"],
@@ -48,10 +51,11 @@ def collect(output, *, runner=None):
         )
         if not allowed:
             raise ValueError(f"Not an allowed sample command: {command!r}")
+        started_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
         result = runner(command, timeout=30 if name == "profiler" else 10, interactive=False)
         (output / f"{name}.stdout").write_text(result.stdout)
         (output / f"{name}.stderr").write_text(result.stderr)
-        results[name] = dict(command=command, rc=result.rc)
+        results[name] = dict(command=command, rc=result.rc, captured_at=started_at)
         if result.rc:
             failures.append(f"{name}: rc={result.rc}; {result.stderr or result.stdout}")
         return result
@@ -64,8 +68,9 @@ def collect(output, *, runner=None):
                 capture("foreground-info", ["lsappinfo", "info", "-only", "pid,bundleid", asn])
             else:
                 failures.append(f"foreground-asn: invalid ASN: {result.stdout!r}")
+    metadata = {key: os.environ.get(key) for key in ("ImageOS", "ImageVersion", "RUNNER_OS", "RUNNER_ARCH")}
     (output / "manifest.json").write_text(
-        json.dumps(dict(results=results, failures=failures), indent=2) + "\n"
+        json.dumps(dict(results=results, failures=failures, runner=metadata), indent=2) + "\n"
     )
     return failures
 

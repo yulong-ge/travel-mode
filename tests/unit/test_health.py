@@ -2,7 +2,10 @@
 
 import json
 import os
+import plistlib
+import re
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -26,6 +29,12 @@ def process(pid, executable, cpu=0, *, uid=None, ppid=1, stat="S"):
 
 
 def response(fake, command, output, rc=0):
+    # Build real isolated APPL bundles for synthetic process observations.
+    for candidate in re.findall(r"/Applications/[^\n]+?\.app", output):
+        path = Path.home() / candidate.lstrip("/")
+        (path / "Contents").mkdir(parents=True, exist_ok=True)
+        (path / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundlePackageType": "APPL"}))
+    output = output.replace("/Applications/", str(Path.home() / "Applications") + "/")
     fake.responses[tuple(command)] = CmdResult(output, "", rc)
 
 
@@ -184,7 +193,9 @@ def test_cpu_foreground_helpers_system_terminal_ancestors_and_other_users_exclud
     row = rows()["high_cpu"]
     assert len(row["evidence"]) == 2
     assert "vm" in row["evidence"][0] and "909" in row["evidence"][1]
-    assert row["actions"] == [dict(kind="quit", path="/Applications/Docker.app", name="Docker")]
+    assert row["actions"] == [
+        dict(kind="quit", path=str(Path.home() / "Applications/Docker.app"), name="Docker")
+    ]
 
 
 def test_ac_skips_native_brightness_and_low_power(health_machine):
@@ -361,8 +372,10 @@ def test_cli_shared_read_failure_preserves_all_independent_checks(
     from travel_mode.cli import main
 
     response(health_machine, command, "read denied", 1)
-    assert main(["check"] + (["--json"] if as_json else [])) == 0
-    output = capsys.readouterr().out
+    assert main(["check"] + (["--json"] if as_json else [])) == 1
+    captured = capsys.readouterr()
+    assert "read denied" in captured.err
+    output = captured.out
     assert "Traceback" not in output
     if as_json:
         data = json.loads(output)

@@ -8,6 +8,7 @@ from travel_mode.actions.apps import ResumeProcess
 from travel_mode.actions.base import Context
 from travel_mode.actions.executor import Executor
 from travel_mode.presentation import action_message as t
+from travel_mode.system.app_bundle import bundle_for_executable
 from travel_mode.system.shell import run_out
 
 """Emergency thaw flow for stopped application processes."""
@@ -24,7 +25,7 @@ def thaw_processes(all_processes=False):
         parts = line.strip().split(None, 2)
         if len(parts) != 3 or not parts[0].isdigit() or not parts[1].startswith("T"):
             continue
-        if ".app/Contents/" not in parts[2]:
+        if bundle_for_executable(parts[2]) is None:
             continue
         rows.append((parts[0], parts[2]))
     if not rows:

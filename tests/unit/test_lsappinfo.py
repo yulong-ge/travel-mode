@@ -56,7 +56,9 @@ def test_unknown_foreground_format_retains_original(raw):
 def machine(tmp_path, fake_runner, *, policy="adaptive"):
     path = tmp_path / "Applications/Worker.app"
     (path / "Contents").mkdir(parents=True)
-    (path / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleIdentifier": "org.example.worker"}))
+    (path / "Contents/Info.plist").write_bytes(
+        plistlib.dumps({"CFBundlePackageType": "APPL", "CFBundleIdentifier": "org.example.worker"})
+    )
     (tmp_path / "config.toml").write_text(f'[apps]\npolicy="{policy}"\nquit=["Worker"]\n')
     fake_runner.responses[("ps", "-axo", "pid=,%cpu=,command=")] = CmdResult(
         f"810 5 {path}/Contents/MacOS/Worker", "", 0

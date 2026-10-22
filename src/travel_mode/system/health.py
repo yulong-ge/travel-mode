@@ -71,8 +71,13 @@ def parse_processes(output):
 
 
 def app_path(executable):
-    match = re.match(r"(.+?\.app)/Contents/(?:MacOS|Frameworks|Helpers)/", executable)
-    return match[1] if match else None
+    from .app_bundle import bundle_for_executable
+
+    if executable.startswith(SYSTEM_ROOTS) or not re.match(
+        r".+?\.app/Contents/(?:MacOS|Frameworks|Helpers)/", executable, re.IGNORECASE
+    ):
+        return None
+    return bundle_for_executable(executable)
 
 
 class Session:

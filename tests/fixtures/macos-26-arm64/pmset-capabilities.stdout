@@ -1,0 +1,8 @@
+Capabilities for AC Power:
+ displaysleep
+ disksleep
+ sleep
+ standby
+ powernap
+ ttyskeepawake
+ tcpkeepalive

@@ -92,6 +92,11 @@ def app_path(name):
 
 
 def app_bid(path):
+    from .app_snapshot import current_snapshot
+
+    snapshot = current_snapshot()
+    if snapshot is not None and path in snapshot.index.metadata:
+        return snapshot.index.metadata[path].get("CFBundleIdentifier", "")
     plist = Path(path) / "Contents" / "Info.plist"
     try:
         with plist.open("rb") as f:
