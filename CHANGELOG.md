@@ -4,6 +4,15 @@ All notable changes follow Keep a Changelog.
 
 ## [Unreleased]
 
+### Changed
+
+- Detection no longer depends on the maintainer's Mac: the hard-coded sleep-source special case and the built-in network/VPN name list are replaced by sourced rules (15 network, VPN, proxy and remote-access products), maintainer-specific app lists and backup-label guesses are removed (old configuration files keep their behavior), and the demo data is neutral.
+- First-run setup checks the whole Mac in one read-only scan and groups apps, LaunchAgents, network apps and keep-awake tools with recommendations; "Add recommended" writes apps, services and the network list at once. `setup --yes` and `suggest --write` share the same logic.
+
+### Added
+
+- A read-only clean-machine job on a GitHub macOS runner that runs check, setup preview and suggest and rejects any maintainer-specific term in the output.
+
 ## [1.2.0] - 2026-10-21
 
 ### Changed

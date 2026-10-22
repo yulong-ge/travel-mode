@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from .. import app_policy
+from .. import app_policy, onboarding
 from ..config import load_config, preview_app_choices, write_app_choices
 from ..i18n import t
 from ..paths import config_path
@@ -45,34 +45,56 @@ def run(*, yes=False, dry_run=False, input_fn=None):
                 return 0
             if answer:
                 raise ValueError(t("setup.begin_invalid"))
-        rows = app_policy.discover()
-        selected = app_policy.choices(rows, load_config())
+        data = onboarding.scan()
+        rows = data["apps"]
+        selected = onboarding.choices(data, load_config())
+        print(onboarding.detected(data))
         print(t("setup.title"))
-        group = None
-        for row in rows:
-            if row["reason"] != group:
-                group = row["reason"]
-                print(t("setup.group_" + group))
-            print(app_policy.row_text(row, selected))
-            if not yes and not dry_run:
-                for scenario in ("work", "away"):
-                    answer = (
-                        ask(
-                            t(
-                                "setup.choose",
-                                name=row["name"],
-                                scenario=t("scenario." + scenario),
-                                action=selected[scenario][row["name"]],
+        for group in onboarding.GROUPS:
+            members = [row for row in rows if row["group"] == group]
+            services = [row for row in data["services"] if row["group"] == group]
+            if not members and not services:
+                continue
+            print(t("onboarding.group_" + group))
+            for row in members:
+                print(app_policy.row_text(row, selected))
+                if not yes and not dry_run:
+                    for scenario in ("work", "away"):
+                        answer = (
+                            ask(
+                                t(
+                                    "setup.choose",
+                                    name=row["name"],
+                                    scenario=t("scenario." + scenario),
+                                    action=selected[scenario][row["name"]],
+                                )
                             )
+                            .strip()
+                            .lower()
                         )
-                        .strip()
-                        .lower()
+                        if answer:
+                            if answer not in {"freeze", "quit", "ask", "skip"}:
+                                raise ValueError(t("config.invalid_action"))
+                            selected[scenario][row["name"]] = answer
+            for row in services:
+                label = row["label"]
+                print(
+                    t(
+                        "onboarding.service",
+                        name=label,
+                        action=t("onboarding." + selected["services"][label]),
+                        reason=onboarding.reason(row),
                     )
+                )
+                if not yes and not dry_run:
+                    answer = ask(t("onboarding.choose_service", name=label)).strip().lower()
                     if answer:
-                        if answer not in {"freeze", "quit", "ask", "skip"}:
+                        if answer not in {"keep", "unload"}:
                             raise ValueError(t("config.invalid_action"))
-                        selected[scenario][row["name"]] = answer
-        print(app_policy.summary(selected, config_path()))
+                        selected["services"][label] = answer
+        for row in data["readiness"]["items"]:
+            print(row["message"])
+        print(onboarding.summary(selected, config_path()))
         if dry_run:
             print(save(selected, completed=True, adaptive=True, dry_run=True), end="")
         elif yes or ask(t("setup.confirm")).strip().lower() == "y":

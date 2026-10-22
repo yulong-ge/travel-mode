@@ -17,14 +17,19 @@ from travel_mode.config import Config, ConfigError, load_config
 def test_defaults_are_portable_and_complete(tmp_path: Path):
     config = Config.defaults()
     assert config.apps.default == "freeze"
-    assert "WeChat" in config.apps.freeze
-    assert "Spotify" in config.apps.freeze
-    assert "Google Drive" in config.apps.quit
-    assert config.network.apps
+    assert config.apps.policy == "adaptive" and config.apps.all == ()
+    assert config.network.apps == ()
     assert config.services.unload == ()
     assert config.power_overrides == {}
     assert config.options.language == "auto"
     assert load_config(tmp_path / "missing.toml") == config
+    from travel_mode.constants import DEFAULT_APPS, DEFAULT_NET_APPS
+
+    legacy = tmp_path / "legacy.toml"
+    legacy.write_text("[apps]\n")
+    old = load_config(legacy)
+    assert old.apps.policy == "legacy" and old.apps.all == tuple(DEFAULT_APPS)
+    assert old.network.apps == tuple(DEFAULT_NET_APPS)
 
 
 def test_complete_valid_config(tmp_path: Path):

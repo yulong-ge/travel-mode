@@ -16,12 +16,7 @@ PRIVATE_PATTERNS = (
     "bWFjYm9va2Fpcg==",
     "L1VzZXJzL21hY2Jvb2thaXI=",
     "Y29tLm1hY2Jvb2thaXIu",
-    "cmVzdGlj",
-    "Z2RyaXZl",
-    "Y2MtY29ubmVjdA==",
-    "ZGV2c3BhY2U=",
     "Y2xvdWRmbGFyZWQuZGV2c3BhY2U=",
-    "cmF5c3luYw==",
     "Y2l0cm9sYWJz",
     "RWdvVXBkYXRlcg==",
     "YXNyLXByb3h5",
@@ -29,23 +24,6 @@ PRIVATE_PATTERNS = (
     "aGVyZHI=",
     "YXNpbW92",
     "aHlwZXJDb25uZWN0",
-    "eGlhb21p",
-    "WFpQcmludENsaWVudA==",
-    "T3JiU3RhY2s=",
-    "5ZCM6Iqx6aG6",
-    "5rOi54K56Z+z5LmQ",
-    "d3Bzb2ZmaWNl",
-    "VGlja1RpY2s=",
-    "UnN5bmNVSQ==",
-    "TmV0TmV3c1dpcmU=",
-    "T3BlbkNoYW1iZXI=",
-    "UGFzZW8=",
-    "Q2hlcnJ5",
-    "RG91YmFv",
-    "UWlhbndlbg==",
-    "U3BhcmsgRGVza3RvcA==",
-    "VHlwb3Jh",
-    "U3VibGltZSBUZXh0",
     "MjMzOTY0NTE=",
     "MjM2NTg1OTU=",
     "L3Zhci9mb2xkZXJzL3Y5L3hyZGdkdHluMThqYzhkc2ZqcGdyMGdoaDAwMDBnbg==",
@@ -53,8 +31,12 @@ PRIVATE_PATTERNS = (
     "bG9uZ+eahE1hY0Jvb2sgUHJv",
     "bG9uZ2RlTWFjQm9vay1Qcm8=",
     "5L2c6ICF5pys5py6",
+    "Y29tLnVzZXIuY2MtY29ubmVjdA==",
+    "b3JnLnVzZXIuZGV2c3BhY2U=",
+    "Y29tLnVzZXIucmVzdGljLmJhY2t1cA==",
+    "aG9tZWJyZXcubXhjbC5mcnBjLXBlcnNvbmFs",
 )
-SOURCE_PATTERNS = "ZnJwCnN5bmN0aGluZwpzYW5nZm9y"
+
 BANNED_IN_LOCALES = (
     "Tailscale",
     "Clash",
@@ -82,22 +64,16 @@ def test_public_files_have_no_personal_identifiers():
             payload = path.read_bytes().lower()
             # Include binary/generator artifacts and UTF-16 text, not just Python sources.
             for number, pattern in enumerate(patterns):
-                if path.relative_to(ROOT).as_posix() in {
-                    "src/travel_mode/categories.toml",
-                    "tests/unit/test_categories.py",
-                } and number in {3, 18}:
-                    # Public product identities required by the category registry.
-                    continue
                 if any(pattern.encode(encoding) in payload for encoding in ("utf-8", "utf-16le", "utf-16be")):
                     offenders.append(f"{path.relative_to(ROOT)}: private pattern {number}")
     assert offenders == []
 
 
 def test_source_has_no_personal_service_names():
-    patterns = base64.b64decode(SOURCE_PATTERNS).decode().splitlines()
+    patterns = [base64.b64decode(value).decode().casefold() for value in PRIVATE_PATTERNS]
     offenders = []
     for path in SRC.rglob("*.py"):
-        content = path.read_text(encoding="utf-8")
+        content = path.read_text(encoding="utf-8").casefold()
         if any(word in content for word in patterns):
             offenders.append(path.relative_to(ROOT).as_posix())
     assert offenders == []
@@ -133,4 +109,19 @@ def test_privacy_scan_still_checks_other_hidden_files(tmp_path, monkeypatch):
     (tmp_path / ".private-note").write_bytes(base64.b64decode(PRIVATE_PATTERNS[0]))
     monkeypatch.setattr(__import__(__name__, fromlist=["ROOT"]), "ROOT", tmp_path)
     with pytest.raises(AssertionError, match="private-note"):
+        test_public_files_have_no_personal_identifiers()
+
+
+def test_public_products_allowed_but_private_service_labels_rejected(tmp_path, monkeypatch):
+    import pytest
+
+    monkeypatch.setattr(__import__(__name__, fromlist=["ROOT"]), "ROOT", tmp_path)
+    public = tmp_path / "products.txt"
+    public.write_text(
+        "restic OrbStack WPS TickTick NetNewsWire Syncthing Tailscale frp Keystone "
+        "gdrive cc-connect DevSpace Raysync"
+    )
+    test_public_files_have_no_personal_identifiers()
+    public.write_bytes(base64.b64decode(PRIVATE_PATTERNS[-1]))
+    with pytest.raises(AssertionError, match=r"products\.txt"):
         test_public_files_have_no_personal_identifiers()

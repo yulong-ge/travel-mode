@@ -26,3 +26,40 @@ def test_network_scan_reports_running_background_and_missing_apps(monkeypatch, f
     assert not by_name["aTrust"]["resident"]
     assert by_name["UURemote"]["status"] == "background"
     assert by_name["UURemote"]["resident"]
+
+
+def test_sourced_standalone_network_helper_is_observed_without_mutation_target(fake_runner):
+    fake_runner.responses[("ps", "-axo", "pid=,%cpu=,command=")] = CmdResult(
+        "910001 0.7 /Library/Helpers/remoting_me2me_host --start\n"
+        "910002 0.3 /Library/Helpers/remoting_me2me_host --worker\n"
+        "910003 8.0 /Library/Helpers/unrecognized-vpn --start\n",
+        "",
+        0,
+    )
+    rows = network_scan(Config.defaults())
+    assert rows == [
+        dict(
+            name="Chrome Remote Desktop",
+            path="",
+            running=True,
+            status="background",
+            resident=True,
+            cpu=1.0,
+            rule_id="chrome-remote-desktop",
+        )
+    ]
+
+
+def test_cli_disconnect_uses_observed_network_rules_and_explicit_configuration():
+    from travel_mode.network_apps import disconnect_names
+
+    config = Config(network=NetworkConfig(("Configured VPN",)))
+    observed = [
+        dict(name="International VPN", path="/Applications/International VPN.app", category="network"),
+        dict(name="Configured VPN", path="/Applications/Configured VPN.app", category="network"),
+        dict(name="Editor", path="/Applications/Editor.app"),
+        dict(name="Ignored VPN", path="/Applications/Ignored.app", category="network", category_ignored=True),
+        dict(name="Front VPN", path="/Applications/Front.app", category="network", reason="foreground"),
+    ]
+    assert disconnect_names(config, observed) == ("Configured VPN", "International VPN")
+    assert disconnect_names(Config.defaults(), []) == ()

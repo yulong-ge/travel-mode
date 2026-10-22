@@ -19,6 +19,7 @@ POWER_KEYS = [
 ]
 POWER_KEY_ORDER = [key for key, _, _ in POWER_KEYS]
 
+# Frozen legacy-policy compatibility only; adaptive discovery never uses these names.
 DEFAULT_APPS = [
     "Google Chrome",
     "Microsoft Edge",
@@ -48,39 +49,6 @@ DEFAULT_APPS = [
     "OneDrive",
     "Dropbox",
 ]
-DEFAULT_ACTIONS = {
-    "freeze": [
-        "WeChat",
-        "QQ",
-        "Lark",
-        "DingTalk",
-        "Slack",
-        "Discord",
-        "Telegram",
-        "WhatsApp",
-        "Notion",
-        "ChatGPT",
-        "Claude",
-        "Spotify",
-        "Docker",
-        "Steam",
-        "zoom.us",
-        "Microsoft Teams",
-        "Figma",
-    ],
-    "quit": ["Google Drive", "OneDrive", "Dropbox"],
-    "ask": [
-        "Google Chrome",
-        "Microsoft Edge",
-        "Firefox",
-        "Brave Browser",
-        "Arc",
-        "Visual Studio Code",
-        "Cursor",
-        "Obsidian",
-    ],
-    "skip": [],
-}
 DEFAULT_NET_APPS = [
     "aTrust",
     "Sangfor",
@@ -121,7 +89,6 @@ STR_KEYS = (
 
 __all__ = [
     "APPS",
-    "DEFAULT_ACTIONS",
     "DEFAULT_APPS",
     "DEFAULT_DAEMON_APPS",
     "DEFAULT_NET_APPS",

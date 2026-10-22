@@ -1,7 +1,7 @@
 # Public product identities only. No machine-specific paths or labels.
 # Matching is case-insensitive glob matching; app names are exact unless a glob is present.
 # action applies to apps; matching non-Apple user LaunchAgents use unload unless action=notice.
-# restic/borg/kopia/rclone label substring selectors are a product requirement, not vendor labels.
+# Backup tools match documented executables, never guessed user LaunchAgent labels.
 # notice means identification only: no action, including explicit category selection.
 version = 1
 
@@ -195,8 +195,8 @@ name = "restic"
 action = "unload"
 apps = []
 bundle_ids = []
-labels = ["*restic*"]
-executables = []
+labels = []
+executables = ["*/restic"]
 
 # Source: https://borgbackup.readthedocs.io/en/stable/
 # Public identity: *borg*
@@ -207,8 +207,8 @@ name = "borg"
 action = "unload"
 apps = []
 bundle_ids = []
-labels = ["*borg*"]
-executables = []
+labels = []
+executables = ["*/borg"]
 
 # Source: https://kopia.io/docs/
 # Public identity: *kopia*
@@ -219,8 +219,8 @@ name = "kopia"
 action = "unload"
 apps = []
 bundle_ids = []
-labels = ["*kopia*"]
-executables = []
+labels = []
+executables = ["*/kopia"]
 
 # Source: https://rclone.org/docs/
 # Public identity: *rclone*
@@ -231,8 +231,8 @@ name = "rclone"
 action = "unload"
 apps = []
 bundle_ids = []
-labels = ["*rclone*"]
-executables = []
+labels = []
+executables = ["*/rclone"]
 
 # Source: https://support.apple.com/guide/mac-help/back-up-files-mh35860/mac
 # Public identity: com.apple.backupd, com.apple.backupd-helper
@@ -448,3 +448,228 @@ apps = ["Sleepless"]
 bundle_ids = []
 labels = []
 executables = []
+
+# Source: https://www.cisco.com/c/en/us/support/docs/security/umbrella/225301-deploy-csc-on-macos-with-correct-app.html
+# Public identity: com.cisco.secureclient.gui, com.cisco.anyconnect.gui, Cisco Secure Client, Cisco AnyConnect Secure Mobility Client
+[[rules]]
+id = "cisco-secure-client"
+category = "network"
+subtype = "vpn"
+name = "Cisco Secure Client"
+action = "notice"
+apps = ["Cisco Secure Client", "Cisco AnyConnect Secure Mobility Client"]
+bundle_ids = ["com.cisco.secureclient.gui", "com.cisco.anyconnect.gui"]
+labels = []
+executables = []
+source = "https://www.cisco.com/c/en/us/support/docs/security/umbrella/225301-deploy-csc-on-macos-with-correct-app.html"
+
+# Source: https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA14u000000oMrvCAE&lang=en_US
+# Public identity: GlobalProtect.app/Contents/MacOS/GlobalProtect and Contents/Resources/PanGPS
+[[rules]]
+id = "globalprotect"
+category = "network"
+subtype = "vpn"
+name = "GlobalProtect"
+action = "notice"
+apps = ["GlobalProtect"]
+bundle_ids = []
+labels = []
+executables = ["*/GlobalProtect.app/Contents/MacOS/GlobalProtect", "*/GlobalProtect.app/Contents/Resources/PanGPS"]
+source = "https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA14u000000oMrvCAE&lang=en_US"
+
+# Source: https://tailscale.com/kb/1286/macos-mdm
+# Public identity: io.tailscale.ipn.macsys, io.tailscale.ipn.macos, Tailscale
+[[rules]]
+id = "tailscale"
+category = "network"
+subtype = "vpn"
+name = "Tailscale"
+action = "notice"
+apps = ["Tailscale"]
+bundle_ids = ["io.tailscale.ipn.macsys", "io.tailscale.ipn.macos"]
+labels = []
+executables = []
+source = "https://tailscale.com/kb/1286/macos-mdm"
+
+# Source: https://git.zx2c4.com/wireguard-apple/tree/Sources/WireGuardApp/UI/macOS/Info.plist
+# Public identity: com.wireguard.macos, WireGuard
+[[rules]]
+id = "wireguard"
+category = "network"
+subtype = "vpn"
+name = "WireGuard"
+action = "notice"
+apps = ["WireGuard"]
+bundle_ids = ["com.wireguard.macos"]
+labels = []
+executables = []
+source = "https://git.zx2c4.com/wireguard-apple/tree/Sources/WireGuardApp/UI/macOS/Info.plist"
+
+# Source: https://formulae.brew.sh/api/cask/tunnelblick.json
+# Public identity: net.tunnelblick.tunnelblick, Tunnelblick
+[[rules]]
+id = "tunnelblick"
+category = "network"
+subtype = "vpn"
+name = "Tunnelblick"
+action = "notice"
+apps = ["Tunnelblick"]
+bundle_ids = ["net.tunnelblick.tunnelblick"]
+labels = []
+executables = []
+source = "https://formulae.brew.sh/api/cask/tunnelblick.json"
+
+# Source: https://formulae.brew.sh/api/cask/openvpn-connect.json
+# Public identity: org.openvpn.client.app, OpenVPN Connect
+[[rules]]
+id = "openvpn-connect"
+category = "network"
+subtype = "vpn"
+name = "OpenVPN Connect"
+action = "notice"
+apps = ["OpenVPN Connect"]
+bundle_ids = ["org.openvpn.client.app"]
+labels = []
+executables = []
+source = "https://formulae.brew.sh/api/cask/openvpn-connect.json"
+
+# Source: https://formulae.brew.sh/api/cask/nordvpn.json
+# Public identity: com.nordvpn.macos, NordVPN
+[[rules]]
+id = "nordvpn"
+category = "network"
+subtype = "vpn"
+name = "NordVPN"
+action = "notice"
+apps = ["NordVPN"]
+bundle_ids = ["com.nordvpn.macos"]
+labels = []
+executables = []
+source = "https://formulae.brew.sh/api/cask/nordvpn.json"
+
+# Source: https://formulae.brew.sh/api/cask/expressvpn.json
+# Public identity: com.express.vpn, ExpressVPN
+[[rules]]
+id = "expressvpn"
+category = "network"
+subtype = "vpn"
+name = "ExpressVPN"
+action = "notice"
+apps = ["ExpressVPN"]
+bundle_ids = ["com.express.vpn"]
+labels = []
+executables = []
+source = "https://formulae.brew.sh/api/cask/expressvpn.json"
+
+# Source: https://formulae.brew.sh/api/cask/cloudflare-warp.json
+# Public identity: com.cloudflare.1dot1dot1dot1.macos, Cloudflare WARP
+[[rules]]
+id = "cloudflare-warp"
+category = "network"
+subtype = "vpn"
+name = "Cloudflare WARP"
+action = "notice"
+apps = ["Cloudflare WARP"]
+bundle_ids = ["com.cloudflare.1dot1dot1dot1.macos"]
+labels = []
+executables = []
+source = "https://formulae.brew.sh/api/cask/cloudflare-warp.json"
+
+# Source: https://formulae.brew.sh/api/cask/teamviewer.json
+# Public identity: com.teamviewer.TeamViewer, TeamViewer
+[[rules]]
+id = "teamviewer"
+category = "network"
+subtype = "remote-access"
+name = "TeamViewer"
+action = "notice"
+apps = ["TeamViewer"]
+bundle_ids = ["com.teamviewer.TeamViewer"]
+labels = []
+executables = []
+source = "https://formulae.brew.sh/api/cask/teamviewer.json"
+
+# Source: https://formulae.brew.sh/api/cask/anydesk.json
+# Public identity: com.philandro.anydesk, com.philandro.anydesk.Frontend, AnyDesk
+[[rules]]
+id = "anydesk"
+category = "network"
+subtype = "remote-access"
+name = "AnyDesk"
+action = "notice"
+apps = ["AnyDesk"]
+bundle_ids = ["com.philandro.anydesk", "com.philandro.anydesk.Frontend"]
+labels = []
+executables = []
+source = "https://formulae.brew.sh/api/cask/anydesk.json"
+
+# Source: https://formulae.brew.sh/api/cask/parsec.json
+# Public identity: tv.parsec.www, Parsec
+[[rules]]
+id = "parsec"
+category = "network"
+subtype = "remote-access"
+name = "Parsec"
+action = "notice"
+apps = ["Parsec"]
+bundle_ids = ["tv.parsec.www"]
+labels = []
+executables = []
+source = "https://formulae.brew.sh/api/cask/parsec.json"
+
+# Source: https://formulae.brew.sh/api/cask/chrome-remote-desktop-host.json
+# Executable source: https://chromium.googlesource.com/chromium/src/+/main/remoting/host/BUILD.gn
+# Public identity: Chrome Remote Desktop Host, */remoting_me2me_host (macOS build target)
+[[rules]]
+id = "chrome-remote-desktop"
+category = "network"
+subtype = "remote-access"
+name = "Chrome Remote Desktop"
+action = "notice"
+apps = ["Chrome Remote Desktop Host"]
+bundle_ids = []
+labels = []
+executables = ["*/remoting_me2me_host"]
+source = "https://formulae.brew.sh/api/cask/chrome-remote-desktop-host.json"
+
+# Source: https://formulae.brew.sh/api/cask/clash-verge-rev.json
+# Public identity: io.github.clash-verge-rev.clash-verge-rev, Clash Verge
+[[rules]]
+id = "clash-verge"
+category = "network"
+subtype = "proxy"
+name = "Clash Verge"
+action = "notice"
+apps = ["Clash Verge"]
+bundle_ids = ["io.github.clash-verge-rev.clash-verge-rev"]
+labels = []
+executables = []
+source = "https://formulae.brew.sh/api/cask/clash-verge-rev.json"
+
+# Source: https://formulae.brew.sh/api/cask/surge.json
+# Public identity: com.nssurge.surge-mac, Surge
+[[rules]]
+id = "surge"
+category = "network"
+subtype = "proxy"
+name = "Surge"
+action = "notice"
+apps = ["Surge"]
+bundle_ids = ["com.nssurge.surge-mac"]
+labels = []
+executables = []
+source = "https://formulae.brew.sh/api/cask/surge.json"
+
+# Source: https://github.com/RASLK/AmphetamineNet#how-closed-lid-works
+# Public identity: AmphetamineNet; documented pmset -a disablesleep behavior.
+[[rules]]
+id = "amphetamine-net"
+category = "keep-awake"
+name = "AmphetamineNet"
+action = "notice"
+apps = ["AmphetamineNet"]
+bundle_ids = []
+labels = []
+executables = ["*/AmphetamineNet"]
+may_disable_sleep = true
+source = "https://github.com/RASLK/AmphetamineNet#how-closed-lid-works"

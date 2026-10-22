@@ -5,7 +5,7 @@ import asyncio
 import pytest
 from textual.widgets import Button, Static
 
-from travel_mode import app_policy
+from travel_mode import app_policy, onboarding
 from travel_mode.config import load_config
 from travel_mode.i18n import set_language
 from travel_mode.tui.app import TravelApp
@@ -34,6 +34,10 @@ async def ready(app):
     assert isinstance(screen, SetupScreen)
     await asyncio.wait_for(screen.ready.wait(), 10)
     assert await screen.wait_for_refresh()
+    # Editor/layout tests inspect expanded rows; the new overview is tested separately.
+    for content in screen.query(".setup-items"):
+        screen.show_group(content.id.removeprefix("setup-items-"))
+    assert await screen.wait_for_refresh()
     return screen
 
 
@@ -61,7 +65,7 @@ async def test_setup_tui_edits_columns_reviews_and_preserves_comments(tmp_path, 
         assert screen.selected["away"]["WeChat"] == "ask"
         assert screen.query_one("#setup-save", Button).disabled
         await press(screen, "#setup-review", screen.reviewed)
-        assert str(path) in str(screen.query_one("#setup-status", Static).content)
+        assert onboarding.display_path(path) in str(screen.query_one("#setup-status", Static).content)
         assert not screen.query_one("#setup-save", Button).disabled
         await press(screen, "#setup-save", screen.completed)
     config = load_config(path)
@@ -238,7 +242,13 @@ async def test_setup_compact_table_columns_buttons_and_focus(monkeypatch, langua
     assert by_name["Box"]["reason"] == "provider"
     assert by_name["Box"]["work"] == by_name["Box"]["away"] == "quit"
     assert by_name["Nextcloud"]["reason"] == "freeze"
-    assert {row["reason"] for row in demo_rows} == {"freeze", "provider", "assertion", "interactive"}
+    assert {row["reason"] for row in demo_rows} == {
+        "freeze",
+        "provider",
+        "assertion",
+        "interactive",
+        "network",
+    }
     monkeypatch.setattr(app_policy, "discover", lambda: demo_rows)
     app = SetupApp(dry_run=True)
     async with app.run_test(size=size) as pilot:
@@ -250,12 +260,12 @@ async def test_setup_compact_table_columns_buttons_and_focus(monkeypatch, langua
         assert all(group.region.height == 1 for group in screen.query(".setup-group"))
         visible = [button for button in buttons if body.content_region.contains_region(button.region)]
         if size == (120, 36):
-            assert len(visible) >= 15
+            assert len(visible) >= 10
         for key in ("setup-column", "setup-review", "setup-skip", "setup-save"):
             button = screen.query_one(f"#{key}", Button)
             assert screen.region.contains_region(button.region)
             assert button.label.cell_length <= button.content_region.width - 2 * button.styles.line_pad
-        header = str(screen.query_one("#setup-header", Static).content)
+        header = str(screen.query_one(".setup-header", Static).content)
         assert t("scenario.work") in header and t("scenario.away") in header
         help_text = str(screen.query_one("#setup-help").content)
         assert t("scenario.work") in help_text and "work" not in help_text
@@ -329,7 +339,12 @@ async def test_setup_and_cli_omit_protected_rows_from_choices(monkeypatch, capsy
     async with app.run_test(size=(120, 36)):
         screen = await ready(app)
         assert [row["name"] for row in screen.rows] == ["Ordinary"]
-        assert screen.selected == {"work": {"Ordinary": "freeze"}, "away": {"Ordinary": "freeze"}}
+        assert screen.selected == {
+            "work": {"Ordinary": "freeze"},
+            "away": {"Ordinary": "freeze"},
+            "services": {},
+            "network": [],
+        }
         assert len(screen.query(".setup-app")) == 1
         await press(screen, "#setup-app-0", screen.changed)
         assert screen.selected["work"] == {"Ordinary": "quit"}

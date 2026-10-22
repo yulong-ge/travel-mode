@@ -11,26 +11,26 @@
  应用
  ✗   Quit Refusal Demo        未完成       未能退出，可能正在显示确认框。                          重试    强制退出
  ▲   Google Drive             已强退       拒绝正常退出（可能正在显示确认框），已强制退出。
- ✓   Amphetamine              已冻结       它阻止的是空闲睡眠，合盖仍会睡眠；冻结后断言仍在
+ ✓   AmphetamineNet           已冻结       它阻止的是空闲睡眠，合盖仍会睡眠；冻结后断言仍在
  ✓   KeepingYouAwake          已冻结       它阻止的是空闲睡眠，合盖仍会睡眠；冻结后断言仍在
- ✓   UURemote                 已冻结       它阻止的是空闲睡眠，合盖仍会睡眠；冻结后断言仍在
- ✓   Anki                     已冻结       保留运行状态，恢复后继续使用
- ✓   Audacity                 已冻结       保留运行状态，恢复后继续使用
- ✓   Calibre                  已冻结       保留运行状态，恢复后继续使用
+ ✓   Archive Manager          已冻结       保留运行状态，恢复后继续使用
+ ✓   Audio Studio             已冻结       保留运行状态，恢复后继续使用
+ ✓   Book Library             已冻结       保留运行状态，恢复后继续使用
+ ✓   Clipboard Shelf          已冻结       保留运行状态，恢复后继续使用
  ✓   Discord                  已冻结       保留运行状态，恢复后继续使用
- ✓   HandBrake                已冻结       保留运行状态，恢复后继续使用
- ✓   IINA                     已冻结       保留运行状态，恢复后继续使用
- ✓   KeePassXC                已冻结       保留运行状态，恢复后继续使用
- ✓   Maccy                    已冻结       保留运行状态，恢复后继续使用
- ✓   Nextcloud                已冻结       保留运行状态，恢复后继续使用
- ✓   Rectangle                已冻结       保留运行状态，恢复后继续使用
+ ✓   Nextcloud                已冻结       保留运行状态，恢复后继续使用                                              ▄▄
+ ✓   Password Vault           已冻结       保留运行状态，恢复后继续使用
+ ✓   Research Reader          已冻结       保留运行状态，恢复后继续使用
  ✓   Signal                   已冻结       保留运行状态，恢复后继续使用
  ✓   Slack                    已冻结       保留运行状态，恢复后继续使用
+ ✓   Spotify                  已冻结       保留运行状态，恢复后继续使用
+ ✓   Study Cards              已冻结       保留运行状态，恢复后继续使用
+ ✓   Telegram                 已冻结       保留运行状态，恢复后继续使用
 
- 成功 29 项，失败 1 项。详情见 /tmp/travel-mode-demo/travel-mode.log
+ 成功 28 项，失败 1 项。详情见 /tmp/travel-mode-demo/travel-mode.log
    更多     调整默认动作     重新体检
 
                                                                                                             完成
 
- ✘ Quit Refusal Demo 拒绝退出，可能正在显示确认框。处理后重试，或选择强制退出。
+ ✘ 成功 28 项，失败 1 项。详情见 /tmp/travel-mode-demo/travel-mode.log
  q 退出  l 语言  r 刷新  d 详情  ? 帮助

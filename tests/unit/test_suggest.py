@@ -22,7 +22,7 @@ def test_suggest_uses_top_ps_and_assertions(monkeypatch):
     monkeypatch.setattr(suggest_module, "svc_scan", lambda config: {"candidates": []})
     data = suggest_data(samples=1)
     assert data["apps"][0]["name"] == "Test"
-    assert data["apps"][0]["action"] == "quit"
+    assert data["apps"][0]["action"] == "freeze"
     assert data["assertions"][0]["pid"] == "123"
 
 
@@ -32,7 +32,7 @@ def test_tomlkit_suggest_write_preserves_comments(tmp_path):
     write_selection([{"name": "Example", "action": "freeze"}], [], path)
     text = path.read_text("utf-8")
     assert "# keep this" in text and '"Example"' in text
-    assert load_config(path).apps.freeze == ("Example",)
+    assert load_config(path).apps.work == load_config(path).apps.away == {"Example": "freeze"}
 
 
 def _write_plist(path, value):

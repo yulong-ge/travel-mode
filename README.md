@@ -106,8 +106,11 @@ Every probe is read-only and has a short time limit; a probe that fails is repor
 ### Built-in program categories
 
 The tool recognizes common sync clients (Google Drive, Dropbox, OneDrive, Syncthing, …),
-backup tools, updaters and virtual machines by their public identifiers. In `work` they can be
-paused with one selection. Rules and sources: [categories.toml](src/travel_mode/categories.toml).
+backup tools, updaters, virtual machines and VPN, proxy and remote-access apps (Cisco Secure
+Client, GlobalProtect, Tailscale, WireGuard, TeamViewer, AnyDesk, …) by their public identifiers,
+each rule with a cited source. Nothing in the detection is specific to one person's Mac: apps
+that match no rule get the general recommendation, and your own services go in your
+configuration. Rules and sources: [categories.toml](src/travel_mode/categories.toml).
 
 ### Power measurement
 
@@ -198,7 +201,7 @@ state file and `pmset -g ps`. SwiftBar itself stays running; travel-mode adds no
 | `report [--json]` | Sleep and DarkWake report from the system power log |
 | `suggest [--write]` | Suggest apps, services and categories to add to the configuration |
 | `thaw [--all]` | List stopped app processes and resume them after confirmation |
-| `setup [--no-tui] [--yes]` | Choose what happens to each app in `work` and `away` |
+| `setup [--no-tui] [--yes] [--dry-run]` | Check this Mac and save recommended or chosen actions for apps, services and network apps |
 | `profiles` | List profiles |
 | `config path\|init\|validate\|edit` | Manage the configuration file |
 | `config set-language en\|zh`, `config set-interface cli\|tui` | Save preferences |
@@ -215,12 +218,17 @@ Common options: `--scenario work|away`, `--profile NAME`, `--dry-run`, `--yes`, 
 template with `travel-mode config init`; a full example is in
 [examples/config.toml](examples/config.toml).
 
-The first run opens a setup screen (also `travel-mode setup`) that lists your apps with a
-recommended action for each scenario: ordinary apps are frozen; Google Drive, OneDrive, Dropbox
-and Box are quit, because a frozen cloud-file provider can stall Finder; apps that keep the Mac
-awake are quit in `away`, because freezing does not release their sleep assertion; browsers and
-editors are asked about. Change any row, review the summary and save. When you change an app's
-action during a session, the tool offers to remember it.
+The first run checks the Mac and opens setup (also `travel-mode setup`): what it found, grouped
+as sync and backup, updaters, network and remote access, keep-awake tools and other apps, each
+with a recommended action per scenario. "Add recommended" fills in every group; change any row,
+review the summary of what will be written and save. Ordinary apps are frozen when on the go and
+quit for overnight; cloud-file providers (Google Drive, OneDrive, Dropbox, Box) are quit because a
+frozen one can stall Finder; apps that keep the Mac awake are quit for overnight; browsers and
+editors are asked about; network and remote-access apps are kept. Settings you made yourself are
+shown as yours and never replaced by a recommendation. Without the interface:
+`travel-mode setup --no-tui` asks group by group, `travel-mode setup --yes` saves the
+recommendations, and `--dry-run` only prints them. When you change an app's action during a
+session, the tool offers to remember it.
 
 ```toml
 [options]

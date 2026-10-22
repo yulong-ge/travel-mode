@@ -367,7 +367,11 @@ def _main(argv=None):
             else 0
         )
     if args.cmd == "suggest":
-        from .flows.suggest import confirm_write, print_suggestions, print_warnings, suggest_data
+        if args.write:
+            from .flows.setup import run
+
+            return run(yes=args.yes, dry_run=args.dry_run)
+        from .flows.suggest import print_suggestions, print_warnings, suggest_data
 
         data = suggest_data(args.samples)
         print_warnings(data)
@@ -377,8 +381,6 @@ def _main(argv=None):
             print(json.dumps(data, ensure_ascii=False))
         else:
             print_suggestions(data)
-        if args.write:
-            confirm_write(data)
         return 0
     if args.cmd in ("off", "restore"):
         return mode_off(

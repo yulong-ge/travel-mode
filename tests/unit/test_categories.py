@@ -108,7 +108,11 @@ def test_app_scanning_discovers_bundle_id_once_and_respects_ignore(fake_runner, 
 
 
 def test_one_click_batches_deduplicate_and_keep_explicit_exclusions():
-    service = {"label": "org.fixture.restic", "plist_path": "/tmp/fixture.plist"}
+    service = {
+        "label": "org.fixture.restic",
+        "plist_path": "/tmp/fixture.plist",
+        "executable": "/opt/fixture/bin/restic",
+    }
     kept = {"label": "com.google.keystone.agent", "plist_path": "/tmp/keystone.plist"}
     app = {"name": "Google Drive", "path": "/Applications/Google Drive.app"}
     skipped = {"name": "Dropbox", "path": "/Applications/Dropbox.app"}
@@ -135,9 +139,17 @@ def test_one_click_batches_deduplicate_and_keep_explicit_exclusions():
 
 
 def test_one_click_failure_does_not_abort_other_services():
-    service = {"label": "org.fixture.restic", "plist_path": "/tmp/fixture.plist"}
+    service = {
+        "label": "org.fixture.restic",
+        "plist_path": "/tmp/fixture.plist",
+        "executable": "/opt/fixture/bin/restic",
+    }
     attempted, saved = [], []
-    other = {"label": "org.fixture.restic.second", "plist_path": "/tmp/second.plist"}
+    other = {
+        "label": "org.fixture.restic.second",
+        "plist_path": "/tmp/second.plist",
+        "executable": "/opt/fixture/bin/restic",
+    }
 
     def execute(action):
         attempted.append(action.path)

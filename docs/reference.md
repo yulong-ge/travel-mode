@@ -455,15 +455,36 @@ and `travel-mode history` list the failed actions.
 
 ## App defaults and setup
 
-`travel-mode setup` (shown automatically on the first run without a configuration file) lists
-installed and running apps with a recommended action for `work` and `away` and a one-line reason:
+`travel-mode setup` (shown automatically on the first run without a configuration file) runs one
+read-only scan (one app/process snapshot, 15-second command budget) and groups what it found:
+installed and running apps, user LaunchAgents that match a rule or use a lot of CPU, network and
+remote-access apps, keep-awake tools, and sleep-readiness problems. Each item has a recommendation
+for `work` and `away` and a one-line reason:
 
-| App | work | away |
+| Item | work | away |
 | --- | --- | --- |
-| Ordinary app | freeze | freeze |
+| Ordinary app | freeze | quit |
 | Cloud-file provider (`file_provider = true` in categories.toml: Google Drive, OneDrive, Dropbox, Box) | quit | quit |
 | Holds a sleep assertion | freeze, with a note | quit |
-| Browser, editor, terminal | ask | ask |
+| Browser, editor, terminal (`interactive.toml`) | ask | ask |
+| Network / VPN / proxy / remote-access app | keep | keep |
+| User LaunchAgent of a sync, backup or updater rule, or using a lot of CPU | pause | pause |
+
+"Add recommended" fills every group; saving writes `[apps.work]`, `[apps.away]`,
+`[services] unload/keep` and the network list in one atomic, comment-preserving write after
+showing a summary. Existing choices are marked as yours and kept. `setup --no-tui` asks per group,
+`setup --yes` saves the recommendations, `--dry-run` prints the summary and the configuration it
+would write. `suggest --write` uses the same flow; plain `suggest` stays read-only.
+
+Detection uses public rules only. Every rule in `categories.toml` and `interactive.toml` cites a
+public source (vendor documentation or a Homebrew cask). Apps that match no rule get the general
+recommendation; personal services and labels belong in the user's configuration, not in the
+rules. A rule may mark a product as able to switch the global sleep setting itself
+(`may_disable_sleep`); the sleep-readiness check names such a product only when a rule with a
+source says so, and otherwise explains the common causes in general terms. The `macOS guarded
+e2e` workflow includes a read-only job on a clean GitHub macOS runner that runs `check --json`,
+`setup --yes --dry-run` and `suggest --json` and fails if the output contains any term from the
+maintainer's private list.
 
 Protected apps (the terminal running the tool and its ancestors, the frontmost app, protected
 Apple apps) are not listed. Explicit configuration always wins over a recommendation, and

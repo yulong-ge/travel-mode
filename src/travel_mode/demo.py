@@ -22,7 +22,8 @@ def _configure_demo(directory=None) -> None:
     demo_state = demo_root / "state.json"
     demo_config = demo_root / "config.toml"
     demo_config.write_text(
-        '[network]\napps = ["Clash Party", "aTrust", "UURemote"]\n\n[options]\nlanguage = "auto"\n',
+        '[apps]\npolicy="adaptive"\n[network]\n'
+        'apps = ["Tunnelblick", "WireGuard", "AnyDesk"]\n\n[options]\nlanguage = "auto"\n',
         encoding="utf-8",
     )
     os.environ["TRAVEL_MODE_STATE"] = str(demo_state)
@@ -83,7 +84,7 @@ def _configure_demo(directory=None) -> None:
                 return CmdResult(
                     "\n".join(
                         f"{pid} 0.5 /Demo/{name}.app/Contents/MacOS/{name}"
-                        for pid, name in enumerate(("aTrust", "Clash Party", "UURemote"), 1001)
+                        for pid, name in enumerate(("WireGuard", "Tunnelblick", "AnyDesk"), 1001)
                     ),
                     "",
                     0,
@@ -132,7 +133,7 @@ def setup_rows():
     from .categories import identify
 
     names = (
-        "WeChat",
+        "zoom.us",
         "Slack",
         "Discord",
         "Signal",
@@ -152,8 +153,8 @@ def setup_rows():
         "Dropbox",
         "Box",
         "Nextcloud",
-        "UURemote",
-        "Amphetamine",
+        "AnyDesk",
+        "AmphetamineNet",
         "KeepingYouAwake",
         "Google Chrome",
         "Safari",
@@ -162,15 +163,15 @@ def setup_rows():
         "Terminal",
         "TextEdit",
         "VLC",
-        "IINA",
-        "HandBrake",
-        "Audacity",
-        "Calibre",
-        "Anki",
-        "Zotero",
-        "Maccy",
-        "Rectangle",
-        "KeePassXC",
+        "Video Studio",
+        "Archive Manager",
+        "Audio Studio",
+        "Book Library",
+        "Study Cards",
+        "Research Reader",
+        "Clipboard Shelf",
+        "Window Desk",
+        "Password Vault",
     )
     # Public CFBundleIdentifier values: model the same Apple-app exclusions as live setup.
     apple_ids = {
@@ -195,7 +196,7 @@ def setup_rows():
             **app_policy.recommend(
                 name,
                 rule=identify(name=name),
-                assertion=name in {"UURemote", "Amphetamine", "KeepingYouAwake"},
+                assertion=name in {"AnyDesk", "AmphetamineNet", "KeepingYouAwake"},
             ),
         )
         for name in names
@@ -209,9 +210,44 @@ def _configure_demo_views() -> None:
     from . import app_policy
 
     app_policy.discover = setup_rows
+    from . import onboarding
+
+    def setup_snapshot(**kwargs):
+        data = setup_rows()
+        from .categories import identify
+
+        for row in data:
+            rule = identify(name=row["name"])
+            row.update(group=onboarding.group(rule["category"] if rule else None), configured=False)
+        services = [
+            dict(
+                label="org.example." + name, name=name, group=group, recommendation="unload", configured=False
+            )
+            for name, group in (
+                ("sync", "sync-backup"),
+                ("backup", "sync-backup"),
+                ("updater", "updater"),
+                ("second-updater", "updater"),
+            )
+        ]
+        from .sleep_readiness import evaluate
+        from .system.app_snapshot import Process
+
+        return dict(
+            apps=data,
+            services=services,
+            readiness=evaluate(
+                "1",
+                processes=[Process("900001", "0", "/Demo/AmphetamineNet.app/Contents/MacOS/AmphetamineNet")],
+            ),
+        )
+
+    onboarding.scan = setup_snapshot
 
     apps.APP_DIRS = []
-    apps.app_path = lambda name: f"/Demo/{name}.app" if name in {"Clash Party", "aTrust", "UURemote"} else ""
+    apps.app_path = lambda name: (
+        f"/Demo/{name}.app" if name in {"Tunnelblick", "WireGuard", "AnyDesk"} else ""
+    )
 
     def scan():
         from .config import load_config
@@ -251,7 +287,7 @@ def _configure_demo_views() -> None:
             },
             {
                 "category": "updater",
-                "label": "com.google.keystone.agent",
+                "label": "org.example.updater",
                 "pid": "-",
                 "cpu": "",
                 "plist_path": "/tmp/demo-updater.plist",
@@ -291,7 +327,7 @@ def _configure_health_sources():
                 rows = [
                     (900000, 1, 0, "/System/Library/CoreServices/loginwindow"),
                     (self.child, 900101, 0, "/usr/bin/caffeinate"),
-                    (900101, 1, 0, "claude --fixture-worker"),
+                    (900101, 1, 0, "/opt/demo/bin/build-worker"),
                     (900200, 1, 85, "/opt/demo/bin/render-worker"),
                     (900201, 1, 65, "/opt/demo/bin/sync-worker"),
                     (900202, 1, 55, "/opt/demo/bin/build-worker"),

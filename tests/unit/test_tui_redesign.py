@@ -86,16 +86,19 @@ def test_sleep_readiness_keeps_idle_assertions_out_of_red(sd, scope, expected):
         assert "合盖仍会睡眠" in result["items"][0]["message"]
 
 
-def test_remote_helper_is_only_a_possible_sleep_switch_source():
+def test_sleep_switch_sources_require_a_public_behavior_rule():
     from types import SimpleNamespace
 
     from travel_mode.sleep_readiness import evaluate
 
-    helper = SimpleNamespace(command="/Library/Demo/UURemoteHelper")
+    helper = SimpleNamespace(command="/Demo/AmphetamineNet.app/Contents/MacOS/AmphetamineNet")
     blocked = evaluate("1", processes=[helper])
-    assert "可能来自 UURemote" in blocked["items"][0]["message"]
+    assert "可能来自 AmphetamineNet" in blocked["items"][0]["message"]
     assert "可能再次改回" in blocked["items"][0]["message"]
-    assert "UURemote" not in evaluate("0", processes=[helper])["items"][0]["message"]
+    unknown = evaluate("1", processes=[SimpleNamespace(command="/Demo/UURemoteHelper")])
+    assert "UURemote" not in unknown["items"][0]["message"]
+    assert "某个程序可能修改了这个设置" in unknown["items"][0]["message"]
+    assert "AmphetamineNet" not in evaluate("0", processes=[helper])["items"][0]["message"]
 
 
 def test_empty_plist_is_not_noise_but_malformed_plist_is(tmp_path, fake_runner):

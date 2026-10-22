@@ -1,6 +1,11 @@
 name: macOS guarded e2e
 
 on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'scripts/check_new_machine.py'
+      - '.github/workflows/e2e-macos.yml'
   workflow_dispatch:
   schedule:
     - cron: '17 8 * * 0'
@@ -9,6 +14,7 @@ on:
     paths:
       - 'src/**'
       - 'scripts/e2e_*.py'
+      - 'scripts/check_new_machine.py'
       - 'pyproject.toml'
       - 'uv.lock'
       - '.github/workflows/e2e-macos.yml'
@@ -17,7 +23,27 @@ permissions:
   contents: read
 
 jobs:
+  clean-machine-readonly:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          version: '0.8.x'
+      - run: uv sync --group dev --python 3.13
+      - name: Check, preview setup and suggest on a clean Mac
+        run: uv run python scripts/check_new_machine.py --output "$RUNNER_TEMP/new-machine"
+      - name: Keep read-only outputs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: new-machine-readonly-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/new-machine/
+          retention-days: 14
+          if-no-files-found: error
   e2e:
+    if: github.event_name != 'pull_request'
     runs-on: macos-latest
     timeout-minutes: 30
     steps:

@@ -3,63 +3,35 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from pathlib import Path
 
 from rich.cells import cell_len
 
 from .i18n import t
 
-# Interactive tools remain opt-in. Match public bundle identities as well as names.
-INTERACTIVE_NAMES = {
-    "Google Chrome",
-    "Microsoft Edge",
-    "Firefox",
-    "Brave Browser",
-    "Arc",
-    "Safari",
-    "Visual Studio Code",
-    "Cursor",
-    "Zed",
-    "Xcode",
-    "TextEdit",
-    "Obsidian",
-    "Terminal",
-    "iTerm",
-    "iTerm2",
-    "Warp",
-    "Alacritty",
-    "kitty",
-    "Ghostty",
-}
-INTERACTIVE_IDS = {
-    "com.google.Chrome",
-    "com.microsoft.edgemac",
-    "org.mozilla.firefox",
-    "com.brave.Browser",
-    "company.thebrowser.Browser",
-    "com.apple.Safari",
-    "com.microsoft.VSCode",
-    "com.todesktop.230313mzl4w4u92",
-    "dev.zed.Zed",
-    "com.apple.dt.Xcode",
-    "com.sublimetext.4",
-    "com.apple.TextEdit",
-    "md.obsidian",
-    "com.apple.Terminal",
-    "com.googlecode.iterm2",
-    "dev.warp.Warp-Stable",
-    "org.alacritty",
-    "net.kovidgoyal.kitty",
-    "com.mitchellh.ghostty",
-}
+
+def interactive(name, bundle_id):
+    return any(name in row["apps"] or bundle_id in row["bundle_ids"] for row in _interactive_rules())
+
+
+@lru_cache(maxsize=1)
+def _interactive_rules():
+    from importlib.resources import files
+
+    from .config import tomllib
+
+    return tomllib.loads(files("travel_mode").joinpath("interactive.toml").read_text("utf-8"))["rules"]
 
 
 def recommend(name, *, rule=None, bundle_id="", assertion=False):
+    if rule and rule.get("category") == "network":
+        return dict(work="skip", away="skip", reason="network")
     if rule and rule.get("file_provider"):
         return dict(work="quit", away="quit", reason="provider")
     if assertion:
         return dict(work="freeze", away="quit", reason="assertion")
-    if name in INTERACTIVE_NAMES or bundle_id in INTERACTIVE_IDS:
+    if interactive(name, bundle_id):
         return dict(work="ask", away="ask", reason="interactive")
     if rule and rule["action"] == "notice":
         return dict(work="skip", away="skip", reason="notice")
@@ -172,7 +144,7 @@ def explanation(row):
 
 
 def row_text(row, selected):
-    name = t("setup.wechat") if row["name"] == "WeChat" else row["name"]
+    name = row["name"]
     name += " " * max(0, 18 - cell_len(name))
     return t(
         "setup.row",
@@ -181,7 +153,9 @@ def row_text(row, selected):
         away_scenario=t("scenario.away"),
         work=t("action." + selected["work"][row["name"]]),
         away=t("action." + selected["away"][row["name"]]),
-        reason=explanation(row),
+        reason=t("onboarding.your_setting", reason=explanation(row))
+        if row.get("configured")
+        else explanation(row),
     )
 
 

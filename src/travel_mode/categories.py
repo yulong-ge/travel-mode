@@ -11,7 +11,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover
     import tomli as tomllib
 
-CATEGORIES = ("sync", "backup", "updater", "vm", "keep-awake")
+CATEGORIES = ("sync", "backup", "updater", "vm", "keep-awake", "network")
 
 
 @lru_cache(maxsize=1)
@@ -24,6 +24,10 @@ def rules() -> tuple[dict, ...]:
             raise ValueError(f"Invalid category rule: {row['id']}")
         if row["action"] not in {"unload", "quit", "freeze", "notice"}:
             raise ValueError(f"Invalid category action: {row['id']}")
+        if row.get("may_disable_sleep") and not row.get("source", "").startswith("https://"):
+            raise ValueError(f"Missing sleep setting source: {row['id']}")
+        if row["category"] == "network" and row.get("subtype") not in {"vpn", "proxy", "remote-access"}:
+            raise ValueError(f"Invalid network subtype: {row['id']}")
         seen.add(row["id"])
     return tuple(rows)
 

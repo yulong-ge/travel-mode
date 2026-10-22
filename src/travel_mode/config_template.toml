@@ -3,21 +3,15 @@
 policy = "adaptive"
 setup_completed = false
 default = "freeze"
-watch = ["Google Chrome", "Slack"]
+watch = []
 ignore = []
 quit = []
 freeze = []
 skip = []
 ask = []
 
-[[apps.with_daemon]]
-name = "Remote Support"
-system_daemons = ["/Library/LaunchDaemons/example.daemon.plist"]
-user_agents = ["/Library/LaunchAgents/example.agent.plist"]
-group = "network"
-
 [network]
-apps = ["Tailscale"]
+apps = []
 
 [services]
 unload = []

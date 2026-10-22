@@ -139,11 +139,17 @@ def test_macos_workflow_is_separate_bounded_and_keeps_failure_artifacts():
     raw = Path(".github/workflows/e2e-macos.yml").read_text()
     workflow = yaml.safe_load(raw)
     triggers = workflow.get("on", workflow.get(True))
-    assert set(triggers) == {"workflow_dispatch", "schedule", "push"}
+    assert set(triggers) == {"workflow_dispatch", "schedule", "push", "pull_request"}
     assert triggers["push"]["branches"] == ["main"]
     job = workflow["jobs"]["e2e"]
+    assert job["if"] == "github.event_name != 'pull_request'"
     assert job["runs-on"] == "macos-latest" and job["timeout-minutes"] == 30
     upload = job["steps"][-1]
     assert upload["if"] == "always()" and upload["with"]["retention-days"] == 14
     assert "scripts/e2e_local.py" in raw and "scripts/e2e_ui.py" in raw
     assert "sudo " not in raw and "tccutil" not in raw and "continue-on-error" not in raw
+    readonly = workflow["jobs"]["clean-machine-readonly"]
+    assert readonly["runs-on"] == "macos-latest" and readonly["timeout-minutes"] == 10
+    assert "check_new_machine.py --output" in readonly["steps"][3]["run"]
+    assert readonly["steps"][-1]["if"] == "always()"
+    assert readonly["steps"][-1]["with"]["retention-days"] == 14

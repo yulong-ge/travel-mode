@@ -1,0 +1,97 @@
+# Public interactive application identities; ask before interrupting user work.
+
+[[rules]]
+id = "chrome"
+apps = ["Google Chrome"]
+bundle_ids = ["com.google.Chrome"]
+source = "https://formulae.brew.sh/api/cask/google-chrome.json"
+
+[[rules]]
+id = "edge"
+apps = ["Microsoft Edge"]
+bundle_ids = ["com.microsoft.edgemac"]
+source = "https://formulae.brew.sh/api/cask/microsoft-edge.json"
+
+[[rules]]
+id = "firefox"
+apps = ["Firefox"]
+bundle_ids = ["org.mozilla.firefox"]
+source = "https://formulae.brew.sh/api/cask/firefox.json"
+
+[[rules]]
+id = "brave"
+apps = ["Brave Browser"]
+bundle_ids = ["com.brave.Browser"]
+source = "https://formulae.brew.sh/api/cask/brave-browser.json"
+
+[[rules]]
+id = "arc"
+apps = ["Arc"]
+bundle_ids = ["company.thebrowser.Browser"]
+source = "https://formulae.brew.sh/api/cask/arc.json"
+
+[[rules]]
+id = "vscode"
+apps = ["Visual Studio Code"]
+bundle_ids = ["com.microsoft.VSCode"]
+source = "https://formulae.brew.sh/api/cask/visual-studio-code.json"
+
+[[rules]]
+id = "cursor"
+apps = ["Cursor"]
+bundle_ids = ["com.todesktop.230313mzl4w4u92"]
+source = "https://formulae.brew.sh/api/cask/cursor.json"
+
+[[rules]]
+id = "zed"
+apps = ["Zed"]
+bundle_ids = ["dev.zed.Zed"]
+source = "https://formulae.brew.sh/api/cask/zed.json"
+
+[[rules]]
+id = "obsidian"
+apps = ["Obsidian"]
+bundle_ids = ["md.obsidian"]
+source = "https://formulae.brew.sh/api/cask/obsidian.json"
+
+[[rules]]
+id = "iterm"
+apps = ["iTerm", "iTerm2"]
+bundle_ids = ["com.googlecode.iterm2"]
+source = "https://formulae.brew.sh/api/cask/iterm2.json"
+
+[[rules]]
+id = "warp"
+apps = ["Warp"]
+bundle_ids = ["dev.warp.Warp-Stable"]
+source = "https://formulae.brew.sh/api/cask/warp.json"
+
+[[rules]]
+id = "alacritty"
+apps = ["Alacritty"]
+bundle_ids = ["org.alacritty"]
+source = "https://formulae.brew.sh/api/cask/alacritty.json"
+
+[[rules]]
+id = "kitty"
+apps = ["kitty"]
+bundle_ids = ["net.kovidgoyal.kitty"]
+source = "https://formulae.brew.sh/api/cask/kitty.json"
+
+[[rules]]
+id = "ghostty"
+apps = ["Ghostty"]
+bundle_ids = ["com.mitchellh.ghostty"]
+source = "https://formulae.brew.sh/api/cask/ghostty.json"
+
+[[rules]]
+id = "sublime"
+apps = []
+bundle_ids = ["com.sublimetext.4"]
+source = "https://formulae.brew.sh/api/cask/sublime-text.json"
+
+[[rules]]
+id = "apple-editors"
+apps = ["Safari", "Xcode", "TextEdit", "Terminal"]
+bundle_ids = ["com.apple.Safari", "com.apple.dt.Xcode", "com.apple.TextEdit", "com.apple.Terminal"]
+source = "https://support.apple.com/guide/mac-help/open-apps-mh35840/mac"

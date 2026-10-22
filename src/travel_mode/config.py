@@ -18,7 +18,6 @@ except ModuleNotFoundError:  # pragma: no cover
     import tomli as tomllib
 
 from .constants import (
-    DEFAULT_ACTIONS,
     DEFAULT_APPS,
     DEFAULT_NET_APPS,
     DEFAULT_SERVICES_KEEP,
@@ -104,6 +103,8 @@ def preview_app_choices(selected, *, completed=False, adaptive=False, path=None)
     if completed:
         apps["setup_completed"] = True
     for scenario, choices in selected.items():
+        if scenario in {"services", "network", "with_daemon"}:
+            continue
         if scenario not in {"work", "away"}:
             raise ConfigError(target, f"apps.{scenario}", t("scenario.invalid"))
         if any(not isinstance(n, str) or not n.strip() or a not in _ACTIONS for n, a in choices.items()):
@@ -119,6 +120,43 @@ def preview_app_choices(selected, *, completed=False, adaptive=False, path=None)
                     scoped[action] = additions
                 continue
             _edit_action_array(previous, choices, action, additions)
+    if "services" in selected:
+        choices = selected["services"]
+        if not isinstance(choices, dict) or any(
+            not isinstance(n, str) or not n.strip() or a not in {"unload", "keep"} for n, a in choices.items()
+        ):
+            raise ConfigError(target, "services", t("config.invalid_action"))
+        if "services" not in doc:
+            doc["services"] = tomlkit.table()
+        for action in ("unload", "keep"):
+            if action not in doc["services"]:
+                doc["services"][action] = []
+            _edit_action_array(
+                doc["services"][action], choices, action, [n for n, a in choices.items() if a == action]
+            )
+    if "network" in selected:
+        names = _strings(selected["network"], target, "network.apps")
+        if "network" not in doc:
+            doc["network"] = tomlkit.table()
+        if "apps" not in doc["network"]:
+            doc["network"]["apps"] = []
+        for name in names:
+            if name not in doc["network"]["apps"]:
+                doc["network"]["apps"].append(name)
+    if "with_daemon" in selected:
+        existing = {item.name for item in load_config(target).apps.with_daemon}
+        for row in selected["with_daemon"]:
+            if row["name"] in existing or row.get("recommended") is False:
+                continue
+            if "with_daemon" not in apps:
+                apps["with_daemon"] = tomlkit.aot()
+            apps["with_daemon"].append(
+                {
+                    key: row.get(key, "apps" if key == "group" else [])
+                    for key in ("name", "system_daemons", "user_agents", "group")
+                }
+            )
+            existing.add(row["name"])
     return tomlkit.dumps(doc)
 
 
@@ -208,7 +246,7 @@ class AppsConfig:
 
     @property
     def all(self) -> tuple[str, ...]:
-        names = list(DEFAULT_APPS) + list(self.watch)
+        names = (list(DEFAULT_APPS) if self.policy == "legacy" else []) + list(self.watch)
         for action in ("quit", "freeze", "skip", "ask"):
             names.extend(getattr(self, action))
         names.extend(self.work)
@@ -219,7 +257,7 @@ class AppsConfig:
 
 @dataclass(frozen=True)
 class NetworkConfig:
-    apps: tuple[str, ...] = tuple(DEFAULT_NET_APPS)
+    apps: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -285,7 +323,6 @@ class Config:
             apps=AppsConfig(
                 default="freeze",
                 policy="adaptive",
-                **{key: tuple(value) for key, value in DEFAULT_ACTIONS.items()},
             ),
             profiles=builtin_profiles(),
         )
@@ -454,7 +491,8 @@ def load_config(path: str | Path | None = None) -> Config:
     _check_keys(network, {"apps"}, target, "network")
     configured_network = _strings(network.get("apps", []), target, "network.apps")
     # Built-ins are defaults; the runtime still consumes this resolved config field.
-    network_config = NetworkConfig(tuple(dict.fromkeys((*DEFAULT_NET_APPS, *configured_network))))
+    legacy_network = DEFAULT_NET_APPS if policy == "legacy" else ()
+    network_config = NetworkConfig(tuple(dict.fromkeys((*legacy_network, *configured_network))))
     services = _table(data, "services", target)
     _check_keys(services, {"unload", "keep"}, target, "services")
     service_config = ServicesConfig(

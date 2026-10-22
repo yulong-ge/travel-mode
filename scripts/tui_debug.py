@@ -21,12 +21,11 @@ from terminal_render import render, text_width
 from textual.binding import Binding
 
 import travel_mode.config as config_api
-from travel_mode.i18n import t
+from travel_mode.i18n import catalog, t
 from travel_mode.system import apps, launchd
 from travel_mode.tui.app import TravelApp
 
 ROOT = Path(__file__).resolve().parents[1]
-TMUX = "/opt/homebrew/bin/tmux"
 SIZES = ((120, 36), (80, 24), (160, 45))
 TABS = ("scenario", "plan", "result", "session", "drawer")
 # launchd identifiers and plist names are data, not untranslated message keys.
@@ -194,8 +193,11 @@ class Session:
         self.tmux("set-option", "mouse", "on")
 
     def tmux(self, *args: str) -> str:
+        executable = shutil.which("tmux")
+        if executable is None:
+            raise FileNotFoundError("tmux is required to capture the TUI; install it and add it to PATH")
         result = subprocess.run(
-            [TMUX, "-f", "/dev/null", "-S", self.socket, *args],
+            [executable, "-f", "/dev/null", "-S", self.socket, *args],
             env=self.env,
             capture_output=True,
             text=True,
@@ -240,7 +242,7 @@ class Session:
             time.sleep(0.05)
         raise TimeoutError("TUI did not mount its initial tab")
 
-    def wait_complete(self, *, active=None, group=None, details=None, predicate=None) -> None:
+    def wait_complete(self, *, active=None, group=None, details=None, predicate=None, text=None) -> None:
         deadline = time.monotonic() + self.timeout
         while time.monotonic() < deadline:
             layout = read_layout(self.root / "layout.json")
@@ -250,6 +252,7 @@ class Session:
                 and (active is None or layout["active"] == active)
                 and (group is None or layout["active_filter"] == group)
                 and (details is None or layout["details_open"] is details)
+                and (text is None or text in self.tmux("capture-pane", "-p"))
             ):
                 return
             time.sleep(0.1)
@@ -321,6 +324,17 @@ class Session:
 
 
 class DebugApp(TravelApp):
+    def update_result_summary(self):
+        if getattr(self, "live_readonly", False):
+            return super().update_result_summary()
+        # Illustrative presentation only. Actual demo writes retain their scoped root.
+        from unittest.mock import patch
+
+        with patch(
+            "travel_mode.failures.log_path", return_value=Path("/tmp/travel-mode-demo/travel-mode.log")
+        ):
+            return super().update_result_summary()
+
     BINDINGS: ClassVar = [
         *TravelApp.BINDINGS,
         Binding("f2", "demo_concurrent", "", show=False),
@@ -768,6 +782,11 @@ def setup_debug_app(telemetry):
             super().reveal_focused_row()
             self.call_after_refresh(self.publish)
 
+        async def on_button_pressed(self, event):
+            event.prevent_default()
+            await super().on_button_pressed(event)
+            self.call_after_refresh(self.publish)
+
         def publish(self):
             ready = self.ready.is_set()
             write_layout(
@@ -776,6 +795,8 @@ def setup_debug_app(telemetry):
                     "schema_version": 1,
                     "active": "setup",
                     "setup_reviewed": self.reviewed.is_set(),
+                    "setup_completed": self.completed.is_set(),
+                    "setup_expanded": sum(w.display for w in self.query(".setup-items")),
                     "setup_column": self.column,
                     "widgets": [
                         dict(
@@ -801,9 +822,9 @@ def setup_debug_app(telemetry):
     class DebugSetupApp(SetupApp):
         def on_mount(self, event):
             event.prevent_default()
-            self.push_screen(DebugSetupScreen(dry_run=True), self.exit)
+            self.push_screen(DebugSetupScreen(dry_run=False, stay_open=True), self.exit)
 
-    return DebugSetupApp(dry_run=True)
+    return DebugSetupApp(dry_run=False)
 
 
 def write_report(output: Path, results: list[dict], mode: str, error: str | None = None) -> dict:
@@ -837,40 +858,24 @@ def run_group(output: Path, cols: int, rows: int, language: str, args, results: 
         session = Session(root, cols, rows, language, args.live_readonly, args.config, setup=True)
         try:
             session.wait_started()
-            session.wait_complete()
-            results.append(session.capture("setup", "setup"))
-            session.keys("Right", "End")
-            deadline = time.monotonic() + session.timeout
-            while time.monotonic() < deadline:
-                layout = read_layout(session.root / "layout.json")
-                app_ids = [w["id"] for w in layout["widgets"] if w["id"] and w["id"].startswith("setup-app-")]
-                focused = next(w for w in layout["widgets"] if w["id"] == app_ids[-1])
-                body = next(w for w in layout["widgets"] if w["id"] == "setup-body")
-                _, fy, _, fh = focused["region"]
-                _, by, _, bh = body["region"]
-                if (
-                    layout["setup_column"] == "away"
-                    and layout["focused_id"] == app_ids[-1]
-                    and by <= fy
-                    and fy + fh <= by + bh
-                ):
-                    break
-                time.sleep(0.1)
-            else:
-                raise TimeoutError("Setup did not focus and reveal the last app")
-            results.append(session.capture("setup-away-last", "setup"))
-            review = next(row for row in layout["widgets"] if row["id"] == "setup-review")
-            x, y, width, height = review["region"]
+            session.wait_complete(text=catalog(language)["setup.title"])
+            results.append(session.capture("setup-overview", "setup"))
+            layout = read_layout(session.root / "layout.json")
+            group = next(w for w in layout["widgets"] if w["id"] and w["id"].startswith("setup-group-"))
+            x, y, width, height = group["region"]
             session.click(x + width // 2, y + height // 2)
-            deadline = time.monotonic() + session.timeout
-            while time.monotonic() < deadline:
+            session.wait_complete(predicate=lambda data: data["setup_expanded"] > 0)
+            results.append(session.capture("setup-expanded", "setup"))
+            for key, name, flag in (
+                ("setup-review", "setup-reviewed", "setup_reviewed"),
+                ("setup-save", "setup-saved", "setup_completed"),
+            ):
                 layout = read_layout(session.root / "layout.json")
-                if layout["setup_reviewed"] and layout["focused_id"] == "setup-save":
-                    break
-                time.sleep(0.1)
-            else:
-                raise TimeoutError("Setup summary and Save did not finish layout")
-            results.append(session.capture("setup-reviewed", "setup"))
+                button = next(w for w in layout["widgets"] if w["id"] == key)
+                x, y, width, height = button["region"]
+                session.click(x + width // 2, y + height // 2)
+                session.wait_complete(predicate=lambda data, flag=flag: data[flag])
+                results.append(session.capture(name, "setup"))
         finally:
             session.close()
         return
@@ -892,8 +897,6 @@ def run_group(output: Path, cols: int, rows: int, language: str, args, results: 
             return
         if args.session_report:
             session.keys("C-o")
-            from travel_mode.i18n import catalog
-
             session.wait_text(catalog(language)["session.heading"].split("{scenario}")[0])
             results.append(session.capture("session-report", "session"))
             return
@@ -902,15 +905,11 @@ def run_group(output: Path, cols: int, rows: int, language: str, args, results: 
             session.wait_complete(active="session")
             results.append(session.capture("restore-pending", "session"))
             session.keys("F11")
-            from travel_mode.i18n import catalog
-
             session.wait_text(catalog(language)["admin.title"])
             results.append(session.capture("administrator", "session"))
             return
         results.append(session.capture("plan", "plan"))
         if args.fast_apply:
-            from travel_mode.i18n import catalog
-
             session.keys("F2")
             session.wait_complete(active="result", group="apps")
             results.append(session.capture("concurrent-running", "result"))

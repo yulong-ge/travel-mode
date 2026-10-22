@@ -75,7 +75,9 @@ def test_mode_apply_formats_caffeinate_process_rows(monkeypatch, tmp_paths, fake
 
 
 @pytest.mark.parametrize("language", ["en", "zh"])
-def test_scan_apps_formats_orphan_process_rows(monkeypatch, fake_runner, language):
+def test_scan_apps_formats_orphan_process_rows(monkeypatch, fake_runner, language, tmp_path):
+    # Orphan display follows an explicit user watch entry, never an installation default.
+    (tmp_path / "config.toml").write_text('[apps]\npolicy="adaptive"\nwatch=["Google Chrome"]\n')
     monkeypatch.setattr(system_apps, "app_path", lambda name: "")
     fake_runner.responses[("ps", "-axo", "pid=,%cpu=,command=")] = CmdResult(
         "12 0.1 Google Chrome helper\n13 0.2 Google Chrome worker\n14 0.3 Google Chrome extra\n", "", 0

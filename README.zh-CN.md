@@ -90,8 +90,9 @@ macOS 自带的命令一律从固定的系统路径调用，不会经过 `PATH`�
 
 ### 内置程序类别
 
-工具通过公开标识识别常见的同步程序（Google Drive、Dropbox、OneDrive、Syncthing 等）、备份工具、更新程序和
-虚拟机。在 `work` 场景下，可以一次勾选全部暂停。规则和来源见 [categories.toml](src/travel_mode/categories.toml)。
+工具通过公开标识识别常见的同步程序（Google Drive、Dropbox、OneDrive、Syncthing 等）、备份工具、更新程序、
+虚拟机，以及 VPN、代理和远程控制软件（Cisco Secure Client、GlobalProtect、Tailscale、WireGuard、TeamViewer、AnyDesk 等），
+每条规则都注明出处。识别不针对某个人的 Mac：没有命中规则的 app 使用通用推荐，你自己的后台服务写在你的配置里。在 `work` 场景下，可以一次勾选全部暂停。规则和来源见 [categories.toml](src/travel_mode/categories.toml)。
 
 ### 功耗测量
 
@@ -169,7 +170,7 @@ travel-mode 不会额外留下任何进程。
 | `report [--json]` | 根据系统电源日志生成睡眠与 DarkWake 报告 |
 | `suggest [--write]` | 建议可以加入配置的 app、服务和类别 |
 | `thaw [--all]` | 列出所有处于停止状态的 app 进程，确认后恢复运行 |
-| `setup [--no-tui] [--yes]` | 设置每个 app 在 `work` 和 `away` 场景下的处理方式 |
+| `setup [--no-tui] [--yes] [--dry-run]` | 检查这台 Mac，保存 app、后台服务和网络 app 的推荐或自选动作 |
 | `profiles` | 列出所有配置档 |
 | `config path\|init\|validate\|edit` | 管理配置文件 |
 | `config set-language en\|zh`、`config set-interface cli\|tui` | 保存偏好设置 |
@@ -185,10 +186,12 @@ travel-mode 不会额外留下任何进程。
 配置文件在 `~/.config/travel-mode/config.toml`（可用 `TRAVEL_MODE_CONFIG` 指定其它路径）。运行
 `travel-mode config init` 会生成带注释的模板，完整示例见 [examples/config.toml](examples/config.toml)。
 
-第一次运行时会打开设置页（之后也可以用 `travel-mode setup` 打开），列出你的 app，并按场景给出推荐动作：普通 app
-冻结；Google Drive、OneDrive、Dropbox 和 Box 退出，因为冻结云盘文件提供程序可能让访达卡住；会让 Mac 保持唤醒的 app
-在 `away` 场景下退出，因为冻结不会释放它们的防睡断言；浏览器和编辑器每次询问。改好后查看摘要再保存。会话中你改了某个
-app 的动作，工具会问是否下次也这样处理。
+第一次运行时会先检查这台 Mac，再打开设置页（之后也可以用 `travel-mode setup` 打开）：按「同步与备份、更新程序、网络与远程、
+防睡工具、其它 app」分组列出检测到的内容，每项都有按场景的推荐动作。点「按推荐添加」一次填好所有分组，可以逐项修改，
+查看将写入配置的摘要后保存。普通 app 外出时冻结、过夜时退出；云盘文件提供程序（Google Drive、OneDrive、Dropbox、Box）
+退出，因为冻结后访达可能卡住；会让 Mac 保持唤醒的 app 过夜时退出；浏览器和编辑器每次询问；网络和远程控制 app 保持运行。
+你自己做过的设置会标为「你的设置」，不会被推荐覆盖。不用界面时：`travel-mode setup --no-tui` 按分组提问，
+`travel-mode setup --yes` 直接保存推荐，`--dry-run` 只显示不保存。会话中你改了某个 app 的动作，工具会问是否下次也这样处理。
 
 ```toml
 [options]

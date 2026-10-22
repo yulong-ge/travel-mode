@@ -4,15 +4,15 @@
  Battery 80%
 
  Sleep readiness
- ✗ Lid sleep may be blocked: system sleep is disabled. UURemote may set this and may undo a     Enable system sleep
- repair.
+ ✗ Lid sleep may be blocked: system sleep is disabled. An app may have changed this. Check      Enable system sleep
+ 'prevent sleep on power' in remote-access or keep-awake tools.
  ▲ External display connected; this increases energy use. Disconnect it when not needed.
  ▲ Screen brightness 85%, above the suggested 70%.                                                       Set to 50%
- ▲ High background CPU load: Docker                                                                     Quit Docker
+ ▲ High background CPU load: Docker (CPU 35%)                                                           Quit Docker
    3 other checks normal
 
    All     Power     Apps     Services     Network
-                                                                                                                     ▇▇
+
  Power
  [x] Low Power Mode           On           Reduce energy use; effects vary by Mac model.
  [x] Power Nap (On power)     Off          The sleeping Mac will not wake periodically to sync Mail and iCloud.
@@ -21,16 +21,16 @@
  Already set on battery: Power Nap off, network wake off
 
  Apps
- [x] Amphetamine                Freeze ▾   Prevents idle sleep; lid sleep still works. Freezing keeps the assertion.
+ [x] AmphetamineNet             Freeze ▾   Prevents idle sleep; lid sleep still works. Freezing keeps the assertion.
  [x] KeepingYouAwake            Freeze ▾   Prevents idle sleep; lid sleep still works. Freezing keeps the assertion.
- [x] Quit Refusal Demo           Quit ▾    Freezing may block access to cloud files
- [x] UURemote                   Freeze ▾   Prevents idle sleep; lid sleep still works. Freezing keeps the assertion.
- [x] Anki                       Freeze ▾   Preserve running state; continue after resuming
- [x] Audacity                   Freeze ▾   Preserve running state; continue after resuming
+ [x] Quit Refusal Demo           Quit ▾    Quit the app; restore reopens it.
+ [x] Archive Manager            Freeze ▾   Preserve running state; continue after resuming
+ [x] Audio Studio               Freeze ▾   Preserve running state; continue after resuming
+ [x] Book Library               Freeze ▾   Preserve running state; continue after resuming
 
    More     Adjust defaults     Run health check
 
-                                                                                            Start saving power (30)
+                                                                                            Start saving power (29)
 
- No actions performed.
+
  q Quit  l Language  r Refresh  d Details  ? Help

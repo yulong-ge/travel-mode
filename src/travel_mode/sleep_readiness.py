@@ -52,14 +52,20 @@ def evaluate(
         )
     if sleep_disabled == "1":
         message = t("redesign.sleep_disabled")
-        # Public product/process identity supplied by the maintainer's field evidence.
-        # A helper's presence is evidence of a possible source, not proof of its settings.
-        if any(Path(getattr(p, "command", str(p))).name in {"UURemote", "UURemoteHelper"} for p in processes):
-            message = t(
-                "redesign.readiness_source",
-                message=message,
-                source=t("redesign.remote_source", name="UURemote"),
-            )
+        from .categories import identify
+
+        sources = set()
+        for process in processes:
+            executable = getattr(process, "command", str(process))
+            rule = identify(name=Path(executable).name, executable=executable)
+            if rule and rule.get("may_disable_sleep"):
+                sources.add(rule["name"])
+        source = (
+            t("redesign.remote_source", name=", ".join(sorted(sources)))
+            if sources
+            else t("redesign.sleep_source_generic")
+        )
+        message = t("redesign.readiness_source", message=message, source=source)
         items.append(dict(level="red", message=message, action=dict(kind="sleep")))
     from .caffeinate_view import describe, groups
 

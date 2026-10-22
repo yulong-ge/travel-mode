@@ -391,7 +391,8 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None, continu
 
         if not work:
             c.rule(t("impl.remote_network_apps_kept_by_default"))
-        names = ", ".join(network_api.configured_names())
+        network_targets = network_api.disconnect_names(config, scan["running"])
+        names = ", ".join(network_targets)
         if not work and (
             profile_disconnect
             or ask(
@@ -404,7 +405,7 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None, continu
             )
         ):
             network_actions = []
-            for name in network_api.configured_names():
+            for name in network_targets:
                 path = system_apps.app_path(name)
                 spec = configured_daemon(name)
                 if spec is not None:

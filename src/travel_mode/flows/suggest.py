@@ -9,9 +9,9 @@ from pathlib import Path
 import tomlkit
 
 from .. import __version__
-from ..categories import grouped
+from ..app_policy import recommend
+from ..categories import grouped, identify
 from ..config import load_config
-from ..constants import DEFAULT_ACTIONS
 from ..i18n import t
 from ..paths import config_path
 from ..structured import read_command
@@ -19,22 +19,6 @@ from ..system.daemon_discovery import discover_daemon_apps
 from ..system.launchd import svc_scan
 from ..system.pmset import sleep_blocking_assertions
 from ..system.shell import run_rc
-
-KNOWN_ELECTRON_OR_IM = {
-    "Slack",
-    "Discord",
-    "Microsoft Teams",
-    "Telegram",
-    "WhatsApp",
-    "WeChat",
-    "QQ",
-    "DingTalk",
-    "Lark",
-    "Notion",
-    "Obsidian",
-    "ChatGPT",
-    "Claude",
-}
 
 
 def bundle_for(pid: str) -> str | None:
@@ -114,22 +98,26 @@ def suggest_data(samples: int = 3) -> dict:
         name = Path(path).stem
         if name in configured:
             continue
+        from ..system.apps import app_bid
+
+        bid = app_bid(path)
+        recommendation = recommend(
+            name, rule=identify(name=name, bundle_id=bid), bundle_id=bid, assertion=pid in holders
+        )
         row = bundles.setdefault(
             path,
             {
                 "name": name,
                 "path": path,
                 "power": 0.0,
-                "action": (
-                    "freeze" if name in DEFAULT_ACTIONS["freeze"] or name in KNOWN_ELECTRON_OR_IM else "ask"
-                ),
+                "action": recommendation["work"],
                 "pids": [],
             },
         )
         row["power"] += scores.get(pid, 0)
         row["pids"].append(int(pid))
         if pid in holders:
-            row["action"] = "quit"
+            row["action"] = recommendation["work"]
     from ..system.apps import scan_apps
 
     services = svc_scan(config)
@@ -167,99 +155,33 @@ def daemon_toml(rows: list[dict]) -> str:
     return tomlkit.dumps(doc)
 
 
-def write_selection(
-    apps: list[dict], services: list[dict], path: Path | None = None, daemon_apps: list[dict] | None = None
-):
+def write_selection(apps, services, path=None, daemon_apps=None):
+    from ..config import write_app_choices
+
     target = path or config_path()
     config = load_config(target)
-    doc = tomlkit.parse(target.read_text("utf-8")) if target.exists() else tomlkit.document()
-    daemon_apps = daemon_apps or []
-    original = tomlkit.dumps(doc)
-    if apps:
-        if "apps" not in doc:
-            doc["apps"] = tomlkit.table()
-        for row in apps:
-            name, action = row["name"], row["action"]
-            if action not in {"quit", "freeze", "ask"}:
-                raise ValueError(t("config.invalid_action"))
-            if name in config.apps.actions or name in config.apps.ignore:
-                raise ValueError(t("suggest.already_configured", name=name))
-            table = doc["apps"]
-            for key in ("watch", action):
-                if key not in table:
-                    table[key] = tomlkit.array()
-                if name not in table[key]:
-                    table[key].append(name)
-    if services:
-        if "services" not in doc:
-            doc["services"] = tomlkit.table()
-        table = doc["services"]
-        if "unload" not in table:
-            table["unload"] = tomlkit.array()
-        for row in services:
-            if row["label"] in config.services.keep:
-                raise ValueError(t("suggest.already_configured", name=row["label"]))
-            if row["label"] not in table["unload"]:
-                table["unload"].append(row["label"])
-    if daemon_apps:
-        if "apps" not in doc:
-            doc["apps"] = tomlkit.table()
-        existing = {item.name for item in config.apps.with_daemon}
-        for row in daemon_apps:
-            if row["name"] in existing:
-                print(t("suggest.already_configured", name=row["name"]), file=sys.stderr)
-                continue
-            if row.get("recommended") is False:
-                continue
-            entry = tomlkit.table()
-            entry.add("name", row["name"])
-            entry.add("system_daemons", tomlkit.array(row["system_daemons"]))
-            entry.add("user_agents", tomlkit.array(row["user_agents"]))
-            entry.add("group", row.get("group", "apps"))
-            if "with_daemon" not in doc["apps"]:
-                doc["apps"].add("with_daemon", tomlkit.aot())
-            doc["apps"]["with_daemon"].append(entry)
-            existing.add(row["name"])
-    if tomlkit.dumps(doc) == original:
-        return False
-    target.parent.mkdir(parents=True, exist_ok=True)
-    tmp = target.with_suffix(target.suffix + ".suggest.tmp")
-    try:
-        tmp.write_text(tomlkit.dumps(doc), "utf-8")
-        load_config(tmp)  # 完整校验成功后才替换原文件。
-        tmp.replace(target)
-    finally:
-        tmp.unlink(missing_ok=True)
-    return True
+    for row in apps:
+        if row["name"] in config.apps.ignore or any(
+            config.apps.explicit(row["name"], s) for s in ("work", "away")
+        ):
+            raise ValueError(t("suggest.already_configured", name=row["name"]))
+    for row in daemon_apps or []:
+        if row["name"] in {item.name for item in config.apps.with_daemon}:
+            print(t("suggest.already_configured", name=row["name"]), file=sys.stderr)
+    selected = {scenario: {row["name"]: row["action"] for row in apps} for scenario in ("work", "away")}
+    selected["services"] = {row["label"]: "unload" for row in services}
+    selected["with_daemon"] = list(daemon_apps or [])
+    before = target.read_text() if target.exists() else None
+    write_app_choices(selected, path=target)
+    return before != target.read_text()
 
 
-def confirm_write(data: dict):
+def confirm_write(data):
+    from .setup import run
+
     if not sys.stdin.isatty():
         raise RuntimeError(t("suggest.interactive_required"))
-    apps, services, daemon_apps = [], [], []
-    for collection, selected in (
-        (data["apps"], apps),
-        (data["services"], services),
-        (data["with_daemon"], daemon_apps),
-    ):
-        for row in collection:
-            name = row.get("name", row.get("label"))
-            print(
-                t(
-                    "suggest.confirm",
-                    name=name,
-                    action=(
-                        t("suggest.daemon_action") if selected is daemon_apps else row.get("action", "unload")
-                    ),
-                ),
-                file=sys.stderr,
-                end="",
-            )
-            answer = input().strip().lower()
-            if answer in {"y", "yes"}:
-                selected.append(row)
-    if (apps or services or daemon_apps) and write_selection(apps, services, daemon_apps=daemon_apps):
-        print(t("suggest.written", path=config_path()), file=sys.stderr)
+    return run()
 
 
 def print_suggestions(data: dict):
