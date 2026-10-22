@@ -15,7 +15,7 @@ from travel_mode import config
 from travel_mode.categories import rules
 from travel_mode.constants import DEFAULT_APPS
 from travel_mode.system import apps, health, launchd
-from travel_mode.system.shell import ReadError
+from travel_mode.system.shell import CmdResult, ReadError
 
 APP_QUERY = ["ps", "-axo", "pid=,%cpu=,command="]
 INDEX_QUERY = ["mdfind", 'kMDItemContentType == "com.apple.application-bundle"']
@@ -68,6 +68,8 @@ class FixtureDiscoveryRunner:
         return any(path == app or app in path.parents for app in self.bundles)
 
     def __call__(self, command, timeout=None, interactive=False):
+        if command == ["defaults", "read", "com.ameba.SwiftBar", "PluginDirectory"]:
+            return CmdResult("", "fixture: SwiftBar is not installed", 1)
         result = self.runner(command, timeout, interactive)
         if result.rc:
             return result

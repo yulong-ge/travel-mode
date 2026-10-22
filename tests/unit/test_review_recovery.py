@@ -252,6 +252,8 @@ def test_fake_on_off_roundtrip_preserves_every_original_and_unmodified_key(monke
         commands.append(tuple(command))
         cmd = command[1:] if command[0] == "sudo" else command
         output = ""
+        if cmd == ["defaults", "read", "com.ameba.SwiftBar", "PluginDirectory"]:
+            return CmdResult("", "fixture: SwiftBar is not installed", 1)
         if cmd == ["-n", "true"] or cmd[:2] == ["-n", "-l"]:
             output = "NOPASSWD: ALL"
         elif cmd == ["pmset", "-g", "custom"]:

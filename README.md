@@ -174,7 +174,9 @@ travel-mode menubar uninstall
 
 After installing, refresh SwiftBar. The icon shows an outline leaf when power saving is off, a
 filled leaf or a moon with the elapsed time while a session is running, and a warning triangle
-when the last check found that closing the lid would not put the Mac to sleep. The menu
+when the last check found that closing the lid would not put the Mac to sleep; the menu then says
+why, when it was checked, and offers "Restore system sleep" (`travel-mode sleep repair`). The icon
+refreshes right after you turn power saving on or off, not only every 5 minutes. The menu
 shows the session and battery state and opens commands in a terminal when you click them. The
 plugin refreshes every 5 minutes with `travel-mode status --json`, which only reads the local
 state file and `pmset -g ps`. SwiftBar itself stays running; travel-mode adds no process of its own.
@@ -198,6 +200,7 @@ state file and `pmset -g ps`. SwiftBar itself stays running; travel-mode adds no
 | `power [--seconds N] [--json]` | Measure average battery power |
 | `history [--limit N] [--json]` | Past session reports |
 | `status [--json]` | Cheap status: active session and power source |
+| `sleep repair` | Turn system sleep back on when it has been disabled (recorded, restorable) |
 | `report [--json]` | Sleep and DarkWake report from the system power log |
 | `suggest [--write]` | Suggest apps, services and categories to add to the configuration |
 | `thaw [--all]` | List stopped app processes and resume them after confirmation |

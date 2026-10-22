@@ -248,13 +248,21 @@ class Executor:
         async with lock:
             if merged and not _path().exists():
                 raise StateError(t("impl.snapshot_deleted_externally_possibly_by_off"))
+            from ..menubar import status_changes
             from ..system.sudo import Credentials, credential_scope
 
             with (
+                status_changes(deferred=True) as refresh,
                 credential_scope(credentials or Credentials(authenticate)),
                 journal.mutation_scope(state, save),
             ):
-                yield
+                try:
+                    yield
+                finally:
+                    if refresh is not None:
+                        import asyncio
+
+                        await asyncio.to_thread(refresh)
 
 
 _executor = Executor()
@@ -272,7 +280,12 @@ def _sudo_lifecycle(func):
         from ..system.sudo import Credentials, credential_scope
 
         no_prompt = func.__name__ == "mode_apply" and (kwargs.get("yes", False) or (args and args[0]))
-        with credential_scope(Credentials(interactive=False if no_prompt else None)):
+        from ..menubar import status_changes
+
+        with (
+            status_changes(preview=kwargs.get("dry_run", False)),
+            credential_scope(Credentials(interactive=False if no_prompt else None)),
+        ):
             return func(*args, **kwargs)
 
     return wrapped

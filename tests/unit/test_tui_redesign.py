@@ -122,7 +122,7 @@ def test_menu_readiness_only_uses_one_global_read_and_dated_cached_assertions(fa
     fake_runner.responses[("pmset", "-g")] = CmdResult("SleepDisabled 1\n", "", 0)
     data = status.data()
     assert data["sleep_ready"]["state"] == "blocked"
-    assert data["swiftbar"].splitlines()[0].startswith(" | sfimage=exclamationmark.triangle")
+    assert data["swiftbar"].splitlines()[0].startswith(":exclamationmark.triangle: | symbolize=true")
     assert fake_runner.calls == [("pmset", "-g", "ps"), ("pmset", "-g")]
 
 

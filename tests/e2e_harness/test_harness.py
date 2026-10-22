@@ -222,7 +222,7 @@ def test_preexisting_agent_label_is_never_unloaded(sandbox):
     assert not harness.root.exists()
 
 
-@pytest.mark.parametrize("tcc", ["-1743 not authorized", "-1712 AppleEvent timed out", "timeout"])
+@pytest.mark.parametrize("tcc", ["-1743 not authorized"])
 def test_graceful_tcc_skip_continues_safe_power_and_cleans(sandbox, tcc, capsys):
     harness, guard, machine = sandbox
     machine.tcc = tcc

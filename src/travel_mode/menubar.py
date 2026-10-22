@@ -72,3 +72,89 @@ def status():
         installed_version=plugin_version(content) if content is not None else None,
         bundled_version=plugin_version(payload()),
     )
+
+
+REFRESH = ["open", "-g", "swiftbar://refreshplugin?name=travel-mode"]
+_refresh_scope = ContextVar("menubar_status_change_scope", default=None)
+
+
+def _observation(error, commands=()):
+    from .failures import record
+
+    record(None, t("menubar.refresh"), str(error), commands, kind="observation", store=False, modifying=False)
+
+
+def refresh(*, preview=False):
+    """One optional notification; it never changes action results or session counts."""
+    from .system.shell import run_result
+
+    try:
+        installed = status()["installed"]
+    except (MenubarError, OSError) as exc:
+        _observation(exc)
+        return
+    if not installed:
+        return
+    if preview:
+        import shlex
+
+        print("[dry-run] " + shlex.join(REFRESH))
+        return
+    try:
+        result = run_result(REFRESH, timeout=2)
+    except (OSError, ReadError) as exc:
+        _observation(exc)
+        return
+    if result.rc:
+        _observation(
+            result.stderr or result.stdout or f"open: rc={result.rc}",
+            [dict(command=REFRESH, rc=result.rc, stdout=result.stdout, stderr=result.stderr)],
+        )
+
+
+def status_changed():
+    requested = _refresh_scope.get()
+    if requested is not None:
+        requested[0] = True
+
+
+def _status_marker():
+    from .state import _path
+
+    path = _path()
+    result = []
+    for target in (path, path.parent / "sleep-readiness.json"):
+        try:
+            stat = target.stat()
+        except FileNotFoundError:
+            result.append(None)
+        else:
+            result.append((stat.st_ino, stat.st_mtime_ns, stat.st_size))
+    return tuple(result)
+
+
+@contextmanager
+def status_changes(*, preview=False, deferred=False):
+    """Coalesce a CLI operation or TUI transaction, including nested restoration."""
+    if _refresh_scope.get() is not None:
+        yield None
+        return
+    from .system.shell import is_dry_run
+
+    preview = preview or is_dry_run()
+    before = _status_marker()
+    requested = [False]
+    token = _refresh_scope.set(requested)
+
+    def finish():
+        if requested[0] or preview or before != _status_marker():
+            refresh(preview=preview)
+
+    try:
+        yield finish
+    finally:
+        try:
+            if not deferred:
+                finish()
+        finally:
+            _refresh_scope.reset(token)

@@ -11,7 +11,7 @@ spec = importlib.util.spec_from_file_location("e2e_local", scripts / "e2e_local.
 e2e = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = e2e
 spec.loader.exec_module(e2e)
-from e2e_fake import Machine  # noqa: E402
+from e2e_fake import InstantClock, Machine  # noqa: E402
 from e2e_guard import GuardRunner  # noqa: E402
 
 
@@ -22,5 +22,6 @@ def sandbox(tmp_path, darwin_platform, monkeypatch):
     root.mkdir()
     machine = Machine(root)
     guard = GuardRunner(machine, root, e2e.fixture_paths(root), root / "agent.plist")
-    harness = e2e.Harness(root, guard, tmp_path / "user-state.json", pause=lambda _: None)
+    clock = InstantClock()
+    harness = e2e.Harness(root, guard, tmp_path / "user-state.json", pause=clock.sleep, clock=clock.monotonic)
     return harness, guard, machine

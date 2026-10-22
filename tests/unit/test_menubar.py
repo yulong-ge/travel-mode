@@ -37,8 +37,8 @@ def test_copy_install_status_uninstall_only_our_file(plugin_folder, fake_runner,
         installed=True,
         current=True,
         executable=True,
-        installed_version="2.0.0",
-        bundled_version="2.0.0",
+        installed_version="2.1.0",
+        bundled_version="2.1.0",
     )
     assert cli.main(["menubar", "uninstall"]) == 0
     assert not path.exists() and other.read_text() == "untouched"

@@ -26,6 +26,12 @@
       "-setairportpower",
       "en0",
       "off"
+    ],
+    [
+      "defaults",
+      "read",
+      "com.ameba.SwiftBar",
+      "PluginDirectory"
     ]
   ],
   "exit_code": null,

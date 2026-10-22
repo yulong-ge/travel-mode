@@ -26,6 +26,12 @@
       "-a",
       "disablesleep",
       "0"
+    ],
+    [
+      "defaults",
+      "read",
+      "com.ameba.SwiftBar",
+      "PluginDirectory"
     ]
   ],
   "exit_code": null,

@@ -118,7 +118,7 @@ def data(*, clock=time.monotonic, now=None):
             battery["estimate_error"] = battery_api.describe_interval(exc.reason)
         except (battery_api.BatteryError, ReadError) as exc:
             battery["estimate_error"] = str(exc)
-    result["swiftbar"] = render(result)
+    result["swiftbar"] = render(result, now=now)
     result["elapsed_seconds"] = clock() - started
     return result
 
@@ -128,9 +128,11 @@ def duration(minutes):
 
 
 def header(symbol, text=""):
-    # SwiftBar 2.1.1 SF images are template images: omit sfcolor to follow appearance.
-    # https://github.com/swiftbar/SwiftBar/blob/v2.1.1/SwiftBar/MenuBar/MenuBarItem.swift
-    return f"{text} | sfimage={symbol} sfsize=16 dropdown=false symbolize=false emojize=false"
+    # Embedded symbols avoid NSStatusBarButton's separate image/title spacing.
+    # https://github.com/swiftbar/SwiftBar/blob/v2.1.1/README.md#text
+    # https://github.com/swiftbar/SwiftBar/blob/v2.1.1/SwiftBar/Utility/NSMutableAttributedString+SFSymbols.swift
+    title = f":{symbol}:" + (f" {text}" if text else "")
+    return f"{title} | symbolize=true sfsize=16 dropdown=false emojize=false"
 
 
 def error_menu(detail):
@@ -184,7 +186,31 @@ def power_line(result):
     return text
 
 
-def render(result):
+def checked_line(readiness, *, now=None):
+    """Date the oldest observation supporting the visible warning, in local time."""
+    observed_at = readiness.get("observed_at")
+    if not observed_at:
+        return None
+    warnings = [item for item in readiness.get("items", ()) if item["level"] == "red"]
+    values = [item.get("observed_at", observed_at) for item in warnings] or [observed_at]
+    try:
+        readings = [datetime.fromisoformat(value) for value in values]
+        if any(value.tzinfo is None for value in readings):
+            raise ValueError("check time must include a timezone")
+        oldest = min(readings).astimezone()
+    except ValueError as exc:
+        raise StatusError(f"sleep_readiness.observed_at: {exc}") from exc
+    current = (now or datetime.now().astimezone()).astimezone()
+    when = oldest.strftime("%H:%M")
+    if oldest.date() != current.date():
+        when = t("menubar.checked_date", month=oldest.month, day=oldest.day, time=when)
+    text = t("menubar.checked", when=when)
+    if (current - oldest).total_seconds() > 3600:
+        text += t("menubar.checked_stale")
+    return text
+
+
+def render(result, *, now=None):
     executable = os.environ.get("TRAVEL_MODE_BIN", "travel-mode")
     if any(char in executable for char in "\n\r|\x00"):
         raise StatusError(t("menubar.invalid_executable"))
@@ -206,10 +232,20 @@ def render(result):
     else:
         rows.append(t("menubar.inactive"))
     rows.append(power_line(result))
-    rows.append("---")
+    readiness = result.get("sleep_ready", {})
+    for item in readiness.get("items", ()):
+        if item["level"] == "red":
+            if (item.get("action") or {}).get("kind") == "sleep":
+                rows.append(t("menubar.sleep_disabled"))
+                rows.append(t("menubar.sleep_disabled_detail") + " | color=gray")
+            else:
+                rows.append(" ".join(item["message"].replace("|", "/").split()))
+    checked = checked_line(readiness, now=now)
+    if checked:
+        rows.append(checked)
 
     # Documented bash/paramN, terminal, refresh and -- submenu protocol:
-    # https://github.com/swiftbar/SwiftBar#parameters
+    # https://github.com/swiftbar/SwiftBar/blob/v2.1.1/README.md#parameters
     def action(key, symbol, arguments, prefix=""):
         params = " ".join(f"param{index}={json.dumps(arg)}" for index, arg in enumerate(arguments, 1))
         rows.append(
@@ -217,6 +253,12 @@ def render(result):
             "terminal=true refresh=true"
         )
 
+    if any(
+        item["level"] == "red" and (item.get("action") or {}).get("kind") == "sleep"
+        for item in readiness.get("items", ())
+    ):
+        action("repair_sleep", "moon.zzz", ("sleep", "repair"))
+    rows.append("---")
     if active:
         action("off", "arrow.uturn.backward", ("off",))
     else:

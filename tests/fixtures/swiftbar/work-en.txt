@@ -1,4 +1,4 @@
-1:20 | sfimage=leaf.fill sfsize=16 dropdown=false symbolize=false emojize=false
+:leaf.fill: 1:20 | symbolize=true sfsize=16 dropdown=false emojize=false
 ---
 On the go · 1 h 20 min elapsed
 Battery 82% · About 3 h 10 min at this session's average of 9.8 W

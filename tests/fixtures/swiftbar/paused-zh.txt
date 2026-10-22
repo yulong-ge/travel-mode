@@ -1,4 +1,4 @@
- | sfimage=leaf sfsize=16 dropdown=false symbolize=false emojize=false
+:leaf: | symbolize=true sfsize=16 dropdown=false emojize=false
 ---
 省电模式未开启
 接电 · 85%（未充电）

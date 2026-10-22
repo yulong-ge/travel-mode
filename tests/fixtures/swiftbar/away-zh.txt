@@ -1,4 +1,4 @@
-1:20 | sfimage=moon.fill sfsize=16 dropdown=false symbolize=false emojize=false
+:moon.fill: 1:20 | symbolize=true sfsize=16 dropdown=false emojize=false
 ---
 过夜 / 飞行中 · 已 1 小时 20 分
 电池 82% · 按本次平均 9.8 W 约可用 3 小时 10 分

@@ -42,6 +42,12 @@
       "kill",
       "-STOP",
       "910002"
+    ],
+    [
+      "defaults",
+      "read",
+      "com.ameba.SwiftBar",
+      "PluginDirectory"
     ]
   ],
   "exit_code": null,

@@ -52,6 +52,7 @@ def _main(argv=None):
             "status",
             "menubar",
             "setup",
+            "sleep",
         ],
     )
     parser.add_argument(
@@ -69,6 +70,7 @@ def _main(argv=None):
             "status",
             "power-changed",
             "print",
+            "repair",
         ],
     )
     parser.add_argument("value", nargs="?")
@@ -113,8 +115,11 @@ def _main(argv=None):
         "event",
         "sudoers",
         "menubar",
+        "sleep",
     }:
         parser.error(t("cli.unexpected_config_value"))
+    if args.cmd == "sleep" and (args.config_cmd != "repair" or args.json):
+        parser.error(t("sleep.repair_usage"))
     if args.scope is not None and (args.cmd != "sudoers" or args.config_cmd not in {"print", "install"}):
         parser.error(t("sudoers.usage"))
     if args.sudoers_user is not None and (args.cmd, args.config_cmd) != ("sudoers", "print"):
@@ -164,7 +169,14 @@ def _main(argv=None):
 
         try:
             ensure_macos()
-            if not args.demo and args.cmd not in {"automation", "sudoers", "status", "menubar", "setup"}:
+            if not args.demo and args.cmd not in {
+                "automation",
+                "sudoers",
+                "status",
+                "menubar",
+                "setup",
+                "sleep",
+            }:
                 detect_capabilities()
         except SystemExit:
             raise
@@ -173,11 +185,15 @@ def _main(argv=None):
             return 2
     migration_messages = (
         []
-        if args.cmd in {"suggest", "history", "automation", "sudoers", "status", "menubar", "setup"}
+        if args.cmd in {"suggest", "history", "automation", "sudoers", "status", "menubar", "setup", "sleep"}
         else migrate_legacy()
     )
     for message in migration_messages:
         print(message, file=sys.stderr)
+    if args.cmd == "sleep":
+        from .flows.sleep import repair
+
+        return repair()
     if args.cmd == "setup":
         if args.demo:
             demo._configure_demo_views()

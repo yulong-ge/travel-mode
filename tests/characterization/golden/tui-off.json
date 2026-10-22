@@ -35,6 +35,12 @@
     [
       "pmset",
       "-g"
+    ],
+    [
+      "defaults",
+      "read",
+      "com.ameba.SwiftBar",
+      "PluginDirectory"
     ]
   ],
   "exit_code": null,

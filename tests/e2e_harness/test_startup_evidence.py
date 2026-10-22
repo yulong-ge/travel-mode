@@ -18,7 +18,9 @@ def test_setup_budget_covers_cold_compile_signing_and_launch(tmp_path, monkeypat
     session = object.__new__(UISession)
     session.root = tmp_path
     session.timeout = 40
-    assert SETUP_TIMEOUT >= COMPILE_TIMEOUT + 30 + 60
+    from e2e_graceful import EVENT_SECONDS, EXIT_SECONDS, START_SECONDS
+
+    assert SETUP_TIMEOUT >= COMPILE_TIMEOUT + 30 + 2 * START_SECONDS + EVENT_SECONDS + 5 + EXIT_SECONDS
 
     def wait(predicate, message, timeout):
         assert timeout == SETUP_TIMEOUT > session.timeout

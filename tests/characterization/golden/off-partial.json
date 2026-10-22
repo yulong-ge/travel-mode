@@ -138,6 +138,12 @@
     [
       "open",
       "<ROOT>/Applications/Quit Demo.app"
+    ],
+    [
+      "defaults",
+      "read",
+      "com.ameba.SwiftBar",
+      "PluginDirectory"
     ]
   ],
   "exit_code": 1,

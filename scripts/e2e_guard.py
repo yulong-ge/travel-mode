@@ -9,6 +9,7 @@ import threading
 import time
 from pathlib import Path
 
+import e2e_graceful
 import e2e_refusal
 
 from travel_mode.system.health import PROCESS_COMMAND, native_command
@@ -206,6 +207,7 @@ class GuardRunner:
             ["ps", "-axo", "pid=,%cpu=,command="],
             ["ps", "-ww", "-axo", "pid=,command="],
             ["launchctl", "list"],
+            ["defaults", "read", "com.ameba.SwiftBar", "PluginDirectory"],
             ["mdfind", 'kMDItemContentType == "com.apple.application-bundle"'],
         ]
         allowed |= cmd in [
@@ -256,6 +258,8 @@ class GuardRunner:
                 ["open", "-g", "-j", str(app)],
                 [LSREGISTER, "-u", str(app)],
                 event,
+                e2e_graceful.compile_command(app),
+                e2e_graceful.quit_command(app),
             ]
             if cmd == ["open", str(app)]:
                 return ["open", "-g", "-j", str(app)]

@@ -644,6 +644,12 @@
     [
       "pmset",
       "displaysleepnow"
+    ],
+    [
+      "defaults",
+      "read",
+      "com.ameba.SwiftBar",
+      "PluginDirectory"
     ]
   ],
   "exit_code": 0,

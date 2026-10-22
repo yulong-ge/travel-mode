@@ -138,7 +138,10 @@ def verify_failure(machine, commands, plan, index):
     rows = [json.loads(line) for line in log.read_text().splitlines()]
     assert any(row["rc"] == 1 for row in rows)
     if not has_failure:
-        assert rows and all(row["kind"] == "warning" for row in rows)
+        observations = [row for row in rows if row["kind"] == "observation"]
+        assert all(row.get("modifying") is False for row in observations)
+        mutations = [row for row in rows if row["kind"] != "observation"]
+        assert mutations and all(row["kind"] == "warning" for row in mutations)
     assert log.stat().st_mode & 0o777 == 0o600
     # Independent tool families after the failed item must still be attempted.
     # Follow-up signals within that failed action need not be sent.

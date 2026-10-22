@@ -15,6 +15,12 @@
       "blueutil",
       "-p",
       "0"
+    ],
+    [
+      "defaults",
+      "read",
+      "com.ameba.SwiftBar",
+      "PluginDirectory"
     ]
   ],
   "exit_code": null,

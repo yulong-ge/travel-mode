@@ -1,4 +1,4 @@
- | sfimage=leaf sfsize=16 dropdown=false symbolize=false emojize=false
+:leaf: | symbolize=true sfsize=16 dropdown=false emojize=false
 ---
 Power saving is off
 On power · 85% (not charging)

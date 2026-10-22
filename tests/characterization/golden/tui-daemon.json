@@ -146,6 +146,12 @@
       "ps",
       "-axo",
       "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "defaults",
+      "read",
+      "com.ameba.SwiftBar",
+      "PluginDirectory"
     ]
   ],
   "exit_code": null,

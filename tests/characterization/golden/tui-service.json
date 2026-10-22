@@ -15,6 +15,12 @@
       "launchctl",
       "unload",
       "<ROOT>/Library/LaunchAgents/org.demo.worker.plist"
+    ],
+    [
+      "defaults",
+      "read",
+      "com.ameba.SwiftBar",
+      "PluginDirectory"
     ]
   ],
   "exit_code": null,

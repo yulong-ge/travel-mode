@@ -66,6 +66,12 @@
     [
       "brightness",
       "0.5"
+    ],
+    [
+      "defaults",
+      "read",
+      "com.ameba.SwiftBar",
+      "PluginDirectory"
     ]
   ],
   "exit_code": null,

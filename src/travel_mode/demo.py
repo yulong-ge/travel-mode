@@ -36,6 +36,8 @@ def _configure_demo(directory=None) -> None:
             cmd = tuple(command)
             if cmd == ("sysctl", "-n", "kern.sleeptime", "kern.waketime"):
                 return CmdResult("{ sec = 0, usec = 0 }\n{ sec = 0, usec = 0 }\n", "", 0)
+            if list(command) == ["defaults", "read", "com.ameba.SwiftBar", "PluginDirectory"]:
+                return CmdResult("", "fixture: SwiftBar is not installed", 1)
             if list(command) == native_command("foreground"):
                 return CmdResult(
                     '{"status":"unavailable","source":"NSWorkspace","reason":"fixture has no GUI session"}',

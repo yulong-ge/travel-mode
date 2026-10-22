@@ -1,15 +1,15 @@
 #!/bin/bash
 # travel-mode SwiftBar plugin: io.github.yulong-ge.travel-mode
 # <xbar.title>travel-mode</xbar.title>
-# <xbar.version>2.0.0</xbar.version>
+# <xbar.version>2.1.0</xbar.version>
 # <xbar.author>Long-louis</xbar.author>
 # <xbar.author.github>yulong-ge</xbar.author.github>
 # <xbar.desc>Local session and power-source status; five-minute refresh.</xbar.desc>
 # <xbar.abouturl>https://github.com/yulong-ge/travel-mode</xbar.abouturl>
 # Metadata and parameters: https://github.com/swiftbar/SwiftBar#hiding-default-items
 # https://github.com/swiftbar/SwiftBar#parameters
-# sfimage is a template image in 2.1.1; no sfcolor/palette means adaptive monochrome.
-# templateImage is for base64 images; SF Symbols do not need it. alternate is not used.
+# Title symbols are embedded with symbolize=true and sfsize=16; no separate sfimage title.
+# https://github.com/swiftbar/SwiftBar/blob/v2.1.1/README.md#parameters
 # No refreshOnOpen, stream mode or resident process. One status query per .5m refresh.
 # <swiftbar.hideAbout>true</swiftbar.hideAbout>
 # <swiftbar.hideRunInTerminal>true</swiftbar.hideRunInTerminal>
@@ -37,7 +37,7 @@ resolve_binary() {
 }
 
 warning() {
-    printf '%s\n' ' | sfimage=exclamationmark.triangle sfsize=16 dropdown=false symbolize=false emojize=false' '---'
+    printf '%s\n' ':exclamationmark.triangle: | symbolize=true sfsize=16 dropdown=false emojize=false' '---'
     # Bootstrap-only text: status normally supplies every localized menu line.
     if [[ "${TRAVEL_MODE_LANG:-${LANG:-en}}" == zh* ]]; then
         if [[ "$1" == missing ]]; then

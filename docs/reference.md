@@ -360,6 +360,15 @@ tool runs only when invoked, so a charge while it was not running cannot be dete
 then reflects only what it observed. `status --json` adds `average_watts`, `estimate_source`,
 `estimate_error` and `system_remaining_minutes` (macOS's own estimate, for diagnosis).
 
+The title puts the SF Symbol inside the title text (`:leaf.fill: 1:20 | symbolize=true`), not
+`sfimage` with an empty title: SwiftBar 2.1.1 lays out an image to the left of an empty title and
+the empty title kept a visible gap. When sleep readiness is red, the menu lists each reason, one
+check time in local time (marked as possibly out of date when older than an hour), and "Restore
+system sleep", which runs `travel-mode sleep repair` in a terminal through the normal Action,
+journal and password flow. After `on`, `off`, a restore or the end of a session, the tool opens
+`swiftbar://refreshplugin?name=travel-mode` once if the plugin is installed; a failure there is
+only logged. Nothing polls.
+
 The `5m` in the file name sets the refresh interval. Each refresh runs `travel-mode status --json`,
 which reads the configured language, the local state file and one `pmset -g ps` (2-second limit);
 on the tested Mac a refresh takes about 0.1 s in total. Health check, power measurement and the

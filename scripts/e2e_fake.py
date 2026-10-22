@@ -4,6 +4,7 @@ import os
 import plistlib
 from pathlib import Path
 
+import e2e_graceful
 import e2e_refusal
 from e2e_guard import GRACEFUL_FIXTURES, LABEL, PROCESS_QUERY, QUIT_EVENTS, STATUS_QUERY
 
@@ -55,6 +56,8 @@ class Machine:
         from travel_mode.system.shell import command_started
 
         command_started()
+        if cmd == ["defaults", "read", "com.ameba.SwiftBar", "PluginDirectory"]:
+            return CmdResult("", "fixture: SwiftBar is not installed", 1)
         if cmd == native_command("foreground"):
             return CmdResult(
                 '{"status":"unavailable","source":"NSWorkspace","reason":"fixture has no GUI session"}', "", 0
@@ -128,11 +131,27 @@ class Machine:
                     str(app / "Contents" / executable),
                 )
                 self.next_pid += 1
+            if cmd[0] == "open" and app in [
+                self.root / f"TravelModeE2E-{n}.app" for n, _ in GRACEFUL_FIXTURES
+            ]:
+                e2e_graceful.receipts(app)[0].write_text("ready")
             out = ""
-        elif cmd in QUIT_EVENTS:
+        elif cmd in QUIT_EVENTS or cmd in [
+            e2e_graceful.quit_command(self.root / f"TravelModeE2E-{n}.app") for n, _ in GRACEFUL_FIXTURES
+        ]:
             if self.tcc:
                 return CmdResult("", self.tcc, 124 if self.tcc == "timeout" else 1)
-            name = GRACEFUL_FIXTURES[QUIT_EVENTS.index(cmd)][0]
+            event_index = (
+                QUIT_EVENTS.index(cmd)
+                if cmd in QUIT_EVENTS
+                else next(
+                    i
+                    for i, (name, _) in enumerate(GRACEFUL_FIXTURES)
+                    if cmd == e2e_graceful.quit_command(self.root / f"TravelModeE2E-{name}.app")
+                )
+            )
+            name = GRACEFUL_FIXTURES[event_index][0]
+            e2e_graceful.receipts(self.root / f"TravelModeE2E-{name}.app")[1].write_text("quit")
             path = str(self.root / f"TravelModeE2E-{name}.app")
             self.rows = {p: r for p, r in self.rows.items() if not r[2].startswith(path + "/")}
             out = ""

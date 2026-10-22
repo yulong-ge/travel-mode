@@ -87,6 +87,9 @@ def _readonly_responses() -> dict[tuple[str, ...], CmdResult]:
         ("networksetup", "-getairportpower"): CmdResult("Wi-Fi Power (en0): On\n", "", 0),
         ("blueutil", "-p"): CmdResult("1\n", "", 0),
         ("brightness", "-l"): CmdResult("brightness 0.8\n", "", 0),
+        ("defaults", "read", "com.ameba.SwiftBar", "PluginDirectory"): CmdResult(
+            "", "fixture: SwiftBar is not installed", 1
+        ),
         ("ps",): CmdResult("", "", 0),
         ("pgrep",): CmdResult("", "", 1),
         ("top",): CmdResult("", "", 0),

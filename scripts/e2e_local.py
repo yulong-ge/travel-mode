@@ -24,13 +24,13 @@ from unittest.mock import patch
 
 # Support both `uv run python scripts/e2e_local.py` and imports in default tests.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import e2e_graceful
 from e2e_guard import (
     GRACEFUL_FIXTURES,
     LABEL,
     LSREGISTER,
     PROCESS_QUERY,
     QUIT_EVENT,
-    QUIT_EVENTS,
     STATUS_QUERY,
     GuardRunner,
     LocalBackend,
@@ -178,6 +178,7 @@ class Harness:
         real_state,
         *,
         pause=time.sleep,
+        clock=time.monotonic,
         checkpoint=lambda stage: None,
         brightness_loader=None,
     ):
@@ -185,6 +186,7 @@ class Harness:
         self.root, self.runner, self.real_state = root, runner, real_state
         self.state_file = root / "state.json"
         self.pause, self.checkpoint = pause, checkpoint
+        self.clock = clock
         self.plist = root / "agent.plist"
         self.apps = fixture_paths(root)
         self.original_power = None
@@ -403,47 +405,135 @@ class Harness:
         return any(line.split()[-1:] == [LABEL] for line in self.command(["launchctl", "list"]).splitlines())
 
     def graceful(self):
-        self.graceful_attempted = True
-        create_graceful(self.root, self.runner)
-        for app in self.runner.graceful_apps:
-            self.command(["open", "-g", "-j", str(app)])
-        self.graceful_registered = True
-        self.wait(
-            lambda: all(apps.app_running(str(app)) for app in self.runner.graceful_apps),
-            "Background applets started",
-        )
+        if not self.graceful_capability():
+            return False
         self.runner.observe()
         st = state.new_state()
         start = len(self.runner.commands)
-        try:
-            results = Executor(Context(st)).execute_all(
-                [QuitApp(str(app), app.stem) for app in self.runner.graceful_apps]
-            )
-            ok = all(results)
-        except RuntimeError:
-            if not tcc_denied(self.runner):
-                raise
-            print(TCC_SKIP)
-            self.state_file.unlink(missing_ok=True)
-            return False
-        if not ok and tcc_denied(self.runner):
-            print(TCC_SKIP)
-            self.state_file.unlink(missing_ok=True)
-            return False
+        results = Executor(Context(st)).execute_all(
+            [QuitApp(str(app), app.stem) for app in self.runner.graceful_apps]
+        )
         self.check(
-            ok and all(not apps.app_running(str(app)) for app in self.runner.graceful_apps),
-            "Concurrent AppleEvent quit exited both applets",
+            all(results) and all(not apps.app_running(str(app)) for app in self.runner.graceful_apps),
+            "PRODUCT: concurrent graceful quits passed unchanged product deadlines",
         )
         self.check(
             not any(c[0] == "kill" for c in self.runner.commands[start:]),
             "Graceful quit used no kill fallback",
         )
-        print("Reopen mapping: open <graceful bundle> -> open -g -j <graceful bundle>")
+        self.reset_applet_receipts()
         self.off(st)
-        self.wait(
-            lambda: all(apps.app_running(str(app)) for app in self.runner.graceful_apps),
-            "Applets reopened hidden in recorded order",
+        self.wait_applets("product-reopen", running=True)
+        return True
+
+    def graceful_capability(self):
+        self.graceful_attempted = True
+        create_graceful(self.root, self.runner)
+        self.reset_applet_receipts()
+        for app in self.runner.graceful_apps:
+            self.command(["open", "-g", "-j", str(app)])
+        self.graceful_registered = True
+        self.wait_applets("capability-start", running=True)
+        if not self.quit_applets("capability-quit"):
+            return False
+        self.reset_applet_receipts()
+        for app in self.runner.graceful_apps:
+            self.command(["open", "-g", "-j", str(app)])
+        self.wait_applets("capability-reopen", running=True)
+        return True
+
+    def reset_applet_receipts(self):
+        for app in self.runner.graceful_apps:
+            for path in e2e_graceful.receipts(app):
+                path.unlink(missing_ok=True)
+
+    def record_applets(self, phase, rows, results=()):
+        records = getattr(self, "appleevent_evidence", [])
+        records.append(
+            dict(
+                phase=phase,
+                clock=self.clock(),
+                processes={str(pid): row for pid, row in rows.items() if row[2] in self.runner.shells},
+                receipts={
+                    path.name: path.read_text() if path.exists() else None
+                    for app in self.runner.graceful_apps
+                    for path in e2e_graceful.receipts(app)
+                },
+                results=[
+                    dict(command=command, rc=result.rc, stdout=result.stdout, stderr=result.stderr)
+                    for command, result in results
+                ],
+            )
         )
+        self.appleevent_evidence = records
+        write_json(
+            getattr(self, "evidence", self.root) / "appleevent-capability.json",
+            dict(
+                event_seconds=e2e_graceful.EVENT_SECONDS,
+                start_seconds=e2e_graceful.START_SECONDS,
+                exit_seconds=e2e_graceful.EXIT_SECONDS,
+                observations=records,
+            ),
+        )
+
+    def wait_applets(self, phase, *, running):
+        budget = e2e_graceful.START_SECONDS if running else e2e_graceful.EXIT_SECONDS
+        deadline = self.clock() + budget
+        while True:
+            rows = self.runner.observe()
+            conditions = []
+            for app in self.runner.graceful_apps:
+                present = any(
+                    row[2] == str(app / "Contents/MacOS/applet") and not row[0].startswith("Z")
+                    for row in rows.values()
+                )
+                ready, _quit = e2e_graceful.receipts(app)
+                conditions.append(
+                    present and ready.exists() and ready.read_text() == "ready" if running else not present
+                )
+            if all(conditions):
+                self.record_applets(phase, rows)
+                return
+            remaining = deadline - self.clock()
+            if remaining <= 0:
+                self.record_applets(phase + "-timeout", rows)
+                raise AssertionError(
+                    f"HARNESS CAPABILITY: {phase}: no acknowledged "
+                    f"{'startup' if running else 'exit'} within {budget}s"
+                )
+            self.pause(min(0.1, remaining))
+
+    def quit_applets(self, phase):
+        from concurrent.futures import ThreadPoolExecutor
+
+        rows = self.runner.observe()
+        targets = [
+            app
+            for app in self.runner.graceful_apps
+            if any(
+                row[2] == str(app / "Contents/MacOS/applet") and not row[0].startswith("Z")
+                for row in rows.values()
+            )
+        ]
+        self.record_applets(phase + "-before", rows)
+        with ThreadPoolExecutor(max_workers=max(1, len(targets))) as workers:
+            requests = [
+                (
+                    e2e_graceful.quit_command(app),
+                    workers.submit(
+                        self.runner, e2e_graceful.quit_command(app), timeout=e2e_graceful.EVENT_SECONDS + 5
+                    ),
+                )
+                for app in targets
+            ]
+            results = [(command, future.result()) for command, future in requests]
+        self.record_applets(phase + "-sent", self.runner.observe(), results)
+        if any(result.rc and "-1743" in result.stdout + result.stderr for _, result in results):
+            print(TCC_SKIP)
+            return False
+        # A transport timeout is neither TCC denial nor proof that the app lives.
+        # Observe the actual processes until the shared exit deadline; never resend Quit.
+        self.wait_applets(phase, running=False)
         return True
 
     def thaw(self):
@@ -690,9 +780,24 @@ class Harness:
                     signals.callback(attempt, lambda: signal_current("-CONT"))
 
         def kill_survivors():
-            if self.fixture_attempted:
-                self.pause(1.1)
-                signal_current("-KILL")
+            if not self.fixture_attempted:
+                return
+            deadline = self.clock() + 2
+            while True:
+                rows = self.runner.observe()
+                living = any(
+                    pid in self.runner.owned
+                    and (row[1], row[2]) == self.runner.owned[pid]
+                    and not row[0].startswith("Z")
+                    for pid, row in rows.items()
+                )
+                if not living:
+                    return
+                remaining = deadline - self.clock()
+                if remaining <= 0:
+                    signal_current("-KILL")
+                    return
+                self.pause(min(0.1, remaining))
 
         def unload():
             if self.agent_attempted:
@@ -711,15 +816,8 @@ class Harness:
                 )
 
         def quit_applet():
-            for app, event in zip(self.runner.graceful_apps, QUIT_EVENTS, strict=True):
-                if self.graceful_attempted and apps.app_running(str(app)):
-                    result = self.runner(event, timeout=10)
-                    if result.rc and not tcc_denied(self.runner):
-                        raise RuntimeError(f"Cleanup AppleEvent quit failed: {result}")
-                    if result.rc:
-                        print(TCC_SKIP)
-                    else:
-                        self.pause(1)
+            if self.graceful_attempted:
+                self.quit_applets("cleanup-quit")
 
         def unregister():
             for app in self.runner.graceful_apps:
@@ -768,27 +866,15 @@ class Harness:
 
 
 TCC_SKIP = (
-    "SKIP graceful: AppleEvent denied (-1743) or timed out; allow automation in "
+    "SKIP graceful: AppleEvent denied (-1743); allow automation in "
     "System Settings > Privacy & Security > Automation. Product real use has "
     "the same first-authorization requirement."
 )
 
 
-def tcc_denied(runner):
-    result = next(
-        (result for command, result in reversed(runner.results) if command == tuple(QUIT_EVENT)), None
-    )
-    return result is not None and (
-        result.rc == 124 or any(code in result.stderr + result.stdout for code in ("-1743", "-1712"))
-    )
-
-
 def create_graceful(root, runner):
     for app, (_, identifier) in zip(runner.graceful_apps, GRACEFUL_FIXTURES, strict=True):
-        result = runner(
-            ["osacompile", "-s", "-o", str(app), "-e", "on idle", "-e", "return 1", "-e", "end idle"],
-            timeout=30,
-        )
+        result = runner(e2e_graceful.compile_command(app), timeout=30)
         if result.rc:
             raise RuntimeError(f"osacompile failed: {result}")
         plist = app / "Contents/Info.plist"
@@ -812,9 +898,10 @@ def print_plan():
         PROCESS_QUERY,
         STATUS_QUERY,
         ["launchctl", "list"],
-        ["osacompile", "-s", "-o", str(guard.graceful), "-e", "on idle", "-e", "return 1", "-e", "end idle"],
+        e2e_graceful.compile_command(guard.graceful),
         ["codesign", "--force", "--sign", "-", str(guard.graceful)],
         ["open", "-g", "-j", str(guard.graceful)],
+        e2e_graceful.quit_command(guard.graceful),
         QUIT_EVENT,
         ["open", str(guard.graceful)],
     ]:
@@ -824,7 +911,16 @@ def print_plan():
         "LSUIElement=true before signing."
     )
     print("open <graceful bundle> is mapped to open -g -j <bundle>; no focus/Dock activation.")
-    print("Assert AppleEvent exits applet; recorded commands contain no applet kill; off reopens it.")
+    print(
+        "HARNESS CAPABILITY: wait <=30 s for a fresh idle receipt; "
+        "send one Quit with a 30 s AppleEvent deadline."
+    )
+    print(
+        "Observe both real process exits within a shared 30 s deadline. Timeout is a failure, not TCC denial."
+    )
+    print(
+        "PRODUCT: keep 8 s AppleEvent / 10 s exit limits; assert no kill fallback; off reopens both applets."
+    )
     print(TCC_SKIP)
     for exe in guard.executables:
         guard([exe])

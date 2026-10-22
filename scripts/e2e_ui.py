@@ -35,7 +35,9 @@ from travel_mode.cli import main as product_main
 from travel_mode.i18n import set_language, t
 from travel_mode.system import apps, brightness, pmset, processes
 
-SETUP_TIMEOUT = 240  # Cold Swift compilation (120 s), signing (30 s), launch and TCC probes.
+# Include acknowledged applet startup/reopen, one capability Quit and shared
+# exit observation, in addition to cold Swift compilation and signing.
+SETUP_TIMEOUT = 360
 
 
 def wait_for(predicate, message, timeout=30):
@@ -105,7 +107,7 @@ class InteractiveHarness(Harness):
         self.wait(self.agent_loaded, "Agent loaded")
         # This proves TCC capability independently. Denied authorization skips
         # this fixture only; the remaining CLI/TUI phases continue.
-        graceful_ready = self.graceful()
+        graceful_ready = self.graceful_capability()
         if self.state_file.exists():
             raise AssertionError("Preflight graceful stage left a state file")
         self.refusing_ready = False

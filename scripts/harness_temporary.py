@@ -11,6 +11,7 @@ from harness_evidence import write_json
 MARKER = ".travel-mode-fixture"
 IDENTITY = "travel-mode:e2e:v1\n"
 DIAGNOSTICS = (
+    "appleevent-capability.json",
     "state.json",
     "config.toml",
     "history.jsonl",

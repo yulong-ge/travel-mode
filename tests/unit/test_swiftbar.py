@@ -2,6 +2,7 @@
 
 import json
 import subprocess
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -21,7 +22,7 @@ def model(case):
     ac = case in {"charging", "charged", "paused", "finishing"}
     percent = 100 if case in {"charged", "finishing"} else 85 if ac else 82
     states = {"paused": "not charging", "finishing": "finishing charge"}
-    return dict(
+    result = dict(
         active=active,
         scenario=case if active else None,
         started_at="2026-10-17T10:00:00+00:00" if active else None,
@@ -36,6 +37,17 @@ def model(case):
         ),
         app_version="1.1.0",
     )
+    if case.startswith("blocked-"):
+        from travel_mode.sleep_readiness import evaluate
+
+        readiness = evaluate("1")
+        readiness["observed_at"] = "2026-10-22T10:16:52+00:00"
+        if case == "blocked-stale":
+            cached = evaluate("0", [dict(process="Example", pid="123", scope="system")])["items"][0]
+            cached["observed_at"] = "2026-10-21T03:45:04+00:00"
+            readiness["items"].append(cached)
+        result["sleep_ready"] = readiness
+    return result
 
 
 def bash_run(script, env, *, syntax=False):
@@ -48,12 +60,29 @@ def bash_run(script, env, *, syntax=False):
 
 @pytest.mark.parametrize("language", ["en", "zh"])
 @pytest.mark.parametrize(
-    "case", ["idle", "work", "away", "charging", "charged", "paused", "finishing", "unknown"]
+    "case",
+    [
+        "idle",
+        "work",
+        "away",
+        "charging",
+        "charged",
+        "paused",
+        "finishing",
+        "unknown",
+        "blocked-fresh",
+        "blocked-stale",
+    ],
 )
 def test_complete_localized_menu_fixture(case, language, monkeypatch):
     i18n.set_language(language)
     monkeypatch.setenv("TRAVEL_MODE_BIN", "/fixture/travel-mode")
-    assert status.render(model(case)) + "\n" == (FIXTURES / f"{case}-{language}.txt").read_text()
+    monkeypatch.setenv("TZ", "Asia/Shanghai")
+    time.tzset()
+    assert (
+        status.render(model(case), now=datetime(2026, 10, 22, 10, 30, tzinfo=timezone.utc)) + "\n"
+        == (FIXTURES / f"{case}-{language}.txt").read_text()
+    )
     if case not in {"work", "away"}:
         assert status.render(model(case)).splitlines()[2] == (
             "省电模式未开启" if language == "zh" else "Power saving is off"
