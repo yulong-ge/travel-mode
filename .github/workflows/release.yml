@@ -29,7 +29,9 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           body_path: release-notes.md
-          files: dist/*
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
 
   pypi:
     # Opt-in: set the repository variable PUBLISH_PYPI=true after configuring
