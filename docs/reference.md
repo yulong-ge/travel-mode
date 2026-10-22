@@ -422,6 +422,16 @@ disable`.
 Pressing `L` in the TUI saves `options.language`, keeping comments. JSON schemas are in
 [json-schema/](json-schema/).
 
+## Foreground app protection
+
+The frontmost app and its helpers are never quit or frozen. The foreground app is read with
+`lsappinfo`, whose output is not a documented format; two layouts observed on real machines are
+parsed (`pid = 41918` with `bundleID=...`, and `"pid"=358` with `"CFBundleIdentifier"=...`), each
+from a recorded sample. If the foreground app cannot be identified, the check still reports
+everything else but marks app actions as blocked (`app_safety: "blocked"` in JSON, "cannot check"
+in the health list), and no app is quit, frozen or force-quit until a later check succeeds. The
+identity is read again right before app actions run, so an older plan cannot bypass this.
+
 ## Failed actions and the log
 
 An action that fails (a command exits non-zero, an app refuses to quit, a service cannot be

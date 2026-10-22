@@ -151,6 +151,17 @@
       "pid=,%cpu=,command="
     ],
     [
+      "lsappinfo",
+      "front"
+    ],
+    [
+      "lsappinfo",
+      "info",
+      "-only",
+      "pid,bundleid",
+      "ASN:0x0-0x1:"
+    ],
+    [
       "launchctl",
       "list"
     ],

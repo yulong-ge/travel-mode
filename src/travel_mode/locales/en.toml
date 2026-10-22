@@ -1401,3 +1401,6 @@
 "redesign.sleep_source_generic" = "An app may have changed this. Check 'prevent sleep on power' in remote-access or keep-awake tools."
 
 "onboarding.your" = "Your setting"
+"setup.foreground_blocked" = "Cannot determine the foreground app. No apps will be modified until a recheck succeeds. Reason: {reason}"
+"setup.reason_foreground_unknown" = "Foreground app unavailable; all app changes blocked"
+"setup.short_foreground_unknown" = "App changes blocked"

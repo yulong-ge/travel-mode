@@ -1401,3 +1401,6 @@
 "redesign.sleep_source_generic" = "某个程序可能修改了这个设置；常见原因是远程控制或防睡工具的「接电时防止睡眠」选项。"
 
 "onboarding.your" = "你的设置"
+"setup.foreground_blocked" = "无法确定前台 app，因此本次不会对任何 app 执行修改，直到重新检查成功。原因：{reason}"
+"setup.reason_foreground_unknown" = "无法确定前台 app；已阻止所有 app 修改"
+"setup.short_foreground_unknown" = "已阻止 app 修改"

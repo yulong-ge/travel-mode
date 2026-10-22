@@ -83,6 +83,7 @@ class Session:
         self.check_deadline = self.deadline
         self.cache = {}
         self.subjects = {}
+        self.foreground_error = None
 
     def read(self, command):
         remaining = min(self.deadline, self.check_deadline) - self.clock()
@@ -318,17 +319,17 @@ def brightness(s):
 
 
 def high_cpu(s):
+    from .lsappinfo import ForegroundError, foreground
+
     rows = s.processes()
-    output = s.read(["lsappinfo", "front"]).strip()
-    if not re.fullmatch(r"ASN:0x[0-9a-fA-F]+-0x[0-9a-fA-F]+:", output):
-        raise ObservationError(f"lsappinfo front: invalid ASN: {output!r}")
-    info = s.read(["lsappinfo", "info", "-only", "pid,bundleid", output])
-    match = re.search(r"\bpid\s*=\s*(\d+)\b", info)
-    if not match:
-        raise ObservationError(f"lsappinfo: missing foreground PID: {info!r}")
-    foreground = int(match[1])
-    if not any(r["pid"] == foreground for r in rows):
-        raise ObservationError(f"lsappinfo: foreground PID {foreground} disappeared from ps snapshot")
+    try:
+        front = foreground(s.read)
+        if not any(r["pid"] == front.pid for r in rows):
+            raise ObservationError(f"lsappinfo: foreground PID {front.pid} disappeared from ps snapshot")
+    except (ForegroundError, ObservationError) as exc:
+        s.foreground_error = str(exc)
+        raise ObservationError(str(exc)) from exc
+    foreground = front.pid
     front_paths = {app_path(r["executable"]) for r in rows if r["pid"] == foreground} - {None}
     own = {os.getpid()}
     by_pid = {r["pid"]: r for r in rows}
@@ -428,6 +429,13 @@ def collect(config=None, *, clock=None):
         budget_seconds=BUDGET,
         limitations=[t("health.omitted"), t("health.cpu_method")],
     )
+    if s.foreground_error:
+        message = t("setup.foreground_blocked", reason=s.foreground_error)
+        result["app_safety"] = dict(status="blocked", error=s.foreground_error, message=message)
+        for row in checks:
+            row["actions"] = [a for a in row["actions"] if a["kind"] not in {"quit", "freeze"}]
+            if row["id"] == "high_cpu":
+                row["safety_reason"] = message
     from ..health_view import assertion_context
     from ..state import load_state
 

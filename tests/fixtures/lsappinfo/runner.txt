@@ -1,0 +1,2 @@
+"pid"=358
+"CFBundleIdentifier"="com.apple.finder"

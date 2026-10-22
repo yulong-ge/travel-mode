@@ -93,6 +93,7 @@ def _protected(path, rows):
     if protected_app_identity(path):
         raise PermissionError(t("safety.protected_app", path=path))
     info = resolved / "Contents/Info.plist"
+    bundle_id = None
     if info.exists():
         with info.open("rb") as handle:
             metadata = plistlib.load(handle)
@@ -103,17 +104,13 @@ def _protected(path, rows):
             raise ValueError(t("safety.invalid_bundle_id", path=info))
         if protected_app_identity(path, bundle_id):
             raise PermissionError(t("safety.protected_app", path=f"{path} ({bundle_id})"))
-    from ..config import load_config
+    from .lsappinfo import foreground
 
-    if load_config().apps.policy == "adaptive":
-        from ..app_policy import foreground_pid
-
-        foreground = int(foreground_pid())
-        if any(
-            process.pid == foreground and process.command.startswith(_prefixes(path, True))
-            for process in rows
-        ):
-            raise PermissionError(t("setup.foreground_protected", path=path))
+    front = foreground()
+    if any(
+        process.pid == front.pid and process.command.startswith(_prefixes(path, True)) for process in rows
+    ) or (front.bundle_id is not None and bundle_id == front.bundle_id):
+        raise PermissionError(t("setup.foreground_protected", path=path))
     protected = protected_process_ids(rows)
     prefixes = _prefixes(path, whole_bundle=True)
     if any(process.pid in protected and process.command.startswith(prefixes) for process in rows):

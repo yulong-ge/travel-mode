@@ -1,0 +1,6 @@
+[ NULL ]  ASN:0x0-0x4c74c7: (in front) 
+    bundleID="com.electron.lark"
+    bundle path=[ NULL ] 
+    executable path=[ NULL ] 
+    pid = 41918 !cgsConnection !signalled type=[ NULL ]  flavor=[ NULL ]  Version=[ NULL ]  Arch=!!none 
+

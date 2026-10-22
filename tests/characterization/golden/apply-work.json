@@ -85,6 +85,17 @@
       "pid=,%cpu=,command="
     ],
     [
+      "lsappinfo",
+      "front"
+    ],
+    [
+      "lsappinfo",
+      "info",
+      "-only",
+      "pid,bundleid",
+      "ASN:0x0-0x1:"
+    ],
+    [
       "pmset",
       "-g",
       "assertions"
@@ -93,6 +104,22 @@
       "ps",
       "-axo",
       "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "ps",
+      "-axo",
+      "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "lsappinfo",
+      "front"
+    ],
+    [
+      "lsappinfo",
+      "info",
+      "-only",
+      "pid,bundleid",
+      "ASN:0x0-0x1:"
     ],
     [
       "osascript",
@@ -117,6 +144,17 @@
       "ps",
       "-axo",
       "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "lsappinfo",
+      "front"
+    ],
+    [
+      "lsappinfo",
+      "info",
+      "-only",
+      "pid,bundleid",
+      "ASN:0x0-0x1:"
     ],
     [
       "ps",

@@ -1,0 +1,14 @@
+{
+  "local.txt": {
+    "source": "Read-only lsappinfo info -only pid,bundleid on macOS 27.0.1",
+    "captured": "2026-10-21"
+  },
+  "runner.txt": {
+    "source": "GitHub clean-machine-readonly check.stdout audit_error supplied in /tmp/tm-r40/clean-artifact",
+    "macOS_version": "not recorded in supplied artifact"
+  },
+  "documentation": [
+    "https://www.manpagez.com/man/8/lsappinfo/",
+    "https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html"
+  ]
+}

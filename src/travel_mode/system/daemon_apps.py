@@ -57,6 +57,16 @@ def quit_with_daemons(spec: DaemonApp, state: dict, save=None):
         (True, "unloaded_sys_svcs", [_configured_plist(value) for value in spec.system_daemons]),
         (False, "unloaded_svcs", [_configured_plist(value) for value in spec.user_agents]),
     )
+    # Establish protection before unloading even the first daemon for this app.
+    app_bundle = app_path(spec.name)
+    if app_bundle:
+        from .process_control import _protected, process_table
+
+        _protected(app_bundle, process_table())
+    else:
+        from .lsappinfo import foreground
+
+        foreground()
     messages = []
     ok = True
     uncertain = False
@@ -103,7 +113,7 @@ def quit_with_daemons(spec: DaemonApp, state: dict, save=None):
     if uncertain:
         # Do not infer whether an app whose system daemons were unreadable can quit.
         return "", False, "; ".join(messages)
-    path = app_path(spec.name)
+    path = app_bundle
     if path and bundle_alive(path):
         record_change("quit_apps", path)
         result = grace_quit(path, spec.name)

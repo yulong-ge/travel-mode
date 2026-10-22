@@ -140,6 +140,7 @@ def test_assertions_exclude_system_owners_and_preserve_unknown_owner(health_mach
         health.PROCESS_COMMAND,
         "\n".join(
             [
+                process(900000, "/System/Library/CoreServices/loginwindow"),
                 process(901, "/System/Library/PrivateFrameworks/powerd"),
                 process(902, "/Applications/Worker.app/Contents/MacOS/Worker"),
                 process(903, "/Applications/Other.app/Contents/MacOS/Other", uid=os.getuid() + 1),

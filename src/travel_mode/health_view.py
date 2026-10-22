@@ -133,7 +133,9 @@ def presentation(report, *, scenario="away", session_seconds=None):
         advisory, details = False, []
         if state == "unavailable":
             reason = row.get("error") or t("health_view.capability_unavailable")
-            if row.get("error"):
+            if row.get("safety_reason"):
+                reason = row["safety_reason"]
+            elif row.get("error"):
                 from .failures import log_path
 
                 category = (

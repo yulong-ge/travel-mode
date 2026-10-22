@@ -82,6 +82,7 @@ def _audit_data() -> dict:
                 "effect": t(f"power.{key}.effect"),
             }
         )
+    app_scan = system_apps.scan_apps()
     apps = [
         {
             "name": app["name"],
@@ -89,7 +90,7 @@ def _audit_data() -> dict:
             "cpu": float(app["cpu"]) if app["cpu"] else None,
             "default_action": app["defact"],
         }
-        for app in system_apps.scan_apps()["running"]
+        for app in app_scan["running"]
     ]
     services = launchd.svc_scan()
     state = load_state()
@@ -102,6 +103,7 @@ def _audit_data() -> dict:
         note(state, revived, external=pmset.on_ac_power())
 
     return {
+        **({"app_safety": app_scan["app_safety"]} if "app_safety" in app_scan else {}),
         "version": __version__.split(".dev", 1)[0],
         "scenario": state.get("scenario") or None if state else None,
         "battery": {"percent": int(match[1]) if match else None, "source": source, "raw": raw},

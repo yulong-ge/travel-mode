@@ -40,6 +40,13 @@ def validate_snapshot(data):
 
 def validate_discovered_paths(data):
     """Check the emitted check/suggest results, not only a second setup snapshot."""
+    if data.get("audit_error"):
+        raise AssertionError(f"Clean-machine audit failed: {data['audit_error']}")
+    if data.get("app_safety", {}).get("status") == "blocked":
+        raise AssertionError(f"Clean-machine app audit blocked: {data['app_safety']['message']}")
+    missing = {"apps", "services"} - data.keys()
+    if missing:
+        raise AssertionError(f"Clean-machine audit is missing required fields: {sorted(missing)}")
     for row in data["apps"]:
         if not Path(row["path"]).is_dir():
             raise AssertionError(f"Output app was not observed on this machine: {row['name']}")
@@ -80,10 +87,16 @@ def main(argv=None):
             (output / f"{name}.stdout").write_text(stdout.getvalue())
             (output / f"{name}.stderr").write_text(stderr.getvalue())
             validate_output(stdout.getvalue() + stderr.getvalue(), patterns)
-            if rc != 0:
-                raise AssertionError(f"{name} exited {rc}; see captured output")
             if name != "setup":
-                validate_discovered_paths(json.loads(stdout.getvalue()))
+                try:
+                    data = json.loads(stdout.getvalue())
+                except json.JSONDecodeError as exc:
+                    raise AssertionError(
+                        f"{name} did not return JSON (exit {rc}); {stderr.getvalue()}; see captured output"
+                    ) from exc
+                validate_discovered_paths(data)
+            if rc != 0:
+                raise AssertionError(f"{name} exited {rc}; {stderr.getvalue()}; see captured output")
         data = onboarding.scan()
         validate_snapshot(data)
         validate_output(json.dumps(data), patterns)

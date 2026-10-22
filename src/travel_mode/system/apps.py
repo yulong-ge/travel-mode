@@ -166,10 +166,9 @@ def _grace_quit(path, name):
     """AppleScript quit (8s 超时) + 轮询 10s. 没在跑直接成功."""
     if not app_running(path):
         return QuitResult("not_running", True)
-    if load_config().apps.policy == "adaptive":
-        from .process_control import _protected, process_table
+    from .process_control import _protected, process_table
 
-        _protected(path, process_table())
+    _protected(path, process_table())
     bid = app_bid(path)
     target = bid or name
     if not isinstance(target, str) or not target:
@@ -354,10 +353,13 @@ def scan_apps():
                     }
                 )
                 seen.add(p)
+        foreground_error = None
         if config.apps.policy == "adaptive":
-            from ..app_policy import recommendations
+            from ..app_policy import recommendation_scan
 
-            recommended = {row["path"]: row for row in recommendations(snapshot)}
+            observation = recommendation_scan(snapshot, allow_foreground_failure=True)
+            foreground_error = observation["foreground_error"]
+            recommended = {row["path"]: row for row in observation["apps"]}
             for p, row in recommended.items():
                 if p not in seen and row["running"] and row["name"] not in config.apps.ignore:
                     rule = identify(name=row["name"], bundle_id=row["bundle_id"])
@@ -375,7 +377,7 @@ def scan_apps():
                 row = recommended.get(app["path"])
                 if row:
                     app["reason"] = row["reason"]
-                    if row["reason"] == "foreground":
+                    if row["reason"] in {"foreground", "foreground_unknown"}:
                         app["defact"] = "skip"
                     elif (
                         config.apps.explicit(app["name"], config.options.scenario) is None
@@ -389,12 +391,30 @@ def scan_apps():
                             if row["reason"] == "freeze" and scenario == "work"
                             else row[scenario]
                         )
+        else:
+            from .lsappinfo import ForegroundError, foreground
+
+            try:
+                foreground()
+            except ForegroundError as exc:
+                foreground_error = str(exc)
         notices = []
         for process in snapshot.processes:
             rule = identify(executable=process.command)
             if rule and rule["action"] == "notice":
                 notices.append({"name": rule["name"], "pid": process.pid, **metadata(rule)})
-        return {"running": running, "nobundle": nobundle, "notices": notices}
+        result = {"running": running, "nobundle": nobundle, "notices": notices}
+        if foreground_error:
+            error = foreground_error
+            for app in running:
+                app.update(defact="skip", reason="foreground_unknown")
+            message = t("setup.foreground_blocked", reason=error)
+            result["app_safety"] = dict(status="blocked", error=error, message=message)
+            nobundle.append(message)
+            from ..failures import record
+
+            record(None, "lsappinfo", error, kind="observation", store=False)
+        return result
 
 
 def main_proc_alive(p):

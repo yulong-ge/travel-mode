@@ -5,6 +5,7 @@ on:
     paths:
       - 'src/**'
       - 'scripts/check_new_machine.py'
+      - 'scripts/collect_macos_samples.py'
       - '.github/workflows/e2e-macos.yml'
   workflow_dispatch:
   schedule:
@@ -15,6 +16,7 @@ on:
       - 'src/**'
       - 'scripts/e2e_*.py'
       - 'scripts/check_new_machine.py'
+      - 'scripts/collect_macos_samples.py'
       - 'pyproject.toml'
       - 'uv.lock'
       - '.github/workflows/e2e-macos.yml'
@@ -34,6 +36,9 @@ jobs:
       - run: uv sync --group dev --python 3.13
       - name: Check, preview setup and suggest on a clean Mac
         run: uv run python scripts/check_new_machine.py --output "$RUNNER_TEMP/new-machine"
+      - name: Collect raw macOS parser samples, including on acceptance failure
+        if: always()
+        run: uv run python scripts/collect_macos_samples.py --output "$RUNNER_TEMP/new-machine/raw-macos"
       - name: Keep read-only outputs
         if: always()
         uses: actions/upload-artifact@v7

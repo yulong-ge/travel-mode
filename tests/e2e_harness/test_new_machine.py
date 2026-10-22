@@ -76,3 +76,42 @@ def test_acceptance_runs_cli_commands_with_fake_machine_and_no_writes(tmp_path, 
     assert not (output / "config.toml").exists()
     assert not (output / "state.json").exists()
     assert not any(call[0] in {"sudo", "kill", "open", "osascript"} for call in fake_runner.calls)
+
+
+@pytest.mark.parametrize(
+    "data,reason",
+    [
+        ({"audit_error": "Cannot read foreground PID: '\"pid\"=358\\n'"}, "Cannot read foreground PID"),
+        (
+            {"app_safety": {"status": "blocked", "message": "Cannot determine foreground; recheck required"}},
+            "recheck required",
+        ),
+        ({"health": {}}, "missing required fields"),
+    ],
+)
+def test_incomplete_audit_reports_root_cause_instead_of_keyerror(data, reason):
+    with pytest.raises(AssertionError, match=reason):
+        clean.validate_discovered_paths(data)
+
+
+@pytest.mark.parametrize("rc", [0, 1])
+def test_acceptance_preserves_failed_check_and_restores_runner(tmp_path, monkeypatch, fake_runner, rc):
+    import json
+
+    from travel_mode.system import shell
+
+    monkeypatch.setattr(shell, "ReadOnlyRunner", lambda: fake_runner)
+    monkeypatch.setattr(clean.runpy, "run_path", lambda _: {"PRIVATE_PATTERNS": []})
+    reason = "Cannot read foreground PID: '\"pid\"=broken'"
+
+    def failed_audit(argv):
+        print(json.dumps({"audit_error": reason, "health": {}}))
+        return rc
+
+    monkeypatch.setattr(clean, "product_main", failed_audit)
+    output = tmp_path / "failed-acceptance"
+    with pytest.raises(AssertionError, match="Clean-machine audit failed") as error:
+        clean.main(["--output", str(output)])
+    assert reason in str(error.value)
+    assert json.loads((output / "check.stdout").read_text())["audit_error"] == reason
+    assert shell.get_runner() is fake_runner

@@ -39,19 +39,16 @@ def recommend(name, *, rule=None, bundle_id="", assertion=False):
 
 
 def foreground_pid():
-    from .system.shell import ReadError, _read
+    from .system.lsappinfo import foreground
 
-    front = _read(["lsappinfo", "front"], timeout=5).strip()
-    if not re.fullmatch(r"ASN:0x[0-9a-fA-F]+-0x[0-9a-fA-F]+:", front):
-        raise ReadError(t("setup.foreground_error", detail=repr(front)))
-    info = _read(["lsappinfo", "info", "-only", "pid,bundleid", front], timeout=5)
-    match = re.search(r"\bpid\s*=\s*(\d+)\b", info)
-    if not match:
-        raise ReadError(t("setup.foreground_error", detail=repr(info)))
-    return match[1]
+    return str(foreground().pid)
 
 
 def recommendations(snapshot):
+    return recommendation_scan(snapshot)["apps"]
+
+
+def recommendation_scan(snapshot, *, allow_foreground_failure=False):
     from .categories import identify
     from .system.apps import app_bid
     from .system.pmset import pmset_assertions, sleep_blocking_assertions
@@ -61,7 +58,16 @@ def recommendations(snapshot):
     if not any("Assertion status system-wide:" in line for line in lines):
         raise ReadError(t("setup.assertions_error"))
     holders = sleep_blocking_assertions(lines)
-    foreground = foreground_pid()
+    from .system.lsappinfo import ForegroundError
+
+    foreground_error = None
+    try:
+        front = foreground_pid()
+    except ForegroundError as exc:
+        if not allow_foreground_failure:
+            raise
+        foreground_error = str(exc)
+        front = None
     rows = []
     for path in snapshot.index.paths:
         # System bundles are never candidates for personalized mutation defaults.
@@ -76,7 +82,9 @@ def recommendations(snapshot):
         )
         rule = identify(name=name, bundle_id=bid)
         recommendation = recommend(name, rule=rule, bundle_id=bid, assertion=assertion)
-        if foreground in pids:
+        if foreground_error:
+            recommendation = dict(work="skip", away="skip", reason="foreground_unknown")
+        elif front in pids:
             recommendation = dict(work="skip", away="skip", reason="foreground")
         rows.append(
             dict(
@@ -89,7 +97,10 @@ def recommendations(snapshot):
                 **recommendation,
             )
         )
-    return sorted(rows, key=lambda row: (row["reason"], row["name"].casefold()))
+    return dict(
+        apps=sorted(rows, key=lambda row: (row["reason"], row["name"].casefold())),
+        foreground_error=foreground_error,
+    )
 
 
 def setup_candidates(rows, processes):

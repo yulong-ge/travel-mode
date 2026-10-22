@@ -126,13 +126,15 @@ def _plist(path, label):
     return str(path)
 
 
-def test_daemon_unload_checkpoint_precedes_interruption(tmp_path, monkeypatch):
+def test_daemon_unload_checkpoint_precedes_interruption(tmp_path, monkeypatch, fake_runner):
     first = _plist(tmp_path / "first.plist", "com.example.first")
     second = _plist(tmp_path / "second.plist", "com.example.second")
     state = _state()
     saved = []
 
     def fake(cmd, timeout=None, interactive=False):
+        if cmd[0] == "lsappinfo":
+            return fake_runner(cmd, timeout, interactive)
         if cmd[-1] == second:
             raise KeyboardInterrupt("simulated interruption")
         return CmdResult("- 0 com.example.first\n- 0 com.example.second\n", "", 0)
@@ -165,11 +167,13 @@ def test_daemon_missing_configured_plist_fails_explicitly(tmp_path, monkeypatch)
         )
 
 
-def test_daemon_unload_failure_is_not_success(tmp_path, monkeypatch):
+def test_daemon_unload_failure_is_not_success(tmp_path, monkeypatch, fake_runner):
     path = _plist(tmp_path / "remote.plist", "com.example.remote")
     set_runner(
         lambda cmd, *args: (
-            CmdResult("- 0 com.example.remote\n", "", 0)
+            fake_runner(cmd, *args)
+            if cmd[0] == "lsappinfo"
+            else CmdResult("- 0 com.example.remote\n", "", 0)
             if cmd[-1] == "list"
             else CmdResult("", "permission denied", 2)
         )

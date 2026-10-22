@@ -359,6 +359,10 @@
                 "items": {
                   "type": "object"
                 }
+              },
+              "safety_reason": {
+                "type": "string",
+                "minLength": 1
               }
             }
           }
@@ -397,12 +401,56 @@
               ]
             }
           }
+        },
+        "app_safety": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "error",
+            "message"
+          ],
+          "properties": {
+            "status": {
+              "const": "blocked"
+            },
+            "error": {
+              "type": "string",
+              "minLength": 1
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
         }
       }
     },
     "audit_error": {
       "type": "string",
       "minLength": 1
+    },
+    "app_safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "error",
+        "message"
+      ],
+      "properties": {
+        "status": {
+          "const": "blocked"
+        },
+        "error": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     }
   },
   "required": [

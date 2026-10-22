@@ -4,6 +4,10 @@ All notable changes follow Keep a Changelog.
 
 ## [Unreleased]
 
+### Fixed
+
+- The app audit no longer fails on Macs whose `lsappinfo` prints quoted keys (seen on macOS 26): both observed layouts are parsed, and if the foreground app cannot be identified, app actions are blocked while the rest of the check still works. The clean-machine CI job reports the real error and collects raw command output from each runner.
+
 ### Changed
 
 - Detection no longer depends on the maintainer's Mac: the hard-coded sleep-source special case and the built-in network/VPN name list are replaced by sourced rules (15 network, VPN, proxy and remote-access products), maintainer-specific app lists and backup-label guesses are removed (old configuration files keep their behavior), and the demo data is neutral.
