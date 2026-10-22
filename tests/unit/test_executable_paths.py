@@ -13,7 +13,7 @@ PATH_WHICH = shutil.which
 @pytest.mark.parametrize(
     ("command", "expected"),
     [
-        (["ioreg", "-rn", "AppleSmartBattery"], ["/usr/sbin/ioreg", "-rn", "AppleSmartBattery"]),
+        (["ioreg", "-a", "-rn", "AppleSmartBattery"], ["/usr/sbin/ioreg", "-a", "-rn", "AppleSmartBattery"]),
         (["sw_vers", "-productVersion"], ["/usr/bin/sw_vers", "-productVersion"]),
         (["sudo", "pmset", "-g"], ["/usr/bin/sudo", "-n", "/usr/bin/pmset", "-g"]),
         (["sudo", "-n", "-l", "pmset", "-g"], ["/usr/bin/sudo", "-n", "-l", "/usr/bin/pmset", "-g"]),
@@ -47,13 +47,13 @@ def test_missing_system_path_never_falls_back_to_path(monkeypatch):
 
     set_language("en")
     with pytest.raises(shell.CommandResolutionError, match="/usr/sbin/ioreg"):
-        shell.resolve_command(["ioreg", "-rn", "AppleSmartBattery"])
-    result = shell.subprocess_runner(["ioreg", "-rn", "AppleSmartBattery"])
+        shell.resolve_command(["ioreg", "-a", "-rn", "AppleSmartBattery"])
+    result = shell.subprocess_runner(["ioreg", "-a", "-rn", "AppleSmartBattery"])
     assert result.rc == 127 and "/usr/sbin/ioreg" in result.stderr
     assert "PATH fallback is disabled" in result.stderr
     shell.set_runner(shell.subprocess_runner)
     with pytest.raises(shell.ReadError, match="/usr/sbin/ioreg"):
-        shell._read(["ioreg", "-rn", "AppleSmartBattery"])
+        shell._read(["ioreg", "-a", "-rn", "AppleSmartBattery"])
 
 
 @pytest.mark.parametrize("tool", shell.THIRD_PARTY_TOOLS)
@@ -133,11 +133,11 @@ def test_timeout_keeps_existing_result_semantics(monkeypatch):
     monkeypatch.setattr(shell, "_is_executable", lambda _: True)
 
     def run(cmd, **kwargs):
-        assert cmd == ["/usr/sbin/ioreg", "-rn", "AppleSmartBattery"]
+        assert cmd == ["/usr/sbin/ioreg", "-a", "-rn", "AppleSmartBattery"]
         raise subprocess.TimeoutExpired(cmd, kwargs["timeout"])
 
     monkeypatch.setattr(shell.subprocess, "run", run)
-    assert shell.subprocess_runner(["ioreg", "-rn", "AppleSmartBattery"], timeout=1).rc == 124
+    assert shell.subprocess_runner(["ioreg", "-a", "-rn", "AppleSmartBattery"], timeout=1).rc == 124
 
 
 def test_optional_paths_are_in_json_and_text_check(monkeypatch, capsys):
@@ -177,8 +177,8 @@ def test_missing_sudo_target_stops_before_sudo_execution(monkeypatch):
 
 def test_fake_and_dry_run_keep_logical_commands(fake_runner, monkeypatch, capsys):
     monkeypatch.setattr(shell, "resolve_command", lambda _: pytest.fail("logical Runner resolved argv"))
-    shell.run_rc(["ioreg", "-rn", "AppleSmartBattery"])
-    assert fake_runner.calls[-1] == ("ioreg", "-rn", "AppleSmartBattery")
+    shell.run_rc(["ioreg", "-a", "-rn", "AppleSmartBattery"])
+    assert fake_runner.calls[-1] == ("ioreg", "-a", "-rn", "AppleSmartBattery")
     shell.DryRunRunner(fake_runner)(["sudo", "pmset", "-b", "lowpowermode", "1"])
     assert "[dry-run] sudo pmset -b lowpowermode 1" in capsys.readouterr().out
 

@@ -1,5 +1,7 @@
 """Synthetic fresh generations for tests of the voltage/current fallback."""
 
+import plistlib
+
 from travel_mode.system import battery
 
 
@@ -32,3 +34,11 @@ def fresh_readings(monkeypatch, value=None):
         return result
 
     monkeypatch.setattr(battery, "read", read)
+
+
+def registry(properties):
+    return plistlib.dumps([properties]).decode("utf-8")
+
+
+def properties(text):
+    return plistlib.loads(text.encode("utf-8"))[0]

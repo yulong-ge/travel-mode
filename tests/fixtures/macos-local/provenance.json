@@ -1,0 +1,45 @@
+{
+  "source": "Local read-only captures",
+  "captured_at": "2026-10-22T06:56:57.466757+00:00",
+  "version": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0.1\nBuildVersion:\t\t26A434\n",
+  "commands": {
+    "ioreg_battery": [
+      "ioreg",
+      "-a",
+      "-rn",
+      "AppleSmartBattery"
+    ],
+    "ioreg_absent": [
+      "ioreg",
+      "-a",
+      "-rn",
+      "TravelModeMissingBatteryProbe"
+    ],
+    "pmset_current": [
+      "pmset",
+      "-g"
+    ],
+    "pmset_custom": [
+      "pmset",
+      "-g",
+      "custom"
+    ],
+    "pmset_cap": [
+      "pmset",
+      "-g",
+      "cap"
+    ]
+  },
+  "transformations": {
+    "ioreg-battery.plist": "Allowlisted measurement fields; capacity/telemetry nested keys allowlisted; all values and plist types unchanged. Serial and hardware identifiers removed.",
+    "pmset-current.stdout": "Removed parenthesized live process annotations; remaining text unchanged."
+  },
+  "files": {
+    "pmset-custom.stdout": "85cb0bcba4cb29aa6fe1de4882b6e4ea69d4a327a3badaea8399b4bdfa0c634f",
+    "pmset-cap.stdout": "6b2f0f2d07b8bf19b50b7198722948b5202cf4450b4bec08fe6155179fb51c2f",
+    "ioreg-battery.plist": "aa212d20baf5d3e7aa4bb45290e1663ff965d14fe5fbe4d3f3fefd6a59f6e00c",
+    "version.stdout": "4ef10a0fc370704ea84699cf3851e51488598c5f1ab35cb572eb6b96278a8e5c",
+    "pmset-current.stdout": "c9238bfe664dabf88a6ebf674eeeabc2fc70c6d3470d371876779448379af66c",
+    "ioreg-absent.plist": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

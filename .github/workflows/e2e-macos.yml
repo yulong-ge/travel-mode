@@ -26,7 +26,14 @@ permissions:
 
 jobs:
   clean-machine-readonly:
-    runs-on: macos-latest
+    name: clean-machine-readonly (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-26, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    env:
+      TRAVEL_MODE_RUNNER_LABEL: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
@@ -43,7 +50,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: new-machine-readonly-${{ github.run_id }}-${{ github.run_attempt }}
+          name: new-machine-readonly-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/new-machine/
           retention-days: 14
           if-no-files-found: error

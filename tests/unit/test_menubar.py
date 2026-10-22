@@ -1,6 +1,7 @@
 """Only temporary plugin folders are writable; no SwiftBar refresh is emitted."""
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -72,10 +73,25 @@ def test_dry_run_preserves_preference_target_and_files(
 ):
     path = plugin_folder / menubar.FILENAME
     path.write_bytes(menubar.payload())
+    # Reads may update atime (the CI failure changed only this field).
+    os.utime(path, ns=(1, path.stat().st_mtime_ns))
     before = path.stat()
     assert cli.main(["menubar", operation, "--dry-run"]) == 0
     assert str(path) in capsys.readouterr().out
-    assert path.read_bytes() == menubar.payload() and path.stat() == before
+    assert path.read_bytes() == menubar.payload()
+    after = path.stat()
+    for key in (
+        "st_mode",
+        "st_ino",
+        "st_dev",
+        "st_nlink",
+        "st_uid",
+        "st_gid",
+        "st_size",
+        "st_mtime_ns",
+        "st_ctime_ns",
+    ):
+        assert getattr(after, key) == getattr(before, key), key
     assert fake_runner.calls == [tuple(menubar.PREFERENCE)]
 
 

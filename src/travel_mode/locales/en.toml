@@ -647,7 +647,7 @@
 "plan.impl.power_saving_actions_complete" = "Power-saving plan ready"
 "plan.impl.power_saving_actions_complete_snapshot_updated" = "Plan ready; temporary recovery record updated; no system changes executed"
 
-"battery.invalid" = "ioreg -rn AppleSmartBattery: {field}: missing or invalid value {value}"
+"battery.invalid" = "ioreg -a -rn AppleSmartBattery: {field}: missing or invalid value {value}"
 "battery.capacity_source" = "Capacity source: {source}."
 "battery.unavailable" = "Not measurable: {reason}"
 "battery.reason.no_battery" = "no battery was found"
@@ -730,7 +730,7 @@
 
 "battery.latest" = "Latest registry power {watts:.2f} W ({source}; cached, not real time). Run power for interval averages."
 "battery.awaiting" = "Registry telemetry has no instantaneous value; run power for interval averages."
-"battery.interval_invalid" = "ioreg -rn AppleSmartBattery: invalid telemetry interval: {reason}"
+"battery.interval_invalid" = "ioreg -a -rn AppleSmartBattery: invalid telemetry interval: {reason}"
 "measurement.window_result" = "Average power {watts:.2f} W ({source}); {intervals} intervals covering {seconds:.1f} s, waited {wait:.1f} s; estimated remaining {hours:.2f} h; macOS estimate: {macos}"
 "measurement.unavailable" = "Not measurable: {reason}; fresh updates {n}/{total}, waited {seconds:.1f} s."
 "measurement.reason.insufficient_samples" = "insufficient fresh telemetry samples"
@@ -1409,3 +1409,8 @@
 "apps.bundle_type" = "CFBundlePackageType is not APPL: {value}"
 "apps.bundle_executable" = "Missing APPL type and an executable CFBundleExecutable in Contents/MacOS"
 "apps.bundle_invalid" = "Skipped application candidate {path}: {reason}"
+
+"health.foreground_source" = "Foreground application source: {source}."
+"setup.copies" = "{name} ({n} copies)"
+"setup.reason_copies_conflict" = "Copies have different recommendations; choose an action."
+"setup.short_copies_conflict" = "Different copies; choose"

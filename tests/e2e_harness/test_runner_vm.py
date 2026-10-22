@@ -149,7 +149,22 @@ def test_macos_workflow_is_separate_bounded_and_keeps_failure_artifacts():
     assert "scripts/e2e_local.py" in raw and "scripts/e2e_ui.py" in raw
     assert "sudo " not in raw and "tccutil" not in raw and "continue-on-error" not in raw
     readonly = workflow["jobs"]["clean-machine-readonly"]
-    assert readonly["runs-on"] == "macos-latest" and readonly["timeout-minutes"] == 10
+    assert readonly["runs-on"] == "${{ matrix.os }}" and readonly["timeout-minutes"] == 10
     assert "check_new_machine.py --output" in readonly["steps"][3]["run"]
     assert readonly["steps"][-1]["if"] == "always()"
     assert readonly["steps"][-1]["with"]["retention-days"] == 14
+
+
+def test_free_macos_matrix_and_os_attributed_readonly_artifacts():
+    ci = yaml.safe_load(Path(".github/workflows/ci.yml").read_text())
+    entries = ci["jobs"]["test"]["strategy"]["matrix"]["include"]
+    labels = {"macos-15", "macos-26", "macos-15-intel"}
+    assert {row["os"] for row in entries} == labels
+    assert {row["python"] for row in entries if row["os"] == "macos-26"} == {"3.10", "3.11", "3.12", "3.13"}
+    readonly = yaml.safe_load(Path(".github/workflows/e2e-macos.yml").read_text())["jobs"][
+        "clean-machine-readonly"
+    ]
+    assert set(readonly["strategy"]["matrix"]["os"]) == labels
+    assert "${{ matrix.os }}" in readonly["steps"][-1]["with"]["name"]
+    collector = next(step for step in readonly["steps"] if "collect_macos_samples.py" in step.get("run", ""))
+    assert collector["if"] == "always()"

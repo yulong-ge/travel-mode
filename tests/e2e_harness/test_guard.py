@@ -164,8 +164,8 @@ def test_readonly_timeout_reaches_backend_and_keeps_diagnostic_trace(sandbox, mo
 
     monkeypatch.setattr(e2e_guard, "subprocess_runner", backend)
     guard.backend = LocalBackend([])
-    result = guard(["ioreg", "-rn", "AppleSmartBattery"], timeout=10)
-    assert result.rc == 124 and calls == [(["ioreg", "-rn", "AppleSmartBattery"], 10, False)]
+    result = guard(["ioreg", "-a", "-rn", "AppleSmartBattery"], timeout=10)
+    assert result.rc == 124 and calls == [(["ioreg", "-a", "-rn", "AppleSmartBattery"], 10, False)]
     assert not guard.tripped and not guard.violations
     trace = guard.trace[-1]
     assert trace["command"] == calls[0][0] and trace["timeout"] == 10
@@ -176,7 +176,7 @@ def test_readonly_timeout_reaches_backend_and_keeps_diagnostic_trace(sandbox, mo
 @pytest.mark.parametrize(
     ("logical", "executed"),
     [
-        (["ioreg", "-rn", "AppleSmartBattery"], ["/usr/sbin/ioreg", "-rn", "AppleSmartBattery"]),
+        (["ioreg", "-a", "-rn", "AppleSmartBattery"], ["/usr/sbin/ioreg", "-a", "-rn", "AppleSmartBattery"]),
         (["pmset", "-g", "custom"], ["/usr/bin/pmset", "-g", "custom"]),
         (
             ["sudo", "-n", "-l", "pmset", "-g", "ps"],

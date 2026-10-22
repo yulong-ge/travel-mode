@@ -30,8 +30,12 @@ def main():
         from .brightness import NativeBrightness
 
         result = NativeBrightness.load().get()
+    elif sys.argv[1:] == ["foreground"]:
+        from .workspace import frontmost_application
+
+        result = frontmost_application()
     else:
-        raise ValueError("expected displays or brightness")
+        raise ValueError("expected displays, brightness or foreground")
     print(json.dumps(result))
 
 

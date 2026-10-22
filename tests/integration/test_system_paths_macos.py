@@ -9,7 +9,9 @@ from travel_mode.system import shell
 
 @pytest.mark.macos
 @pytest.mark.skipif(sys.platform != "darwin", reason="macOS system tools")
-@pytest.mark.parametrize("command", [["sw_vers", "-productVersion"], ["ioreg", "-rn", "AppleSmartBattery"]])
+@pytest.mark.parametrize(
+    "command", [["sw_vers", "-productVersion"], ["ioreg", "-a", "-rn", "AppleSmartBattery"]]
+)
 def test_host_apple_tool_bypasses_same_name_shim(command, tmp_path, monkeypatch):
     shim = tmp_path / command[0]
     shim.write_text("#!/bin/sh\nprintf 'unexpected shim'\nexit 99\n")

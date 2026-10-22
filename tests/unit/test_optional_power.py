@@ -1,10 +1,12 @@
 """Recorded AC-only custom output; -g is SYNTHETIC (trace retained byte count only)."""
 
 import json
+import plistlib
 from pathlib import Path
 
 import pytest
 
+from battery_support import properties, registry
 from travel_mode import snapshots
 from travel_mode.system import pmset
 from travel_mode.system.shell import CmdResult, ReadError
@@ -110,10 +112,10 @@ def test_missing_low_power_field_is_unavailable_without_repair(fake_runner):
     assert result["status"] == "unavailable" and result["actions"] == []
 
 
-def test_recorded_empty_ioreg_is_explicitly_unavailable():
+def test_empty_xml_registry_is_explicitly_unavailable():
     from travel_mode.system.battery import parse
 
-    assert parse((FIXTURES / "ioreg-empty-recorded.txt").read_text()) == {
+    assert parse(plistlib.dumps([]).decode("utf-8")) == {
         "available": False,
         "reason": "no_battery",
     }
@@ -122,8 +124,9 @@ def test_recorded_empty_ioreg_is_explicitly_unavailable():
 def test_absent_optional_ioreg_time_estimate_does_not_block_power():
     from travel_mode.system.battery import parse
 
-    text = (FIXTURES.parent / "battery/discharging.txt").read_text().replace('"TimeRemaining" = 240\n', "")
-    result = parse(text)
+    data = properties((FIXTURES.parent / "battery/discharging.txt").read_text())
+    del data["TimeRemaining"]
+    result = parse(registry(data))
     assert result["available"] and result["watts"] == 12
     assert result["ioreg_minutes"] is None
 

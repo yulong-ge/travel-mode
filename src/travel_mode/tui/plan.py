@@ -120,7 +120,12 @@ def collect(scenario, state):
             app["name"],
             app["defact"],
             reason,
-            dict(kind="app", name=app["name"], path=app["path"]),
+            dict(
+                kind="app",
+                name=app["name"],
+                path=app["path"],
+                **({"by_path": True} if app.get("quit_by_path") else {}),
+            ),
             selected=app["defact"] in {"quit", "freeze"},
             evidence=[app["path"], str(app.get("cpu", ""))],
         )
@@ -159,7 +164,12 @@ def collect(scenario, state):
                 app["name"],
                 "quit",
                 t("redesign.network_reason"),
-                dict(kind="app", name=app["name"], path=app["path"]),
+                dict(
+                    kind="app",
+                    name=app["name"],
+                    path=app["path"],
+                    **({"by_path": True} if app.get("quit_by_path") else {}),
+                ),
                 selected=False,
                 evidence=[str(app)],
             )
@@ -374,7 +384,11 @@ def operation(row, scenario, state, save):
         if row["action"] == "force":
             return ForceQuitApp(path)
         spec = configured_daemon(name)
-        return QuitDaemonApp(spec, state, save) if spec else QuitApp(path, name, fallback=scenario == "away")
+        return (
+            QuitDaemonApp(spec, state, save)
+            if spec
+            else QuitApp(path, name, fallback=scenario == "away", by_path=descriptor.get("by_path", False))
+        )
     if kind == "agent":
         return UnloadAgent(descriptor["path"])
     if kind == "power":

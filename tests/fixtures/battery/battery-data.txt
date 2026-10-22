@@ -1,10 +1,31 @@
-+-o AppleSmartBattery
-{
-  "Voltage" = 12339
-  "InstantAmperage" = 18446744073709550135
-  "Amperage" = 18446744073709550135
-  "TimeRemaining" = 199
-  "ExternalConnected" = No
-  "IsCharging" = No
-  "BatteryData" = {"RemainingCapacity"=4781,"FullChargeCapacity"=4820,"NominalChargeCapacity"=4970,"DesignCapacity"=6075}
-}
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+	<dict>
+		<key>Amperage</key>
+		<integer>18446744073709550135</integer>
+		<key>BatteryData</key>
+		<dict>
+			<key>DesignCapacity</key>
+			<integer>6075</integer>
+			<key>FullChargeCapacity</key>
+			<integer>4820</integer>
+			<key>NominalChargeCapacity</key>
+			<integer>4970</integer>
+			<key>RemainingCapacity</key>
+			<integer>4781</integer>
+		</dict>
+		<key>ExternalConnected</key>
+		<false/>
+		<key>InstantAmperage</key>
+		<integer>18446744073709550135</integer>
+		<key>IsCharging</key>
+		<false/>
+		<key>TimeRemaining</key>
+		<integer>199</integer>
+		<key>Voltage</key>
+		<integer>12339</integer>
+	</dict>
+</array>
+</plist>

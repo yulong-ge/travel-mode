@@ -18,11 +18,17 @@ jobs:
       - run: uv run ruff format --check
 
   test:
+    name: test (${{ matrix.os }}, ${{ matrix.python }})
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest]
-        python: ["3.10", "3.11", "3.12", "3.13"]
+        include:
+          - {os: macos-26, python: "3.10"}
+          - {os: macos-26, python: "3.11"}
+          - {os: macos-26, python: "3.12"}
+          - {os: macos-26, python: "3.13"}
+          - {os: macos-15, python: "3.13"}
+          - {os: macos-15-intel, python: "3.13"}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7

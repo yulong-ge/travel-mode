@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from jsonschema import validate
 
-from battery_support import FakeClock, fresh_readings
+from battery_support import FakeClock, fresh_readings, properties, registry
 from travel_mode import cli, measurement, state
 from travel_mode.config import ConfigError, load_config
 from travel_mode.system import battery
@@ -38,16 +38,17 @@ def test_unmeasurable_has_reason_without_synthetic_numbers(name, reason):
     [
         ("Voltage", "oops"),
         ("IsCharging", "maybe"),
-        ("AppleRawMaxCapacity", "0"),
-        ("InstantAmperage", str(2**64)),
-        ("TimeRemaining", "-1"),
+        ("AppleRawMaxCapacity", 0),
+        ("InstantAmperage", 2**64),
+        ("TimeRemaining", -1),
     ],
 )
 def test_invalid_fields_have_command_and_key_context(field, value):
-    text = (FIXTURES / "discharging.txt").read_text()
-    import re
-
-    text = re.sub(rf'"{field}" = [^\n]+', f'"{field}" = {value}', text)
+    data = properties((FIXTURES / "discharging.txt").read_text())
+    data[field] = 0 if value == 2**64 else value
+    text = registry(data)
+    if value == 2**64:
+        text = text.replace("<integer>0</integer>", f"<integer>{value}</integer>")
     with pytest.raises(battery.BatteryError, match=field):
         battery.parse(text)
 
@@ -60,14 +61,12 @@ def test_missing_fields_and_empty_registry_are_distinct():
 
 
 def test_amperage_alternative_and_unknown_time():
-    text = (
-        (FIXTURES / "discharging.txt")
-        .read_text()
-        .replace("InstantAmperage", "Amperage")
-        .replace('"TimeRemaining" = 240', '"TimeRemaining" = 65535')
-    )
-    assert battery.parse(text)["ioreg_minutes"] is None
-    assert battery.parse(text)["watts"] == 12
+    data = properties((FIXTURES / "discharging.txt").read_text())
+    data["Amperage"] = data.pop("InstantAmperage")
+    data["TimeRemaining"] = 65535
+    reading = battery.parse(registry(data))
+    assert reading["ioreg_minutes"] is None
+    assert reading["watts"] == 12
 
 
 def test_finite_window_requires_three_fresh_updates_and_fake_time(fake_runner, monkeypatch):

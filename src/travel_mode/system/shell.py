@@ -214,7 +214,7 @@ def _dry_run_readonly(cmd: list[str]) -> bool:
         return (
             len(args) == 3
             and args[:2] == ["-m", "travel_mode.system.health_native"]
-            and args[2] in {"displays", "brightness"}
+            and args[2] in {"displays", "brightness", "foreground"}
         )
     if base == "tmutil":
         return args == ["status"]
@@ -237,7 +237,7 @@ def _dry_run_readonly(cmd: list[str]) -> bool:
     if base == "launchctl":
         return args == ["list"] or (len(args) == 2 and args[0] == "print")
     if base == "ioreg":
-        return args == ["-rn", "AppleSmartBattery"]
+        return args == ["-a", "-rn", "AppleSmartBattery"]
     if base == "mdutil":
         return args[:1] == ["-s"]
     if base in {"ps", "pgrep", "top", "mdfind"}:

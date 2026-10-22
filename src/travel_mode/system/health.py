@@ -89,6 +89,7 @@ class Session:
         self.cache = {}
         self.subjects = {}
         self.foreground_error = None
+        self.foreground = None
 
     def read(self, command):
         remaining = min(self.deadline, self.check_deadline) - self.clock()
@@ -327,8 +328,18 @@ def high_cpu(s):
     from .lsappinfo import ForegroundError, foreground
 
     rows = s.processes()
+
+    def read(command):
+        from .shell import ReadError
+
+        try:
+            return s.read(command)
+        except ObservationError as exc:
+            raise ReadError(str(exc)) from exc
+
     try:
-        front = foreground(s.read)
+        front = foreground(read)
+        s.foreground = front.as_dict()
         if not any(r["pid"] == front.pid for r in rows):
             raise ObservationError(f"lsappinfo: foreground PID {front.pid} disappeared from ps snapshot")
     except (ForegroundError, ObservationError) as exc:
@@ -441,6 +452,10 @@ def collect(config=None, *, clock=None):
             row["actions"] = [a for a in row["actions"] if a["kind"] not in {"quit", "freeze"}]
             if row["id"] == "high_cpu":
                 row["safety_reason"] = message
+    if s.foreground:
+        result["limitations"].append(t("health.foreground_source", source=s.foreground["source"]))
+        if s.foreground["fallback_reason"]:
+            result["limitations"].append(s.foreground["fallback_reason"])
     from ..health_view import assertion_context
     from ..state import load_state
 

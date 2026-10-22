@@ -1,12 +1,52 @@
-+-o AppleSmartBattery
-{
-  "Voltage" = 11764
-  "InstantAmperage" = 18446744073709549618
-  "Amperage" = 18446744073709549618
-  "TimeRemaining" = 119
-  "ExternalConnected" = No
-  "IsCharging" = No
-  "UpdateTime" = 1792120888
-  "BatteryData" = {"RemainingCapacity"=3667,"FullChargeCapacity"=4751,"NominalChargeCapacity"=4901,"DesignCapacity"=6075}
-  "PowerTelemetryData" = {"SystemLoad"=24840,"BatteryPower"=18446744073709526776,"AccumulatedSystemLoad"=1332280892,"SystemLoadAccumulatorCount"=124749,"AccumulatedBatteryPower"=86888531,"BatteryPowerAccumulatorCount"=6376,"AccumulatedBatteryDischarge"=18446744073588019530,"BatteryDischargeAccumulatorCount"=9758}
-}
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+	<dict>
+		<key>Amperage</key>
+		<integer>18446744073709549618</integer>
+		<key>BatteryData</key>
+		<dict>
+			<key>DesignCapacity</key>
+			<integer>6075</integer>
+			<key>FullChargeCapacity</key>
+			<integer>4751</integer>
+			<key>NominalChargeCapacity</key>
+			<integer>4901</integer>
+			<key>RemainingCapacity</key>
+			<integer>3667</integer>
+		</dict>
+		<key>ExternalConnected</key>
+		<false/>
+		<key>InstantAmperage</key>
+		<integer>18446744073709549618</integer>
+		<key>IsCharging</key>
+		<false/>
+		<key>PowerTelemetryData</key>
+		<dict>
+			<key>AccumulatedBatteryDischarge</key>
+			<integer>18446744073588019530</integer>
+			<key>AccumulatedBatteryPower</key>
+			<integer>86888531</integer>
+			<key>AccumulatedSystemLoad</key>
+			<integer>1332280892</integer>
+			<key>BatteryDischargeAccumulatorCount</key>
+			<integer>9758</integer>
+			<key>BatteryPower</key>
+			<integer>18446744073709526776</integer>
+			<key>BatteryPowerAccumulatorCount</key>
+			<integer>6376</integer>
+			<key>SystemLoad</key>
+			<integer>24840</integer>
+			<key>SystemLoadAccumulatorCount</key>
+			<integer>124749</integer>
+		</dict>
+		<key>TimeRemaining</key>
+		<integer>119</integer>
+		<key>UpdateTime</key>
+		<integer>1792120888</integer>
+		<key>Voltage</key>
+		<integer>11764</integer>
+	</dict>
+</array>
+</plist>

@@ -129,7 +129,7 @@ def test_threshold_boundary_and_external_power_invalidates_run(battery_sandbox):
     _, guard, machine = battery_sandbox
     assert assert_comparison(guard, comparison(1))["minimum_saving_watts"] == 1
     machine.external = True
-    guard(["ioreg", "-rn", "AppleSmartBattery"])
+    guard(["ioreg", "-a", "-rn", "AppleSmartBattery"])
     with pytest.raises(AssertionError, match="external power"):
         assert_comparison(guard, comparison(10))
 
@@ -219,7 +219,7 @@ def test_battery_cli_round_trip_measures_only_fixture_freeze(battery_sandbox, mo
 def test_battery_plan_contains_read_only_power_commands_and_quick_selection(capsys):
     assert main(["--battery-measure", "--plan"]) == 0
     output = capsys.readouterr().out
-    assert "/usr/bin/pmset -g ps" in output and "ioreg -rn AppleSmartBattery" in output
+    assert "/usr/bin/pmset -g ps" in output and "ioreg -a -rn AppleSmartBattery" in output
     assert "saving >= 1.0 W" in output and "while :; do :; done" in output
     assert "240 s timeout" in output and "up to 48 polls" in output
     assert "sudo -n" not in output and "pmset -b" not in output

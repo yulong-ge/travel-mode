@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from battery_support import FakeClock
+from battery_support import FakeClock, properties, registry
 from travel_mode import measurement, sessions
 from travel_mode.system import battery
 from travel_mode.system.shell import CmdResult
@@ -23,13 +23,14 @@ def test_recorded_nested_charger_cannot_shadow_session_status(fake_runner):
 
 
 def test_multiline_nested_status_and_child_registry_cannot_shadow_battery():
-    text = FIXTURE.read_text().replace(
-        '"ChargerData" = {"IsCharging"=0}',
-        '"ChargerData" = {\n    "IsCharging" = 1,\n    "Voltage" = 1,\n'
-        '    "Nested" = ({"ExternalConnected"=Yes,"RemainingCapacity"=1})\n  }',
-    )
-    text += '\n+-o OtherBattery\n{\n  "IsCharging" = Yes\n  "Voltage" = 1\n}\n'
-    reading = battery.parse(text)
+    data = properties(FIXTURE.read_text())
+    data["ChargerData"] = {
+        "IsCharging": True,
+        "Voltage": 1,
+        "Nested": [{"ExternalConnected": True, "RemainingCapacity": 1}],
+    }
+    data["IORegistryEntryChildren"] = [{"IsCharging": True, "Voltage": 1}]
+    reading = battery.parse(registry(data))
     assert reading["available"] and reading["is_charging"] is False
     assert reading["voltage_mv"] == 12339 and reading["remaining_mah"] == 4781
 
@@ -68,7 +69,15 @@ def test_only_battery_adapter_owns_the_apple_smart_battery_command():
     assert owners == ["system/battery.py"]
 
 
-@pytest.mark.parametrize("value", ['{"IsCharging"=0', '(1,{"IsCharging"=0}', "<0011", '"unclosed'])
+@pytest.mark.parametrize("value", ["<plist><array>", "<plist><dict>", "<plist><data>!", "not a plist"])
 def test_malformed_nested_values_fail_explicitly(value):
     with pytest.raises(battery.BatteryError, match="ioreg structure"):
-        battery.parse('"ChargerData" = ' + value)
+        battery.parse(value)
+
+
+@pytest.mark.parametrize("roots", [{}, [1], [{}, {}]])
+def test_registry_requires_one_selected_dictionary(roots):
+    import plistlib
+
+    with pytest.raises(battery.BatteryError, match="ioreg structure"):
+        battery.parse(plistlib.dumps(roots).decode())

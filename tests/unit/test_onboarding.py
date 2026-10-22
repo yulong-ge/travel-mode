@@ -162,3 +162,105 @@ def test_expected_detection_and_write_wording():
     summary = onboarding.summary(selected, "~/.config/travel-mode/config.toml")
     assert "冻结 15 个、退出 3 个" in summary and "冻结 12 个、退出 6 个" in summary
     assert "暂停后台服务 4 个；网络保持 1 个" in summary
+
+
+@pytest.mark.parametrize("policy", ["adaptive", "legacy"])
+def test_duplicate_names_configure_once_and_target_every_running_copy(tmp_path, fake_runner, policy):
+    from travel_mode import app_policy
+    from travel_mode.profiles import profile_scope
+    from travel_mode.system import apps
+
+    paths = []
+    for number in range(4):
+        path = tmp_path / f"SDK-{number}" / "Python Launcher.app"
+        (path / "Contents").mkdir(parents=True)
+        (path / "Contents/Info.plist").write_bytes(
+            plistlib.dumps({"CFBundlePackageType": "APPL", "CFBundleIdentifier": "org.python.launcher"})
+        )
+        paths.append(str(path))
+    alias = tmp_path / "Python Launcher.app"
+    alias.symlink_to(paths[0])
+    fake_runner.responses[("mdfind",)] = CmdResult("\n".join([*paths, str(alias)]), "", 0)
+    fake_runner.responses[("ps", "-axo", "pid=,%cpu=,command=")] = CmdResult(
+        "\n".join(f"{810 + i} 2 {path}/Contents/MacOS/Launcher" for i, path in enumerate(paths)), "", 0
+    )
+    data = onboarding.scan()
+    assert len(data["apps"]) == 1
+    row = data["apps"][0]
+    assert row["name"] == "Python Launcher" and row["copies"] == 4
+    assert set(row["paths"]) == set(paths)
+    set_language("zh")
+    assert app_policy.display_name(row) == "Python Launcher（4 个副本）"
+    assert "Python Launcher（4 个副本）" in app_policy.row_text(row, onboarding.choices(data))
+    selected = onboarding.choices(data)
+    selected["work"]["Python Launcher"] = "freeze"
+    write_app_choices(selected, completed=True, adaptive=policy == "adaptive")
+    config = load_config()
+    assert config.apps.work == {"Python Launcher": "freeze"}
+    if policy == "legacy":
+        from dataclasses import replace
+
+        config = replace(config, apps=replace(config.apps, policy="legacy"))
+    with profile_scope(config, None, scenario="work"):
+        plan = apps.scan_apps()["running"]
+    # Aliases may observe the same process but may not schedule a second mutation.
+    assert len(plan) == 4
+    assert {str(Path(item["path"]).resolve()) for item in plan} == set(paths)
+    assert all(item["defact"] == "freeze" for item in plan)
+
+
+def test_one_foreground_copy_protects_entire_setup_name(tmp_path, fake_runner):
+    from travel_mode import app_policy
+
+    rows = [
+        dict(
+            name="Worker",
+            path=str(tmp_path / f"copy-{i}/Worker.app"),
+            bundle_id="org.example.worker",
+            reason="foreground" if i == 1 else "freeze",
+            work="skip" if i == 1 else "freeze",
+            away="skip" if i == 1 else "quit",
+            running=True,
+        )
+        for i in range(2)
+    ]
+    assert app_policy.setup_candidates(rows, []) == []
+
+
+def test_copies_quit_by_exact_path_and_journal_each_target(tmp_path, fake_runner):
+    from test_process_safety import ProcessRunner, _row
+
+    from travel_mode.actions.apps import QuitApp
+    from travel_mode.actions.journal import mutation_scope
+    from travel_mode.state import new_state, save_state
+    from travel_mode.system import shell
+
+    paths = [str(tmp_path / f"sdk-{i}/Python Launcher.app") for i in range(4)]
+    rows = {810 + i: _row(path + "/Contents/MacOS/Launcher") for i, path in enumerate(paths)}
+    for path in paths:
+        info = Path(path) / "Contents/Info.plist"
+        info.parent.mkdir(parents=True)
+        info.write_bytes(
+            plistlib.dumps({"CFBundlePackageType": "APPL", "CFBundleIdentifier": "org.python.launcher"})
+        )
+
+    class CopiesRunner(ProcessRunner):
+        def __call__(self, cmd, timeout=None, interactive=False):
+            if cmd[0] == "osascript":
+                self.calls.append(tuple(cmd))
+                target = next(path for path in paths if f'tell application "{path}" to quit' in cmd)
+                checkpoint = __import__("json").loads((tmp_path / "state.json").read_text())
+                assert target in checkpoint["quit_apps"]  # Intent exists before each request.
+                rows[810 + paths.index(target)]["stat"] = "gone"
+                return CmdResult("", "", 0)
+            return super().__call__(cmd, timeout, interactive)
+
+    runner = CopiesRunner(rows)
+    shell.set_runner(runner)
+    snapshot = new_state()
+    with mutation_scope(snapshot, lambda value: save_state(value)):
+        for path in paths:
+            assert QuitApp(path, "Python Launcher", by_path=True).apply(None)
+    assert snapshot["quit_apps"] == paths
+    assert all(row["stat"] == "gone" for row in rows.values())
+    assert len([call for call in runner.calls if call[0] == "osascript"]) == 4

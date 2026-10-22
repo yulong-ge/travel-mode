@@ -1,6 +1,7 @@
 """The maintainer experiment is exercised with a strict fake backend and clock only."""
 
 import json
+import plistlib
 from pathlib import Path
 
 import measure_lowpower as experiment
@@ -55,18 +56,18 @@ class Machine(FakeRunner):
             if self.restore_mismatch and self.writes:
                 raw = raw.replace(" sleep                1", " sleep                2")
             return CmdResult(raw, "", 0)
-        if cmd == ["ioreg", "-rn", "AppleSmartBattery"]:
+        if cmd == ["ioreg", "-a", "-rn", "AppleSmartBattery"]:
             self.calls.append(tuple(cmd))
             self.generation += not self.cached
             self.total += (10 if self.value else 20) * 20_000 * (not self.cached)
             raw = (Path(__file__).parents[1] / "fixtures/battery/discharging.txt").read_text()
-            raw = raw.replace('"UpdateTime" = 1000', f'"UpdateTime" = {1000 + self.generation * 20}')
+            data = plistlib.loads(raw.encode())[0]
+            data["UpdateTime"] = 1000 + self.generation * 20
             if self.telemetry:
-                raw = raw.rsplit("}", 1)[0] + (
-                    '"PowerTelemetryData" = {'
-                    f'"AccumulatedSystemLoad"={self.total},'
-                    f'"SystemLoadAccumulatorCount"={100 + self.generation * 20}' + "}\n}\n"
+                data["PowerTelemetryData"] = dict(
+                    AccumulatedSystemLoad=self.total, SystemLoadAccumulatorCount=100 + self.generation * 20
                 )
+            raw = plistlib.dumps([data]).decode()
             return CmdResult(raw, "", 0)
         return super().__call__(cmd, timeout, interactive)
 
@@ -277,4 +278,4 @@ def test_plan_executes_no_system_commands_or_state_reads(monkeypatch, capsys, la
     output = capsys.readouterr().out
     assert output.count("sudo -n -k /usr/bin/pmset -b lowpowermode") == 4
     assert "300" in output and "30" in output and "0→1→0" in output
-    assert "-a " not in output and "-c " not in output
+    assert "/usr/bin/pmset -a " not in output and "/usr/bin/pmset -c " not in output

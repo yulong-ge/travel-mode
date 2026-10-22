@@ -22,6 +22,8 @@ class ProcessRunner:
 
     def __call__(self, cmd, timeout=None, interactive=False):
         self.calls.append(tuple(cmd))
+        if cmd[-3:] == ["-m", "travel_mode.system.health_native", "foreground"]:
+            return CmdResult('{"status":"unavailable","reason":"fixture has no GUI session"}', "", 0)
         if cmd == ["lsappinfo", "front"]:
             return CmdResult("ASN:0x0-0x1:", "", 0)
         if cmd[:2] == ["lsappinfo", "info"]:

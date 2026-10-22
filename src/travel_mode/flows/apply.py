@@ -308,7 +308,9 @@ def mode_apply(yes=False, aggressive=False, dry_run=False, measure=None, continu
                 # Workers never prompt; successful force quits retain warnings.
                 fallback = not work
                 action = (
-                    QuitDaemonApp(spec, st, state_api.save_state) if spec else QuitApp(path, name, fallback)
+                    QuitDaemonApp(spec, st, state_api.save_state)
+                    if spec
+                    else QuitApp(path, name, fallback, by_path=app.get("quit_by_path", False))
                 )
             elif act == "freeze":
                 from ..failures import probe

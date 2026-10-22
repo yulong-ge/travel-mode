@@ -1,10 +1,22 @@
-+-o AppleSmartBattery
-{
-  "Voltage" = 12000
-  "InstantAmperage" = 1000
-  "AppleRawCurrentCapacity" = 4000
-  "AppleRawMaxCapacity" = 5000
-  "ExternalConnected" = Yes
-  "IsCharging" = Yes
-  "TimeRemaining" = 240
-}
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+	<dict>
+		<key>AppleRawCurrentCapacity</key>
+		<integer>4000</integer>
+		<key>AppleRawMaxCapacity</key>
+		<integer>5000</integer>
+		<key>ExternalConnected</key>
+		<true/>
+		<key>InstantAmperage</key>
+		<integer>1000</integer>
+		<key>IsCharging</key>
+		<true/>
+		<key>TimeRemaining</key>
+		<integer>240</integer>
+		<key>Voltage</key>
+		<integer>12000</integer>
+	</dict>
+</array>
+</plist>

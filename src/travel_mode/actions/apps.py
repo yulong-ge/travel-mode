@@ -18,10 +18,15 @@ class QuitApp(Action):
     path: str
     name: str
     fallback: object = False
+    by_path: bool = False
     description = "impl.quit_2"
 
     def apply(self, ctx):
-        ok = apps.grace_quit(self.path, self.name)
+        ok = (
+            apps.grace_quit(self.path, self.name, by_path=True)
+            if self.by_path
+            else apps.grace_quit(self.path, self.name)
+        )
         if ok and journal.active_state() is not None:
             journal.record_change("quit_apps", self.path)
         if not ok and (self.fallback() if callable(self.fallback) else self.fallback):

@@ -15,6 +15,7 @@
     ],
     [
       "ioreg",
+      "-a",
       "-rn",
       "AppleSmartBattery"
     ],

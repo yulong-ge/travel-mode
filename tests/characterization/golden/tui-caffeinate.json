@@ -2,6 +2,7 @@
   "commands": [
     [
       "ioreg",
+      "-a",
       "-rn",
       "AppleSmartBattery"
     ],

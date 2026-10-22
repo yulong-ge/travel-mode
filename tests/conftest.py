@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import plistlib
 import shutil
 import subprocess
 import sys
@@ -51,13 +52,24 @@ def _readonly_responses() -> dict[tuple[str, ...], CmdResult]:
             "900000 1 0 S 0.0 Thu Oct 15 12:00:00 2026 /System/Library/CoreServices/loginwindow", "", 0
         ),
         (sys.executable, "-m", "travel_mode.system.health_native", "displays"): CmdResult("[]", "", 0),
+        (sys.executable, "-m", "travel_mode.system.health_native", "foreground"): CmdResult(
+            '{"status":"unavailable","source":"NSWorkspace","reason":"fixture has no GUI session"}', "", 0
+        ),
         (sys.executable, "-m", "travel_mode.system.health_native", "brightness"): CmdResult("0.5", "", 0),
         ("tmutil", "status"): CmdResult("Backup session status:\n{ Running = 0; }", "", 0),
         ("lsappinfo", "front"): CmdResult("ASN:0x0-0x1:", "", 0),
         ("lsappinfo", "info"): CmdResult('bundleID="org.demo.front"\npid = 900000', "", 0),
-        ("ioreg", "-rn", "AppleSmartBattery"): CmdResult(
-            '"ExternalConnected" = Yes\n"IsCharging" = No\n"Voltage" = 12000\n'
-            '"AppleRawCurrentCapacity" = 4000\n',
+        ("ioreg", "-a", "-rn", "AppleSmartBattery"): CmdResult(
+            plistlib.dumps(
+                [
+                    {
+                        "AppleRawCurrentCapacity": 4000,
+                        "ExternalConnected": True,
+                        "IsCharging": False,
+                        "Voltage": 12000,
+                    }
+                ]
+            ).decode("utf-8"),
             "",
             0,
         ),
@@ -95,7 +107,7 @@ class ReadOnlyHostRunner:
         allowed = (
             key[:2] == ("pmset", "-g")
             or key == ("launchctl", "list")
-            or key == ("ioreg", "-rn", "AppleSmartBattery")
+            or key == ("ioreg", "-a", "-rn", "AppleSmartBattery")
             or key[:2] == ("mdutil", "-s")
             or key[:2] == ("brightness", "-l")
             or (key and key[0] in {"ps", "pgrep", "top", "mdfind"})

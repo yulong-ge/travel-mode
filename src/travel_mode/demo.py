@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import plistlib
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -35,6 +36,12 @@ def _configure_demo(directory=None) -> None:
             cmd = tuple(command)
             if cmd == ("sysctl", "-n", "kern.sleeptime", "kern.waketime"):
                 return CmdResult("{ sec = 0, usec = 0 }\n{ sec = 0, usec = 0 }\n", "", 0)
+            if list(command) == native_command("foreground"):
+                return CmdResult(
+                    '{"status":"unavailable","source":"NSWorkspace","reason":"fixture has no GUI session"}',
+                    "",
+                    0,
+                )
             if list(command) == native_command("displays"):
                 return CmdResult('[{"id": 99, "builtin": false}]', "", 0)
             if list(command) == native_command("brightness"):
@@ -56,11 +63,21 @@ def _configure_demo(directory=None) -> None:
                 return CmdResult("ASN:0x0-0x1:", "", 0)
             if cmd[:2] == ("lsappinfo", "info"):
                 return CmdResult('pid = 900000\nbundleID="org.demo.editor"', "", 0)
-            if cmd == ("ioreg", "-rn", "AppleSmartBattery"):
+            if cmd == ("ioreg", "-a", "-rn", "AppleSmartBattery"):
                 return CmdResult(
-                    '"ExternalConnected" = No\n"IsCharging" = No\n"Voltage" = 12000\n'
-                    '"InstantAmperage" = 18446744073709550616\n"AppleRawCurrentCapacity" = 4000\n'
-                    '"AppleRawMaxCapacity" = 5000\n"TimeRemaining" = 240\n',
+                    plistlib.dumps(
+                        [
+                            {
+                                "AppleRawCurrentCapacity": 4000,
+                                "AppleRawMaxCapacity": 5000,
+                                "ExternalConnected": False,
+                                "InstantAmperage": 18446744073709550616,
+                                "IsCharging": False,
+                                "TimeRemaining": 240,
+                                "Voltage": 12000,
+                            }
+                        ]
+                    ).decode("utf-8"),
                     "",
                     0,
                 )

@@ -50,6 +50,12 @@
       "pid=,%cpu=,command="
     ],
     [
+      "<PYTHON>",
+      "-m",
+      "travel_mode.system.health_native",
+      "foreground"
+    ],
+    [
       "lsappinfo",
       "front"
     ],

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import re
+import plistlib
+from xml.parsers.expat import ExpatError
 
 from ..i18n import t
 from .shell import _read
 
-COMMAND = ["ioreg", "-rn", "AppleSmartBattery"]
+COMMAND = ["ioreg", "-a", "-rn", "AppleSmartBattery"]
 
 
 class BatteryError(ValueError):
@@ -24,110 +25,17 @@ def unavailable(reason):
     return {"available": False, "reason": reason}
 
 
-class _RegistryParser:
-    """Parse ioreg dictionaries/arrays without flattening nested properties."""
-
-    def __init__(self, text):
-        self.text, self.pos = text, 0
-
-    def space(self):
-        while self.pos < len(self.text) and self.text[self.pos].isspace():
-            self.pos += 1
-
-    def quoted(self):
-        start = self.pos
-        self.pos += 1
-        while self.pos < len(self.text):
-            char = self.text[self.pos]
-            self.pos += 1
-            if char == "\\":
-                self.pos += 1
-            elif char == '"':
-                return self.text[start : self.pos]
-        self.invalid("unterminated string")
-
-    def invalid(self, reason):
-        _invalid("ioreg structure", f"{reason} at offset {self.pos}")
-
-    def pairs(self, end=None):
-        result = {}
-        while True:
-            self.space()
-            if end is not None and self.text[self.pos : self.pos + 1] == end:
-                self.pos += 1
-                return result
-            if self.pos == len(self.text):
-                if end is not None:
-                    self.invalid("unclosed dictionary")
-                return result
-            if self.text[self.pos] != '"':
-                self.invalid("expected property name")
-            key = self.quoted()[1:-1]
-            self.space()
-            if self.text[self.pos : self.pos + 1] != "=":
-                self.invalid("expected =")
-            self.pos += 1
-            if key in result:
-                self.invalid("duplicate property " + key)
-            result[key] = self.value()
-            self.space()
-            if self.text[self.pos : self.pos + 1] == ",":
-                self.pos += 1
-
-    def value(self):
-        self.space()
-        start = self.pos
-        if start == len(self.text):
-            self.invalid("missing value")
-        char = self.text[self.pos]
-        if char == '"':
-            return self.quoted()
-        if char == "{":
-            self.pos += 1
-            return self.pairs("}")
-        if char == "(":
-            self.pos += 1
-            result = []
-            while True:
-                self.space()
-                if self.text[self.pos : self.pos + 1] == ")":
-                    self.pos += 1
-                    return result
-                if self.pos == len(self.text):
-                    self.invalid("unclosed array")
-                result.append(self.value())
-                self.space()
-                if self.text[self.pos : self.pos + 1] == ",":
-                    self.pos += 1
-        if char == "<":
-            end = self.text.find(">", self.pos + 1)
-            if end < 0:
-                self.invalid("unclosed data")
-            self.pos = end + 1
-            return self.text[start : self.pos]
-        while self.pos < len(self.text):
-            char = self.text[self.pos]
-            if char.isspace() or char in ",{}()":
-                break
-            self.pos += 1
-        if self.pos == start:
-            self.invalid("invalid value")
-        return self.text[start : self.pos]
-
-
 def fields(text):
-    # ioreg's tree decoration is outside values. The selected node's first
-    # dictionary ends before any child/sibling node; only its direct keys count.
-    lines = [line.lstrip(" |") for line in text.strip().splitlines()]
-    if lines and lines[0].startswith("+-o "):
-        if not re.match(r"\+-o AppleSmartBattery(?:\s|$)", lines[0]):
-            _invalid("ioreg node", lines[0])
-        lines = lines[1:]
-    parser = _RegistryParser("\n".join(lines).strip())
-    if parser.text.startswith("{"):
-        return parser.value()
-    # Headerless property lists are also accepted by this same grammar.
-    return parser.pairs()
+    # ioreg(8): -a archives the selected registry as an XML property list.
+    # https://github.com/apple-oss-distributions/IOKitTools/blob/main/ioreg.tproj/ioreg.8
+    # Keep the selected node's direct properties; child nodes never shadow it.
+    try:
+        roots = plistlib.loads(text.encode("utf-8"))
+    except (plistlib.InvalidFileException, ValueError, OverflowError, ExpatError) as exc:
+        raise BatteryError(t("battery.invalid", field="ioreg structure", value=repr(text))) from exc
+    if not isinstance(roots, list) or len(roots) > 1 or any(not isinstance(row, dict) for row in roots):
+        _invalid("ioreg structure", roots)
+    return roots[0] if roots else None
 
 
 def _invalid(key, value):
@@ -135,7 +43,7 @@ def _invalid(key, value):
 
 
 def _integer(key, value, *, signed=False):
-    if not isinstance(value, str) or not re.fullmatch(r"-?\d+", value):
+    if type(value) is not int:
         _invalid(key, value)
     number = int(value)
     if signed:
@@ -304,15 +212,18 @@ def capacity(properties, *, include_maximum=True):
 
 def parse(text: str, *, endpoint=False) -> dict:
     """Normalize one node; endpoints need status/capacity even on external power."""
+    # On macOS, an unmatched -a selection returns empty stdout (recorded fixture).
     if not text.strip():
         return unavailable("no_battery")
     properties = fields(text)
+    if properties is None:
+        return unavailable("no_battery")
 
     def boolean(key):
         value = properties.get(key)
-        if value not in ("Yes", "No"):
+        if type(value) is not bool:
             _invalid(key, value)
-        return value == "Yes"
+        return value
 
     external, charging = boolean("ExternalConnected"), boolean("IsCharging")
     # Charging systems may omit raw capacities. They cannot measure system drain.

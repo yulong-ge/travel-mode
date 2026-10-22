@@ -177,12 +177,12 @@ def test_endpoint_observation_preserves_raw_capacity_on_external_power(fake_runn
     assert row["external"] is True and row["charging"] is False
     assert row["percent"] == 87 and row["remaining_mah"] == 4000 and row["voltage_mv"] == 12000
     assert row["errors"] == []
-    assert fake_runner.calls == [("ioreg", "-rn", "AppleSmartBattery"), ("pmset", "-g", "batt")]
+    assert fake_runner.calls == [("ioreg", "-a", "-rn", "AppleSmartBattery"), ("pmset", "-g", "batt")]
 
 
 @pytest.mark.parametrize("output", ["", '"ExternalConnected" = Maybe\n"Voltage" = 0\n'])
 def test_missing_or_malformed_endpoint_is_explicit_without_synthetic_capacity(output, fake_runner):
-    fake_runner.responses[("ioreg", "-rn", "AppleSmartBattery")] = CmdResult(output, "", 0)
+    fake_runner.responses[("ioreg", "-a", "-rn", "AppleSmartBattery")] = CmdResult(output, "", 0)
     fake_runner.responses[("pmset", "-g", "batt")] = CmdResult("", "read denied", 1)
     row = sessions.observe()
     assert row["percent"] is row["remaining_mah"] is row["voltage_mv"] is None

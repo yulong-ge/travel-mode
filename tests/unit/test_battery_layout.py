@@ -7,6 +7,7 @@ import pytest
 from jsonschema import validate
 from test_battery import FakeClock, fresh_readings
 
+from battery_support import properties, registry
 from travel_mode import cli, measurement, sessions
 from travel_mode.system import battery
 from travel_mode.system.shell import CmdResult, ReadError
@@ -27,39 +28,42 @@ def test_recorded_battery_data_capacity_and_unsigned_current():
 
 
 def test_top_level_capacity_layout_takes_precedence():
-    text = (
-        FIXTURE.read_text().rsplit("}", 1)[0]
-        + '\n"AppleRawCurrentCapacity" = 4000\n"AppleRawMaxCapacity" = 5000\n}\n'
-    )
-    reading = battery.parse(text)
+    data = properties(FIXTURE.read_text())
+    data.update(AppleRawCurrentCapacity=4000, AppleRawMaxCapacity=5000)
+    reading = battery.parse(registry(data))
     assert reading["capacity_source"] == "AppleRaw"
     assert reading["remaining_mah"] == 4000
     assert reading["maximum_mah"] == 5000
 
 
 @pytest.mark.parametrize(
-    "change,key",
+    "case,key",
     [
-        (lambda s: s.replace('"RemainingCapacity"=4781,', ""), "BatteryData.RemainingCapacity"),
-        (
-            lambda s: s.replace('"FullChargeCapacity"=4820', '"FullChargeCapacity"=0'),
-            "BatteryData.FullChargeCapacity",
-        ),
-        (
-            lambda s: s.replace('"RemainingCapacity"=4781', '"RemainingCapacity"="invalid"'),
-            "BatteryData.RemainingCapacity",
-        ),
-        (lambda s: s.rsplit("}", 1)[0] + '\n"AppleRawCurrentCapacity" = 4000\n}\n', "AppleRawMaxCapacity"),
-        (lambda s: s.replace('"BatteryData"', '"OtherData"'), "capacity"),
-        (
-            lambda s: s.replace('"RemainingCapacity"=4781', '"Nested"={"RemainingCapacity"=4781}'),
-            "BatteryData.RemainingCapacity",
-        ),
+        ("missing", "BatteryData.RemainingCapacity"),
+        ("zero", "BatteryData.FullChargeCapacity"),
+        ("invalid", "BatteryData.RemainingCapacity"),
+        ("partial", "AppleRawMaxCapacity"),
+        ("absent", "capacity"),
+        ("nested", "BatteryData.RemainingCapacity"),
     ],
 )
-def test_invalid_selected_schema_does_not_substitute_other_capacity(change, key):
+def test_invalid_selected_schema_does_not_substitute_other_capacity(case, key):
+    data = properties(FIXTURE.read_text())
+    capacity = data["BatteryData"]
+    if case == "missing":
+        del capacity["RemainingCapacity"]
+    elif case == "zero":
+        capacity["FullChargeCapacity"] = 0
+    elif case == "invalid":
+        capacity["RemainingCapacity"] = "invalid"
+    elif case == "partial":
+        data["AppleRawCurrentCapacity"] = 4000
+    elif case == "absent":
+        data["OtherData"] = data.pop("BatteryData")
+    elif case == "nested":
+        capacity["Nested"] = {"RemainingCapacity": capacity.pop("RemainingCapacity")}
     with pytest.raises(battery.BatteryError, match=key):
-        battery.parse(change(FIXTURE.read_text()))
+        battery.parse(registry(data))
 
 
 def test_measurement_and_session_use_recorded_capacity(fake_runner, monkeypatch):

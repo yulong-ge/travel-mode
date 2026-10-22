@@ -185,7 +185,7 @@ spotlight_cpu_threshold = 20   # percent
 
 ## Power measurement
 
-`travel-mode power` reads `ioreg -rn AppleSmartBattery` every 5 seconds until it has seen two fresh
+`travel-mode power` reads `ioreg -a -rn AppleSmartBattery` (structured plist output) every 5 seconds until it has seen two fresh
 telemetry updates (one complete interval) or 180 seconds have passed. On the tested MacBook Pro
 (M1 Pro, macOS 27) the registry changed every 20–60 seconds and identical readings in between were
 cached data, so readings that have not changed are never counted as new samples. Too few updates
@@ -424,10 +424,12 @@ Pressing `L` in the TUI saves `options.language`, keeping comments. JSON schemas
 
 ## Foreground app protection
 
-The frontmost app and its helpers are never quit or frozen. The foreground app is read with
-`lsappinfo`, whose output is not a documented format; two layouts observed on real machines are
-parsed (`pid = 41918` with `bundleID=...`, and `"pid"=358` with `"CFBundleIdentifier"=...`), each
-from a recorded sample. If the foreground app cannot be identified, the check still reports
+The frontmost app and its helpers are never quit or frozen. The foreground app is read through
+the documented AppKit API `NSWorkspace.frontmostApplication` (process ID, bundle ID and bundle
+URL), called from a short-lived child process with a 2-second limit. If that returns nothing or
+fails, `lsappinfo` is used as a fallback; its output is not a documented format, so only the two
+layouts observed on real machines are parsed (`pid = 41918` with `bundleID=...`, and `"pid"=358`
+with `"CFBundleIdentifier"=...`). `check --json` reports which source was used. If the foreground app cannot be identified, the check still reports
 everything else but marks app actions as blocked (`app_safety: "blocked"` in JSON, "cannot check"
 in the health list), and no app is quit, frozen or force-quit until a later check succeeds. The
 identity is read again right before app actions run, so an older plan cannot bypass this.

@@ -34,6 +34,7 @@
     ],
     [
       "ioreg",
+      "-a",
       "-rn",
       "AppleSmartBattery"
     ],
@@ -50,6 +51,12 @@
       "ps",
       "-axo",
       "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "<PYTHON>",
+      "-m",
+      "travel_mode.system.health_native",
+      "foreground"
     ],
     [
       "lsappinfo",
@@ -88,6 +95,12 @@
       "ps",
       "-axo",
       "pid=,ppid=,stat=,lstart=,comm="
+    ],
+    [
+      "<PYTHON>",
+      "-m",
+      "travel_mode.system.health_native",
+      "foreground"
     ],
     [
       "lsappinfo",

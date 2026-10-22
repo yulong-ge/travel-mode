@@ -53,7 +53,7 @@ class LowPowerGuard:
             ["pmset", "-g", "custom"],
             ["pmset", "-g", "ps"],
             ["pmset", "-g", "batt"],
-            ["ioreg", "-rn", "AppleSmartBattery"],
+            ["ioreg", "-a", "-rn", "AppleSmartBattery"],
             CPU_COMMAND,
             native_command("brightness"),
             *(write_command(value) for value in (0, 1)),
@@ -243,7 +243,7 @@ def print_plan():
         print(t("lowpower.plan_stage"))
         print(shlex.join(native_command("brightness")))
         print(shlex.join(CPU_COMMAND))
-        print("ioreg -rn AppleSmartBattery")
+        print("ioreg -a -rn AppleSmartBattery")
         print("pmset -g batt")
     print(t("lowpower.plan_restore"))
     print("sudo -n -k /usr/bin/pmset -b lowpowermode <original 0|1>")

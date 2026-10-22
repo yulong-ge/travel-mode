@@ -58,11 +58,13 @@ def recommendation_scan(snapshot, *, allow_foreground_failure=False):
     if not any("Assertion status system-wide:" in line for line in lines):
         raise ReadError(t("setup.assertions_error"))
     holders = sleep_blocking_assertions(lines)
-    from .system.lsappinfo import ForegroundError
+    from .system.lsappinfo import ForegroundError, foreground
 
     foreground_error = None
+    identity = None
     try:
-        front = foreground_pid()
+        identity = foreground()
+        front = str(identity.pid)
     except ForegroundError as exc:
         if not allow_foreground_failure:
             raise
@@ -100,6 +102,7 @@ def recommendation_scan(snapshot, *, allow_foreground_failure=False):
     return dict(
         apps=sorted(rows, key=lambda row: (row["reason"], row["name"].casefold())),
         foreground_error=foreground_error,
+        foreground=identity.as_dict() if identity else None,
     )
 
 
@@ -108,16 +111,34 @@ def setup_candidates(rows, processes):
     from .system.process_control import _prefixes, protected_app_identity, protected_process_ids
 
     protected = protected_process_ids(processes)
-    return [
-        row
-        for row in rows
-        if row["reason"] != "foreground"
-        and not protected_app_identity(row["path"], row.get("bundle_id", ""))
-        and not any(
-            process.pid in protected and process.command.startswith(_prefixes(row["path"], True))
-            for process in processes
-        )
-    ]
+    groups = {}
+    for row in rows:
+        groups.setdefault(row["name"], []).append(row)
+    result = []
+    for copies in groups.values():
+        if any(
+            row["reason"] == "foreground"
+            or protected_app_identity(row["path"], row.get("bundle_id", ""))
+            or any(
+                process.pid in protected and process.command.startswith(_prefixes(row["path"], True))
+                for process in processes
+            )
+            for row in copies
+        ):
+            continue
+        # A symlink and its destination are one physical copy. Keep each real bundle.
+        paths = tuple(dict.fromkeys(str(Path(row["path"]).resolve()) for row in copies))
+        first = dict(copies[0], paths=paths, copies=len(paths))
+        if "running" in first:
+            first["running"] = any(row["running"] for row in copies)
+        if len({(row["work"], row["away"], row["reason"]) for row in copies}) > 1:
+            first.update(work="ask", away="ask", reason="copies_conflict")
+        result.append(first)
+    return result
+
+
+def display_name(row):
+    return t("setup.copies", name=row["name"], n=row["copies"]) if row.get("copies", 1) > 1 else row["name"]
 
 
 def discover():
@@ -155,7 +176,7 @@ def explanation(row):
 
 
 def row_text(row, selected):
-    name = row["name"]
+    name = display_name(row)
     name += " " * max(0, 18 - cell_len(name))
     return t(
         "setup.row",

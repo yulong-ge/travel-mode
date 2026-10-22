@@ -242,9 +242,9 @@ class SetupScreen(ModalScreen):
     def column_widths(self):
         # Reserve body padding and its scrollbar even when the list fits on screen.
         width = max(0, self.size.width - 4)
-        names = [row["name"] for row in self.rows]
+        names = [app_policy.display_name(row) for row in self.rows]
         names.extend(row["label"] for row in (self.data or {}).get("services", []))
-        name_width = min(24, max([18, *(cell_len(name) for name in names)]))
+        name_width = min(36, max([18, *(cell_len(name) for name in names)]))
         work_width = cell_len(t("scenario.work"))
         away_width = cell_len(t("scenario.away"))
         return width, name_width, work_width, away_width
@@ -274,7 +274,7 @@ class SetupScreen(ModalScreen):
             if row.get("configured"):
                 reason = t("onboarding.your_setting", reason=reason)
         line, _ = self.table_line(
-            row["name"],
+            app_policy.display_name(row),
             t("action." + self.selected["work"][row["name"]]),
             t("action." + self.selected["away"][row["name"]]),
             reason,

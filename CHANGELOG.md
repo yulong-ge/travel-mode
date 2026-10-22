@@ -6,6 +6,7 @@ All notable changes follow Keep a Changelog.
 
 ### Fixed
 
+- The foreground app is read through the documented `NSWorkspace` API, with `lsappinfo` only as a fallback; battery data is read from `ioreg -a` plist output instead of text. Apps installed in several copies (for example several Python versions) appear once in setup with a copy count, and actions apply to every copy.
 - Apps are recognized by their bundle structure (`Contents/Info.plist`, type `APPL` or a declared executable), so folders that only end in `.app` (for example a PowerShell module `Az.App`) are skipped; one odd entry no longer aborts setup, check or suggest, and errors go to stderr. Parsers are tested against raw command output recorded on a clean macOS 26 runner.
 - The app audit no longer fails on Macs whose `lsappinfo` prints quoted keys (seen on macOS 26): both observed layouts are parsed, and if the foreground app cannot be identified, app actions are blocked while the rest of the check still works. The clean-machine CI job reports the real error and collects raw command output from each runner.
 
@@ -16,6 +17,7 @@ All notable changes follow Keep a Changelog.
 
 ### Added
 
+- CI covers macOS 15 (arm64 and Intel) as well as macOS 26, and the clean-machine job runs on each of them.
 - A read-only clean-machine job on a GitHub macOS runner that runs check, setup preview and suggest and rejects any maintainer-specific term in the output.
 
 ## [1.2.0] - 2026-10-21

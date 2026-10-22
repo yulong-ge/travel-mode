@@ -7,6 +7,7 @@ import pytest
 from jsonschema import validate
 from test_battery import FakeClock
 
+from battery_support import properties, registry
 from travel_mode import measurement, sessions, state
 from travel_mode.system import battery
 from travel_mode.system.shell import CmdResult
@@ -17,21 +18,17 @@ FIXTURES = Path(__file__).parents[1] / "fixtures/battery"
 def row(step, *, watts=20, telemetry=True, count=None, total=None):
     count = 100 + step * 20 if count is None else count
     total = 1_000_000 + step * 20 * watts * 1000 if total is None else total
-    text = (
-        (FIXTURES / "discharging.txt")
-        .read_text()
-        .replace('"UpdateTime" = 1000', f'"UpdateTime" = {1000 + step * 20}')
-    )
-    text = text.rsplit("}", 1)[0]
+    data = properties((FIXTURES / "discharging.txt").read_text())
+    data["UpdateTime"] = 1000 + step * 20
     if telemetry:
-        text += (
-            '"PowerTelemetryData" = {'
-            f'"AccumulatedSystemLoad"={total},"SystemLoadAccumulatorCount"={count},'
-            f'"SystemLoad"={watts * 1000},'
-            f'"AccumulatedBatteryDischarge"={2**64 - total},'
-            f'"BatteryDischargeAccumulatorCount"={count}' + "}\n"
+        data["PowerTelemetryData"] = dict(
+            AccumulatedSystemLoad=total,
+            SystemLoadAccumulatorCount=count,
+            SystemLoad=watts * 1000,
+            AccumulatedBatteryDischarge=2**64 - total,
+            BatteryDischargeAccumulatorCount=count,
         )
-    return battery.parse(text + "}\n")
+    return battery.parse(registry(data))
 
 
 def sequence(monkeypatch, rows):
@@ -134,9 +131,10 @@ def test_counter_wrap_and_fallback_timestamp_reset_are_explicit(monkeypatch):
 
 
 def test_partial_telemetry_is_an_error_not_a_voltage_fallback():
-    text = (FIXTURES / "telemetry-2.txt").read_text().replace('"SystemLoadAccumulatorCount"=124749,', "")
+    data = properties((FIXTURES / "telemetry-2.txt").read_text())
+    del data["PowerTelemetryData"]["SystemLoadAccumulatorCount"]
     with pytest.raises(battery.BatteryError, match=r"PowerTelemetryData\.SystemLoadAccumulatorCount"):
-        battery.parse(text)
+        battery.parse(registry(data))
 
 
 def test_missing_freshness_marker_cannot_produce_measurement(monkeypatch):

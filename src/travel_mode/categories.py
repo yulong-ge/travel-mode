@@ -179,7 +179,11 @@ def pause_categories(categories, app_rows, service_rows, execute, save, state):
         )
         if action not in {"quit", "freeze"}:
             continue
-        operation = FreezeApp(row["path"]) if action == "freeze" else QuitApp(row["path"], row["name"])
+        operation = (
+            FreezeApp(row["path"])
+            if action == "freeze"
+            else QuitApp(row["path"], row["name"], by_path=row.get("quit_by_path", False))
+        )
         if not execute(operation):
             continue
         save()

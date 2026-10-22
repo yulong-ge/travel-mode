@@ -107,9 +107,13 @@ def _protected(path, rows):
     from .lsappinfo import foreground
 
     front = foreground()
-    if any(
-        process.pid == front.pid and process.command.startswith(_prefixes(path, True)) for process in rows
-    ) or (front.bundle_id is not None and bundle_id == front.bundle_id):
+    if (
+        any(
+            process.pid == front.pid and process.command.startswith(_prefixes(path, True)) for process in rows
+        )
+        or (front.bundle_id is not None and bundle_id == front.bundle_id)
+        or (front.bundle_path is not None and resolved == Path(front.bundle_path).resolve())
+    ):
         raise PermissionError(t("setup.foreground_protected", path=path))
     protected = protected_process_ids(rows)
     prefixes = _prefixes(path, whole_bundle=True)

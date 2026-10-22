@@ -14,7 +14,12 @@ uv run pytest tests/unit/test_config.py::test_name   # one test
 uv build && uv run python scripts/check_dist.py      # package contents
 ```
 
-CI runs the suite on Python 3.10–3.13 on macOS.
+CI runs the suite on Python 3.10–3.13 on macOS 26, and on Python 3.13 on macOS 15 (arm64) and
+macOS 15 Intel. A read-only clean-machine job runs `check`, a setup preview and `suggest` on each
+of these and stores the raw output of the macOS commands the tool parses; use those files (with
+their provenance) as fixtures when a parser needs a new format, rather than guessing formats.
+Prefer documented APIs and structured output (`ioreg -a`, `system_profiler -json`) over parsing
+text.
 `uv run --python 3.10 pytest` catches syntax or library features newer than 3.10.
 `uv run pre-commit install` adds local hooks. Use Conventional Commits, and describe how you
 validated the change (and what hardware it was not tested on) in the pull request.

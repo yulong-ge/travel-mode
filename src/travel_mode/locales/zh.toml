@@ -647,7 +647,7 @@
 "plan.impl.power_saving_actions_complete" = "省电计划已生成"
 "plan.impl.power_saving_actions_complete_snapshot_updated" = "计划已生成，临时恢复记录已更新；未执行系统修改"
 
-"battery.invalid" = "ioreg -rn AppleSmartBattery：{field}：字段缺失或值无效 {value}"
+"battery.invalid" = "ioreg -a -rn AppleSmartBattery：{field}：字段缺失或值无效 {value}"
 "battery.capacity_source" = "容量来源：{source}。"
 "battery.unavailable" = "不可测量：{reason}"
 "battery.reason.no_battery" = "未发现电池"
@@ -730,7 +730,7 @@
 
 "battery.latest" = "最近一次注册表功率 {watts:.2f} W（{source}；缓存值，非实时读数）。运行 power 测量区间均值。"
 "battery.awaiting" = "注册表遥测未提供瞬时值；运行 power 测量区间均值。"
-"battery.interval_invalid" = "ioreg -rn AppleSmartBattery：遥测区间无效：{reason}"
+"battery.interval_invalid" = "ioreg -a -rn AppleSmartBattery：遥测区间无效：{reason}"
 "measurement.window_result" = "平均功率 {watts:.2f} W（{source}）；{intervals} 个区间覆盖 {seconds:.1f} 秒，实际等待 {wait:.1f} 秒；估算剩余 {hours:.2f} 小时；macOS 估计：{macos}"
 "measurement.unavailable" = "不可测量：{reason}；真实更新 {n}/{total} 次，实际等待 {seconds:.1f} 秒。"
 "measurement.reason.insufficient_samples" = "真实遥测样本不足"
@@ -1409,3 +1409,8 @@
 "apps.bundle_type" = "CFBundlePackageType 不是 APPL：{value}"
 "apps.bundle_executable" = "缺少 APPL 类型，且 Contents/MacOS 下没有声明的可执行 CFBundleExecutable"
 "apps.bundle_invalid" = "已跳过应用候选 {path}：{reason}"
+
+"health.foreground_source" = "前台应用来源：{source}。"
+"setup.copies" = "{name}（{n} 个副本）"
+"setup.reason_copies_conflict" = "副本的推荐不同，请选择动作。"
+"setup.short_copies_conflict" = "副本推荐不同，请选择"

@@ -85,7 +85,9 @@ def apply_work_safe(config, details):
                 details.append(t("automation.daemon_skipped", name=name))
                 continue
             actions.append(
-                FreezeApp(row["path"]) if row["defact"] == "freeze" else QuitApp(row["path"], name)
+                FreezeApp(row["path"])
+                if row["defact"] == "freeze"
+                else QuitApp(row["path"], name, by_path=row.get("quit_by_path", False))
             )
         for action in actions:
             if action.risk != "safe":

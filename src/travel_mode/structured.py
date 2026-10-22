@@ -103,6 +103,7 @@ def _audit_data() -> dict:
         note(state, revived, external=pmset.on_ac_power())
 
     return {
+        **({"foreground": app_scan["foreground"]} if "foreground" in app_scan else {}),
         **({"app_safety": app_scan["app_safety"]} if "app_safety" in app_scan else {}),
         "version": __version__.split(".dev", 1)[0],
         "scenario": state.get("scenario") or None if state else None,

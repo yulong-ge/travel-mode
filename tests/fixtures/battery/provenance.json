@@ -1,0 +1,5 @@
+{
+  "source": "Existing synthetic and deidentified text fixtures",
+  "transformation": "Converted existing properties to typed XML plist arrays for ioreg -a adapter tests. These files are derived fixtures, not newly captured XML.",
+  "recorded_xml": "../macos-local/ioreg-battery.plist"
+}

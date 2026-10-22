@@ -155,11 +155,11 @@ class QuitResult:
         return t("failure.quit_" + self.status, name=name)
 
 
-def grace_quit(path, name):
+def grace_quit(path, name, *, by_path=False):
     from .app_snapshot import live_process_scope
 
     with live_process_scope():
-        result = _grace_quit(path, name)
+        result = _grace_quit(path, name, by_path=by_path)
         if result and result.command:
             from ..actions.journal import confirm_pause
 
@@ -167,7 +167,7 @@ def grace_quit(path, name):
         return result
 
 
-def _grace_quit(path, name):
+def _grace_quit(path, name, *, by_path=False):
     """AppleScript quit (8s 超时) + 轮询 10s. 没在跑直接成功."""
     if not app_running(path):
         return QuitResult("not_running", True)
@@ -175,11 +175,11 @@ def _grace_quit(path, name):
 
     _protected(path, process_table())
     bid = app_bid(path)
-    target = bid or name
+    target = path if by_path else bid or name
     if not isinstance(target, str) or not target:
         raise ValueError(t("safety.missing_app_identity", path=path))
     quoted = target.replace("\\", "\\\\").replace('"', '\\"').replace("\r", "\\r").replace("\n", "\\n")
-    tell = f'tell application {"id " if bid else ""}"{quoted}" to quit'
+    tell = f'tell application {"id " if bid and not by_path else ""}"{quoted}" to quit'
     from ..actions.journal import active_state, record_change
 
     if active_state() is not None:
@@ -313,7 +313,14 @@ def scan_apps():
 
         def chosen_name(path, discovered):
             # Setup keys use installed filenames; built-in names may be plist aliases.
-            return next((name for name in scoped if snapshot.index.find(name) == path), discovered)
+            return next(
+                (
+                    name
+                    for name in scoped
+                    if path in snapshot.index.matching_paths(name, snapshot.index.find(name))
+                ),
+                discovered,
+            )
 
         for name in config.apps.all:
             p = app_path(name)
@@ -345,7 +352,11 @@ def scan_apps():
                 continue
             bid = app_bid(p)
             rule = identify(name=name, bundle_id=bid)
-            if rule:
+            if (
+                rule
+                or config.apps.explicit(name, config.options.scenario) is not None
+                or name in config.apps.all
+            ):
                 running.append(
                     {
                         "name": name,
@@ -353,17 +364,19 @@ def scan_apps():
                         "cpu": snapshot.cpu_for(name, p),
                         "bundle_id": bid,
                         "defact": app_action(name, rule, config),
-                        "category_ignored": ignored(rule, config),
+                        "category_ignored": ignored(rule, config) if rule else False,
                         **metadata(rule),
                     }
                 )
                 seen.add(p)
         foreground_error = None
+        foreground_identity = None
         if config.apps.policy == "adaptive":
             from ..app_policy import recommendation_scan
 
             observation = recommendation_scan(snapshot, allow_foreground_failure=True)
             foreground_error = observation["foreground_error"]
+            foreground_identity = observation["foreground"]
             recommended = {row["path"]: row for row in observation["apps"]}
             for p, row in recommended.items():
                 if p not in seen and row["running"] and row["name"] not in config.apps.ignore:
@@ -400,15 +413,27 @@ def scan_apps():
             from .lsappinfo import ForegroundError, foreground
 
             try:
-                foreground()
+                foreground_identity = foreground().as_dict()
             except ForegroundError as exc:
                 foreground_error = str(exc)
+        distinct = {}
+        for row in running:
+            distinct.setdefault(str(Path(row["path"]).resolve()), row)
+        running = list(distinct.values())
+        for row in running:
+            copies = {
+                str(Path(path).resolve()) for path in snapshot.index.matching_paths(row["name"], row["path"])
+            }
+            if len(copies) > 1:
+                row["quit_by_path"] = True
         notices = []
         for process in snapshot.processes:
             rule = identify(executable=process.command)
             if rule and rule["action"] == "notice":
                 notices.append({"name": rule["name"], "pid": process.pid, **metadata(rule)})
         result = {"running": running, "nobundle": nobundle, "notices": notices}
+        if foreground_identity:
+            result["foreground"] = foreground_identity
         if foreground_error:
             error = foreground_error
             for app in running:

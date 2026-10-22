@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import re
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -21,12 +22,13 @@ COMMANDS = {
     "pmset-source": ["pmset", "-g", "ps"],
     "pmset-assertions": ["pmset", "-g", "assertions"],
     "pmset-log": ["pmset", "-g", "log"],
-    "ioreg-battery": ["ioreg", "-rn", "AppleSmartBattery"],
+    "ioreg-battery": ["ioreg", "-a", "-rn", "AppleSmartBattery"],
     "launchctl-list": ["launchctl", "list"],
     "application-index": ["mdfind", 'kMDItemContentType == "com.apple.application-bundle"'],
     "ps-identities": ["ps", "-axo", "pid=,ppid=,stat=,lstart=,comm="],
     "ps-health": ["ps", "-axo", "pid=,ppid=,uid=,stat=,%cpu=,lstart=,comm="],
     "sleep-times": ["sysctl", "-n", "kern.sleeptime", "kern.waketime"],
+    "foreground-native": [sys.executable, "-m", "travel_mode.system.health_native", "foreground"],
     "foreground-asn": ["lsappinfo", "front"],
     "profiler": ["system_profiler", "-json", "SPDisplaysDataType", "SPPowerDataType"],
     "backup": ["tmutil", "status"],
@@ -68,7 +70,10 @@ def collect(output, *, runner=None):
                 capture("foreground-info", ["lsappinfo", "info", "-only", "pid,bundleid", asn])
             else:
                 failures.append(f"foreground-asn: invalid ASN: {result.stdout!r}")
-    metadata = {key: os.environ.get(key) for key in ("ImageOS", "ImageVersion", "RUNNER_OS", "RUNNER_ARCH")}
+    metadata = {
+        key: os.environ.get(key)
+        for key in ("ImageOS", "ImageVersion", "RUNNER_OS", "RUNNER_ARCH", "TRAVEL_MODE_RUNNER_LABEL")
+    }
     (output / "manifest.json").write_text(
         json.dumps(dict(results=results, failures=failures, runner=metadata), indent=2) + "\n"
     )

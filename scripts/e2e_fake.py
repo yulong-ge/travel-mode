@@ -55,6 +55,10 @@ class Machine:
         from travel_mode.system.shell import command_started
 
         command_started()
+        if cmd == native_command("foreground"):
+            return CmdResult(
+                '{"status":"unavailable","source":"NSWorkspace","reason":"fixture has no GUI session"}', "", 0
+            )
         if cmd == native_command("displays"):
             return CmdResult("[]", "", 0)
         if cmd == native_command("brightness"):
@@ -69,10 +73,18 @@ class Machine:
             return CmdResult(
                 "\n".join(f"{p} 1 {os.getuid()} {s} 0.0 {b} {c}" for p, (s, b, c) in self.rows.items()), "", 0
             )
-        if cmd == ["ioreg", "-rn", "AppleSmartBattery"]:
+        if cmd == ["ioreg", "-a", "-rn", "AppleSmartBattery"]:
             return CmdResult(
-                '"ExternalConnected" = Yes\n"IsCharging" = No\n"Voltage" = 12000\n'
-                '"AppleRawCurrentCapacity" = 4000\n',
+                plistlib.dumps(
+                    [
+                        {
+                            "AppleRawCurrentCapacity": 4000,
+                            "ExternalConnected": True,
+                            "IsCharging": False,
+                            "Voltage": 12000,
+                        }
+                    ]
+                ).decode("utf-8"),
                 "",
                 0,
             )
@@ -208,10 +220,16 @@ class VirtualMachine(Machine):
         return (self.recordings / "pmset-custom-recorded.txt").read_text()
 
     def __call__(self, cmd, timeout=None, interactive=False):
-        if cmd in (["/usr/bin/pmset", "-g"], ["ioreg", "-rn", "AppleSmartBattery"]):
+        if cmd in (["/usr/bin/pmset", "-g"], ["ioreg", "-a", "-rn", "AppleSmartBattery"]):
             self.calls.append(tuple(cmd))
             filename = "pmset-g-synthetic.txt" if cmd[0] == "/usr/bin/pmset" else "ioreg-empty-recorded.txt"
-            return CmdResult((self.recordings / filename).read_text(), "", 0)
+            return CmdResult(
+                (self.recordings / filename).read_text()
+                if cmd[0] == "/usr/bin/pmset"
+                else plistlib.dumps([]).decode(),
+                "",
+                0,
+            )
         return super().__call__(cmd, timeout, interactive)
 
 
@@ -240,7 +258,7 @@ class BatteryMachine(Machine):
         self.cached_battery = None
 
     def __call__(self, cmd, timeout=None, interactive=False):
-        if cmd == ["ioreg", "-rn", "AppleSmartBattery"]:
+        if cmd == ["ioreg", "-a", "-rn", "AppleSmartBattery"]:
             self.calls.append(tuple(cmd))
             self.battery_reads += 1
             frozen = any("/TravelModeE2E-Burn.app/" in r[2] and r[0] == "T" for r in self.rows.values())
@@ -248,22 +266,24 @@ class BatteryMachine(Machine):
             if self.cached_battery is None or self.battery_reads % 4 == 0:
                 self.telemetry_count += 20
                 self.telemetry_sum += (-current * 12) * 20
-                self.cached_battery = (
-                    '"ChargerData" = {"IsCharging"=0}\n'
-                    '"IsCharging" = No\n"Voltage" = 12000\n'
-                    f'"InstantAmperage" = {2**64 + current}\n"TimeRemaining" = 200\n'
-                    f'"UpdateTime" = {1000 + self.telemetry_count}\n'
-                    f'"BatteryData" = {{"RemainingCapacity"={4800 - self.battery_reads},'
-                    '"FullChargeCapacity"=5000}\n'
-                    f'"PowerTelemetryData" = {{"AccumulatedSystemLoad"={self.telemetry_sum},'
-                    f'"SystemLoadAccumulatorCount"={self.telemetry_count},"SystemLoad"={-current * 12},'
-                    f'"AccumulatedBatteryDischarge"={2**64 - self.telemetry_sum},'
-                    f'"BatteryDischargeAccumulatorCount"={self.telemetry_count}' + "}\n"
+                self.cached_battery = dict(
+                    ChargerData={"IsCharging": 0},
+                    IsCharging=False,
+                    Voltage=12000,
+                    InstantAmperage=2**64 + current,
+                    TimeRemaining=200,
+                    UpdateTime=1000 + self.telemetry_count,
+                    BatteryData=dict(RemainingCapacity=4800 - self.battery_reads, FullChargeCapacity=5000),
+                    PowerTelemetryData=dict(
+                        AccumulatedSystemLoad=self.telemetry_sum,
+                        SystemLoadAccumulatorCount=self.telemetry_count,
+                        SystemLoad=-current * 12,
+                        AccumulatedBatteryDischarge=2**64 - self.telemetry_sum,
+                        BatteryDischargeAccumulatorCount=self.telemetry_count,
+                    ),
                 )
             return CmdResult(
-                f'"ExternalConnected" = {"Yes" if self.external else "No"}\n' + self.cached_battery,
-                "",
-                0,
+                plistlib.dumps([dict(self.cached_battery, ExternalConnected=self.external)]).decode(), "", 0
             )
         if cmd in [["/usr/bin/pmset", "-g", kind] for kind in ("ps", "batt", "log")]:
             self.calls.append(tuple(cmd))

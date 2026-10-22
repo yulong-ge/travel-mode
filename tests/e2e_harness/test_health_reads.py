@@ -14,7 +14,7 @@ def test_guarded_demo_health_observations_remain_hermetic(sandbox):
     assert not any(row["status"] == "unknown" for row in report["checks"])
     assert not guard.tripped
     assert shell.run_rc(health.native_command("brightness")) == ("0.5", 0)
-    assert shell.run_rc(["ioreg", "-rn", "AppleSmartBattery"])[1] == 0
+    assert shell.run_rc(["ioreg", "-a", "-rn", "AppleSmartBattery"])[1] == 0
     assert machine.calls
 
 
