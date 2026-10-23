@@ -112,6 +112,11 @@ def status(*, include_runtime=True):
         bundled_version=plugin_version(payload()),
     )
     if include_runtime:
+        from .config import load_config
+        from .state import load_state
+
+        show = load_config().menubar.show
+        result.update(show=show, hidden=show == "session" and load_state() is None)
         result.update(runtime_status())
         if result["running"] is None:
             _observation(result["notice"])

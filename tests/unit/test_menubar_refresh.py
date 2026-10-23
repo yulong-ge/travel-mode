@@ -6,9 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from travel_mode import cli, i18n, menubar, state
+from travel_mode import cli, i18n, menubar, state, status
 from travel_mode.actions.base import Context
 from travel_mode.actions.executor import Executor
+from travel_mode.config import load_config, write_menubar
+from travel_mode.paths import config_path
 from travel_mode.system import shell
 from travel_mode.system.shell import CmdResult
 
@@ -23,13 +25,17 @@ def installed(tmp_path, fake_runner, swiftbar_process):
     return folder
 
 
-def test_cli_on_off_notify_once_after_committed_state(installed, fake_runner, darwin_platform, capsys):
+@pytest.mark.parametrize("show", ["always", "session"])
+def test_cli_on_off_notify_once_after_committed_state(installed, fake_runner, darwin_platform, capsys, show):
+    config_path().write_text(f'[menubar]\nshow = "{show}"\n')
     fake_runner.responses[("sudo", "pmset")] = CmdResult("", "", 0)
     observations = []
+    visible = []
 
     def runner(command, timeout=None, interactive=False):
         if command == menubar.REFRESH:
             observations.append(state.load_state() is not None)
+            visible.append(bool(status.data()["swiftbar"]))
         return fake_runner(command, timeout, interactive)
 
     shell.set_runner(runner)
@@ -38,6 +44,7 @@ def test_cli_on_off_notify_once_after_committed_state(installed, fake_runner, da
     assert counts["attempted"] == counts["succeeded"] and counts["failed"] == 0
     assert cli.main(["off"]) == 0
     assert observations == [True, False]
+    assert visible == [True, show == "always"]
     assert fake_runner.calls.count(tuple(menubar.REFRESH)) == 2
     assert "failed" not in capsys.readouterr().err
 
@@ -146,3 +153,24 @@ def test_dry_run_only_prints_refresh_plan(installed, fake_runner, darwin_platfor
     assert "swiftbar://refreshplugin?name=travel-mode" in capsys.readouterr().out
     assert tuple(menubar.REFRESH) not in fake_runner.calls
     assert not (tmp_path / "state.json").exists()
+
+
+@pytest.mark.parametrize("running", [True, False])
+def test_visibility_refresh_observes_committed_config_and_respects_stopped_swiftbar(
+    installed, fake_runner, running
+):
+    if not running:
+        fake_runner.responses[("ps", "-axo", "pid=,ppid=,stat=,lstart=,comm=")] = CmdResult("", "", 0)
+    original = shell.get_runner()
+    observed = []
+
+    def runner(command, timeout=None, interactive=False):
+        if command == menubar.REFRESH:
+            observed.append(load_config().menubar.show)
+        return original(command, timeout, interactive)
+
+    shell.set_runner(runner)
+    write_menubar("session")
+    write_menubar("always")
+    assert observed == (["session", "always"] if running else [])
+    assert state.load_state() is None

@@ -174,7 +174,13 @@ travel-mode menubar uninstall
 
 After installing, refresh SwiftBar, and turn on "Launch at Login" in SwiftBar's settings so the
 icon is back after a restart; `travel-mode menubar status` reminds you when SwiftBar is not
-running. travel-mode only refreshes SwiftBar when it is already running and never starts it. The icon shows an outline leaf when power saving is off, a
+running. travel-mode only refreshes SwiftBar when it is already running and never starts it.
+
+To show the icon only during a power-saving session, run `travel-mode config set-menubar session`
+(or use "More" in the TUI or the menu); `travel-mode config set-menubar always` shows it again.
+Without a session the plugin then prints nothing, which SwiftBar shows as no menu bar item; it
+appears as soon as a session starts. The plugin still runs its 5-minute status check (about
+0.2 s on the test Mac). The icon shows an outline leaf when power saving is off, a
 filled leaf or a moon with the elapsed time while a session is running, and a warning triangle
 when a session is running or the Mac is on battery and the last check found that closing the lid
 would not put the Mac to sleep (on AC power without a session it only adds a grey note); the menu then says
@@ -210,7 +216,7 @@ state file and `pmset -g ps`. SwiftBar itself stays running; travel-mode adds no
 | `setup [--no-tui] [--yes] [--dry-run]` | Check this Mac and save recommended or chosen actions for apps, services and network apps |
 | `profiles` | List profiles |
 | `config path\|init\|validate\|edit` | Manage the configuration file |
-| `config set-language en\|zh`, `config set-interface cli\|tui` | Save preferences |
+| `config set-language en\|zh`, `config set-interface cli\|tui`, `config set-menubar always\|session` | Save preferences |
 | `automation install\|uninstall\|status` | Optional power-source automation |
 | `sudoers print\|install\|uninstall\|status` | Optional sudoers rule |
 | `menubar install\|uninstall\|status` | Optional SwiftBar menu bar plugin |

@@ -6,7 +6,7 @@ import argparse
 import os
 import sys
 
-from travel_mode.config import load_config, write_interface, write_language
+from travel_mode.config import load_config, write_interface, write_language, write_menubar
 from travel_mode.i18n import t
 from travel_mode.paths import config_path, state_path
 
@@ -43,14 +43,16 @@ def _config_command(args) -> int:
             + f", services={len(config.services.unload)}"
         )
         return 0
-    if args.config_cmd in {"set-language", "set-interface"}:
+    if args.config_cmd in {"set-language", "set-interface", "set-menubar"}:
         option = args.config_cmd.removeprefix("set-")
-        writer = write_language if option == "language" else write_interface
+        writer = {"language": write_language, "interface": write_interface, "menubar": write_menubar}[option]
         writer(args.value)
         if option == "language":
             print(t("language.saved", language=args.value, path=target))
-        else:
+        elif option == "interface":
             print(t("interface.saved", interface=args.value, path=target))
+        else:
+            print(t("menubar.saved", mode=t("menubar.mode_" + args.value), path=target))
         return 0
     if args.config_cmd == "edit":
         editor = os.environ.get("VISUAL") or os.environ.get("EDITOR")

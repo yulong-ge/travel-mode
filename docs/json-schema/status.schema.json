@@ -17,9 +17,19 @@
     "duration_minutes",
     "battery",
     "sleep_ready",
-    "sleep_warning"
+    "sleep_warning",
+    "menubar_show",
+    "menubar_hidden"
   ],
   "properties": {
+    "menubar_show": {
+      "enum": ["always", "session"],
+      "description": "Configured menu bar visibility; defaults to always."
+    },
+    "menubar_hidden": {
+      "type": "boolean",
+      "description": "True when menubar_show is session and no session is active; swiftbar is then an empty string (a successful, hidden SwiftBar standard plugin)."
+    },
     "sleep_warning": {
       "type": "boolean",
       "description": "Whether blocked sleep readiness needs a menu bar warning: true only when sleep_ready.state is blocked and a session is active or the current power source is battery. The underlying sleep_ready finding is unchanged."

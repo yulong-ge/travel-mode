@@ -64,14 +64,34 @@ def write_interface(interface: str, path: Path | None = None) -> None:
     _write_option("interface", validate_interface(interface, target), target)
 
 
-def _write_option(key: str, value: str, target: Path) -> None:
+def validate_menubar_show(value: Any, path: str | Path) -> str:
+    if value not in ("always", "session"):
+        raise ConfigError(path, "menubar.show", t("menubar.invalid_show", value=value))
+    return value
+
+
+def write_menubar(show: str, path: Path | None = None) -> None:
+    """Persist visibility before requesting the shared, running-only refresh."""
+    from .menubar import status_changed, status_changes
+
+    target = path or config_path()
+    show = validate_menubar_show(show, target)
+    with status_changes():
+        try:
+            _write_option("show", show, target, section="menubar")
+        except OSError as exc:
+            raise ConfigError(target, "menubar.show", str(exc), cause=exc) from exc
+        status_changed()
+
+
+def _write_option(key: str, value: str, target: Path, *, section="options") -> None:
     load_config(target)
     doc = tomlkit.parse(target.read_text("utf-8")) if target.exists() else tomlkit.document()
     if not target.exists():
         doc["apps"] = {"policy": "adaptive"}
-    if "options" not in doc:
-        doc["options"] = tomlkit.table()
-    doc["options"][key] = value
+    if section not in doc:
+        doc[section] = tomlkit.table()
+    doc[section][key] = value
     target.parent.mkdir(parents=True, exist_ok=True)
     import tempfile
 
@@ -82,7 +102,7 @@ def _write_option(key: str, value: str, target: Path) -> None:
         load_config(temporary)
         temporary.replace(target)
     except OSError as exc:
-        raise ConfigError(target, f"options.{key}", str(exc), cause=exc) from exc
+        raise ConfigError(target, f"{section}.{key}", str(exc), cause=exc) from exc
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -296,6 +316,11 @@ class AutomationConfig:
 
 
 @dataclass(frozen=True)
+class MenubarConfig:
+    show: str = "always"
+
+
+@dataclass(frozen=True)
 class Profile:
     values: dict[str, Any] = field(default_factory=dict)
 
@@ -314,6 +339,7 @@ class Config:
     health: HealthConfig = field(default_factory=HealthConfig)
     history_retain: int = 50
     automation: AutomationConfig = field(default_factory=AutomationConfig)
+    menubar: MenubarConfig = field(default_factory=MenubarConfig)
 
     @classmethod
     def defaults(cls) -> Config:
@@ -329,6 +355,7 @@ class Config:
 
 
 _TOP_KEYS = {
+    "menubar",
     "automation",
     "history",
     "apps",
@@ -435,6 +462,9 @@ def load_config(path: str | Path | None = None) -> Config:
     if not isinstance(data, dict):
         raise _error(target, "<root>", t("config.expected_a_toml_table"))
     _check_keys(data, _TOP_KEYS, target, "")
+    menubar = _table(data, "menubar", target)
+    _check_keys(menubar, {"show"}, target, "menubar")
+    menubar_show = validate_menubar_show(menubar.get("show", "always"), target)
 
     apps = _table(data, "apps", target)
     _check_keys(apps, _APP_KEYS, target, "apps")
@@ -570,6 +600,7 @@ def load_config(path: str | Path | None = None) -> Config:
     if type(automation.get("retain", 50)) is not int or not 1 <= automation.get("retain", 50) <= 10000:
         raise _error(target, "automation.retain", t("session.invalid_retain"))
     return Config(
+        menubar=MenubarConfig(menubar_show),
         automation=AutomationConfig(**automation),
         history_retain=retain,
         apps=app_config,

@@ -155,6 +155,7 @@ async def test_more_keeps_all_secondary_capabilities(fake_runner):
             "b-history",
             "b-thaw",
             "b-automation",
+            "b-menubar",
             "b-category-sync",
             "b-category-updater",
             "close-more",

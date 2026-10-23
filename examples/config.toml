@@ -34,6 +34,10 @@ interface = "tui"
 # Ask at startup, or choose work / away. --scenario and --profile skip the picker.
 scenario = "ask"
 
+[menubar]
+# "always" or "session" (hide the icon outside a power-saving session).
+show = "always"
+
 [profiles.flight]
 # Add profile-specific values in a future release.
 

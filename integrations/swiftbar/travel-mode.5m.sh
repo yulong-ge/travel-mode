@@ -1,7 +1,7 @@
 #!/bin/bash
 # travel-mode SwiftBar plugin: io.github.yulong-ge.travel-mode
 # <xbar.title>travel-mode</xbar.title>
-# <xbar.version>2.1.0</xbar.version>
+# <xbar.version>2.2.0</xbar.version>
 # <xbar.author>Long-louis</xbar.author>
 # <xbar.author.github>yulong-ge</xbar.author.github>
 # <xbar.desc>Local session and power-source status; five-minute refresh.</xbar.desc>
@@ -64,9 +64,16 @@ export TRAVEL_MODE_BIN
 # A failed status may still supply a localized error menu. Never run a full check.
 json="$("$TRAVEL_MODE_BIN" status --json)"
 status_rc=$?
-if menu="$(/usr/bin/plutil -extract swiftbar raw -o - - <<< "$json" 2>/dev/null)" && [[ -n "$menu" ]]; then
-    printf '%s\n' "$menu"
-    exit 0
+if menu="$(/usr/bin/plutil -extract swiftbar raw -o - - <<< "$json" 2>/dev/null)"; then
+    if [[ -n "$menu" ]]; then
+        printf '%s\n' "$menu"
+        exit 0
+    fi
+    # Standard plugins hide with exit 0 and empty stdout, including no newline.
+    # https://github.com/swiftbar/SwiftBar/blob/v2.1.1/README.md#standard-default
+    if [[ "$status_rc" -eq 0 ]]; then
+        exit 0
+    fi
 fi
 warning failed
 exit "$((status_rc == 0 ? 1 : status_rc))"

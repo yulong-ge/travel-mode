@@ -17,5 +17,6 @@ Session history | sfimage=clock bash="/fixture/travel-mode" param1="history" ter
 More | sfimage=ellipsis.circle
 --Automation status | sfimage=bolt.horizontal.circle bash="/fixture/travel-mode" param1="automation" param2="status" terminal=true refresh=true
 --Edit configuration | sfimage=slider.horizontal.3 bash="/fixture/travel-mode" param1="config" param2="edit" terminal=true refresh=true
+--Only show the menu bar icon during power saving | sfimage=leaf bash="/fixture/travel-mode" param1="config" param2="set-menubar" param3="session" terminal=true refresh=true
 --Project homepage | sfimage=link href=https://github.com/yulong-ge/travel-mode
 --Version 1.1.0

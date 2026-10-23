@@ -20,6 +20,7 @@ All notable changes follow Keep a Changelog.
 
 ### Added
 
+- `[menubar] show = "session"` (`travel-mode config set-menubar session`, or "More" in the TUI and menu) shows the menu bar icon only during a power-saving session.
 - CI covers macOS 15 (arm64 and Intel) as well as macOS 26, and the clean-machine job runs on each of them.
 - A read-only clean-machine job on a GitHub macOS runner that runs check, setup preview and suggest and rejects any maintainer-specific term in the output.
 

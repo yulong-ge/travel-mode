@@ -20,6 +20,10 @@ class UtilityScreen(ModalScreen):
     UtilityScreen Button { width: 1fr; height: 1; min-height: 1; border: none; background: transparent; }
     """
 
+    def __init__(self, menubar_show="always"):
+        super().__init__()
+        self.menubar_show = menubar_show
+
     def compose(self):
         with Vertical():
             yield Static(t("redesign.more"))
@@ -35,6 +39,9 @@ class UtilityScreen(ModalScreen):
                 ("b-automation", "redesign.auto"),
             ):
                 yield Button(t(message), id=key)
+            yield Button(
+                t("menubar.mode_setting", mode=t("menubar.mode_" + self.menubar_show)), id="b-menubar"
+            )
             yield Button(t("session.close"), id="close-more")
 
     def on_button_pressed(self, event):

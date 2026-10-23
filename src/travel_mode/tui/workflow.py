@@ -832,12 +832,22 @@ class Workflow:
         from .utility_screen import UtilityScreen
 
         self.push_screen(
-            UtilityScreen(),
+            UtilityScreen(self.config.menubar.show),
             lambda action: self.run_worker(self.utility_action(action), group="utility") if action else None,
         )
 
     async def utility_action(self, action):
-        if action == "b-new-plan":
+        if action == "b-menubar":
+            from travel_mode.config import load_config, write_menubar
+            from travel_mode.paths import config_path
+
+            async with self._mutation_lock:
+                current = load_config(config_path()).menubar.show
+                show = "session" if current == "always" else "always"
+                await self.in_thread(write_menubar, show)
+                self.config = load_config(config_path())
+                self.notify(t("menubar.mode_setting", mode=t("menubar.mode_" + show)))
+        elif action == "b-new-plan":
             from .scenario import ScenarioPicker
 
             self.new_plan_complete.clear()

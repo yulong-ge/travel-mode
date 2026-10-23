@@ -92,7 +92,19 @@ def test_complete_localized_menu_fixture(case, language, monkeypatch):
         )
 
 
-@pytest.mark.parametrize("case", ["success", "error", "invalid", "missing"])
+@pytest.mark.parametrize(
+    "case",
+    [
+        "always-idle",
+        "always-work",
+        "session-idle",
+        "session-work",
+        "error",
+        "empty-error",
+        "invalid",
+        "missing",
+    ],
+)
 @pytest.mark.parametrize("language", ["en", "zh"])
 def test_script_output_and_single_status_call(case, language, tmp_path):
     script = tmp_path / "plugin.sh"
@@ -100,9 +112,17 @@ def test_script_output_and_single_status_call(case, language, tmp_path):
     bin_dir.mkdir()
     trace = tmp_path / "trace"
     menu = (FIXTURES / ("idle-" + language + ".txt")).read_text()
+    visible_case = case.startswith(("always-", "session-"))
+    if visible_case:
+        i18n.set_language(language)
+        show, scenario = case.split("-", 1)
+        menu = status.render({**model(scenario), "menubar_show": show})
+        menu += "\n" if menu else ""
     if case == "error":
         i18n.set_language(language)
         menu = status.error_menu("fixture timeout") + "\n"
+    if case == "empty-error":
+        menu = ""
     output = tmp_path / "menu.txt"
     output.write_text(menu)
     payload = tmp_path / "status.json"
@@ -110,7 +130,8 @@ def test_script_output_and_single_status_call(case, language, tmp_path):
     tool = bin_dir / "travel-mode"
     tool.write_text(
         '#!/bin/bash\n[[ "$*" == "status --json" ]] || exit 90\n'
-        'printf "%s\\n" "$*" >> "$TRACE"\n/bin/cat "$PAYLOAD"\n' + ("exit 1\n" if case == "error" else "")
+        'printf "%s\\n" "$*" >> "$TRACE"\n/bin/cat "$PAYLOAD"\n'
+        + ("exit 1\n" if case in {"error", "empty-error"} else "")
     )
     tool.chmod(0o755)
     parser = bin_dir / "plutil"
@@ -141,12 +162,25 @@ def test_script_output_and_single_status_call(case, language, tmp_path):
         tool.unlink()
     rc, stdout, stderr = bash_run(script, env)
     assert not stderr
-    if case in {"success", "error"}:
+    if visible_case or case == "error":
         assert rc == 0 and stdout == menu
     else:
-        assert stdout == (FIXTURES / f"{case}-{language}.txt").read_text()
-        assert rc == (1 if case == "invalid" else 0)
+        fixture = "invalid" if case == "empty-error" else case
+        assert stdout == (FIXTURES / f"{fixture}-{language}.txt").read_text()
+        assert rc == (1 if case in {"invalid", "empty-error"} else 0)
     assert (trace.read_text() if trace.exists() else "") == ("" if case == "missing" else "status --json\n")
+
+
+@pytest.mark.parametrize("show,target,checked", [("always", "session", False), ("session", "always", True)])
+def test_menu_setting_toggles_config_without_disabling_swiftbar_plugin(show, target, checked):
+    line = next(
+        line
+        for line in status.render({**model("work"), "menubar_show": show}).splitlines()
+        if 'param2="set-menubar"' in line
+    )
+    assert f'param1="config" param2="set-menubar" param3="{target}" terminal=true refresh=true' in line
+    assert ("checked=true" in line) is checked
+    assert not any(word in line for word in ("enableplugin", "disableplugin", "toggleplugin"))
 
 
 def test_script_syntax_and_metadata():

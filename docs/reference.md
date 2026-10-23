@@ -374,6 +374,11 @@ Mac is on battery. On AC power without a session the menu shows one grey note in
 `menubar status` reports whether SwiftBar is running (`running`, `notice` in JSON) and reminds you
 to enable its "Launch at Login" setting; travel-mode does not change SwiftBar's login item.
 
+`[menubar] show = "session"` hides the icon outside a session: `status --json` then renders an
+empty menu and the plugin exits 0 with empty stdout, which SwiftBar 2.1.1 documents as "nothing in
+the menu bar". The plugin is not disabled through SwiftBar's `disableplugin` URL, because that
+would change SwiftBar's own saved state and could stay disabled after a restart.
+
 The `5m` in the file name sets the refresh interval. Each refresh runs `travel-mode status --json`,
 which reads the configured language, the local state file and one `pmset -g ps` (2-second limit);
 on the tested Mac a refresh takes about 0.1 s in total. Health check, power measurement and the

@@ -53,7 +53,10 @@ def source():
 
 
 def data(*, clock=time.monotonic, now=None):
+    from .config import load_config
+
     started = clock()
+    show = load_config().menubar.show
     snapshot = load_state()
     power_source, battery = observation()
     from .sleep_readiness import cached, menu_observation
@@ -82,7 +85,9 @@ def data(*, clock=time.monotonic, now=None):
         battery=battery,
         language=get_language(),
         source_timeout_seconds=SOURCE_TIMEOUT,
+        menubar_show=show,
     )
+    result["menubar_hidden"] = menu_hidden(result)
     result["sleep_warning"] = sleep_warning(result)
     result["duration_minutes"] = None
     if result["started_at"]:
@@ -218,10 +223,16 @@ def sleep_warning(result):
     )
 
 
+def menu_hidden(result):
+    return result.get("menubar_show", "always") == "session" and not result["active"]
+
+
 def render(result, *, now=None):
     executable = os.environ.get("TRAVEL_MODE_BIN", "travel-mode")
     if any(char in executable for char in "\n\r|\x00"):
         raise StatusError(t("menubar.invalid_executable"))
+    if menu_hidden(result):
+        return ""
     quoted = json.dumps(executable, ensure_ascii=False)
 
     minutes = result.get("duration_minutes")
@@ -258,11 +269,11 @@ def render(result, *, now=None):
 
     # Documented bash/paramN, terminal, refresh and -- submenu protocol:
     # https://github.com/swiftbar/SwiftBar/blob/v2.1.1/README.md#parameters
-    def action(key, symbol, arguments, prefix=""):
+    def action(key, symbol, arguments, prefix="", *, checked=False):
         params = " ".join(f"param{index}={json.dumps(arg)}" for index, arg in enumerate(arguments, 1))
         rows.append(
             f"{prefix}{t('menubar.' + key)} | sfimage={symbol} bash={quoted} {params} "
-            "terminal=true refresh=true"
+            "terminal=true refresh=true" + (" checked=true" if checked else "")
         )
 
     if warning and any(
@@ -282,6 +293,14 @@ def render(result, *, now=None):
     rows.extend(("---", t("menubar.more") + " | sfimage=ellipsis.circle"))
     action("automation", "bolt.horizontal.circle", ("automation", "status"), "--")
     action("edit", "slider.horizontal.3", ("config", "edit"), "--")
+    session_only = result.get("menubar_show", "always") == "session"
+    action(
+        "session_only",
+        "leaf",
+        ("config", "set-menubar", "always" if session_only else "session"),
+        "--",
+        checked=session_only,
+    )
     rows.append(
         "--" + t("menubar.homepage") + " | sfimage=link href=https://github.com/yulong-ge/travel-mode"
     )

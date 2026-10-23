@@ -65,6 +65,7 @@ def _main(argv=None):
             "edit",
             "set-language",
             "set-interface",
+            "set-menubar",
             "install",
             "uninstall",
             "status",
@@ -132,6 +133,7 @@ def _main(argv=None):
         "edit",
         "set-language",
         "set-interface",
+        "set-menubar",
     }:
         parser.error(t("cli.config_requires_path_init_validate_or"))
     if args.launch_event and (args.cmd, args.config_cmd) != ("event", "power-changed"):
@@ -152,7 +154,7 @@ def _main(argv=None):
         parser.error(t("measurement.updates_only_power"))
     if args.reapply and args.cmd != "check" and not args.check:
         parser.error(t("resurrection.check_only"))
-    if args.value is not None and args.config_cmd not in {"set-language", "set-interface"}:
+    if args.value is not None and args.config_cmd not in {"set-language", "set-interface", "set-menubar"}:
         parser.error(t("cli.unexpected_config_value"))
     if args.config_cmd == "set-language" and args.value not in {"en", "zh"}:
         parser.error(t("config.must_be_auto_zh_or_en"))
@@ -220,6 +222,8 @@ def _main(argv=None):
         print(
             json.dumps(result, ensure_ascii=False)
             if args.json
+            else t("menubar.hidden")
+            if result["menubar_hidden"]
             else result["swiftbar"].split("---")[1].strip()
         )
         return 0
@@ -242,6 +246,10 @@ def _main(argv=None):
             )
             if not args.json and result["notice"]:
                 print(result["notice"])
+            if not args.json:
+                print(t("menubar.mode_status", mode=t("menubar.mode_" + result["show"])))
+                if result["hidden"]:
+                    print(t("menubar.hidden"))
             return 0
         if args.config_cmd not in {"install", "uninstall"} or args.json:
             parser.error(t("menubar.usage"))
