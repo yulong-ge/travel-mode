@@ -29,15 +29,23 @@ def rows():
     ]
 
 
-async def ready(app):
+async def committed_layout(pilot, screen):
+    # Child display/label changes request layout from their own idle handlers.
+    # A screen-only refresh can finish before those Layout messages arrive.
+    assert pilot.app.screen is screen
+    assert await pilot._wait_for_screen()
+    assert await asyncio.wait_for(screen.wait_for_refresh(), 10)
+
+
+async def ready(app, pilot):
     screen = app.screen
     assert isinstance(screen, SetupScreen)
     await asyncio.wait_for(screen.ready.wait(), 10)
-    assert await screen.wait_for_refresh()
+    await committed_layout(pilot, screen)
     # Editor/layout tests inspect expanded rows; the new overview is tested separately.
     for content in screen.query(".setup-items"):
         screen.show_group(content.id.removeprefix("setup-items-"))
-    assert await screen.wait_for_refresh()
+    await committed_layout(pilot, screen)
     return screen
 
 
@@ -54,8 +62,8 @@ async def test_setup_tui_edits_columns_reviews_and_preserves_comments(tmp_path, 
     path = tmp_path / "config.toml"
     path.write_text('# keep\n[options]\nlanguage="auto" # comment\n')
     app = SetupApp()
-    async with app.run_test(size=(120, 36)):
-        screen = await ready(app)
+    async with app.run_test(size=(120, 36)) as pilot:
+        screen = await ready(app, pilot)
         assert not path.read_text().startswith("[apps]")
         assert screen.selected["work"]["WeChat"] == "freeze"
         await press(screen, "#setup-app-0", screen.changed)
@@ -78,8 +86,8 @@ async def test_setup_tui_edits_columns_reviews_and_preserves_comments(tmp_path, 
 async def test_setup_skip_and_dry_run(tmp_path, monkeypatch, dry_run):
     monkeypatch.setattr(app_policy, "discover", rows)
     app = SetupApp(dry_run=dry_run)
-    async with app.run_test(size=(80, 24)):
-        screen = await ready(app)
+    async with app.run_test(size=(80, 24)) as pilot:
+        screen = await ready(app, pilot)
         await press(screen, "#setup-skip", screen.completed)
         if dry_run:
             assert "setup_completed = true" in str(screen.query_one("#setup-status", Static).content)
@@ -104,8 +112,8 @@ async def test_setup_failure_stays_visible_and_original_unchanged(tmp_path, monk
     if stage == "save":
         monkeypatch.setattr(setup, "write_app_choices", broken)
     app = SetupApp()
-    async with app.run_test(size=(80, 24)):
-        screen = await ready(app)
+    async with app.run_test(size=(80, 24)) as pilot:
+        screen = await ready(app, pilot)
         if stage == "save":
             await press(screen, "#setup-review", screen.reviewed)
             await press(screen, "#setup-save", screen.completed)
@@ -123,7 +131,7 @@ async def test_first_run_setup_after_scenario_and_skip_not_repeated(tmp_path, mo
         with modal_result(monkeypatch, app, SetupScreen) as finished:
             await pilot.press("w", "enter")
             await pilot._wait_for_screen()
-            screen = await ready(app)
+            screen = await ready(app, pilot)
             assert not app.origin_ready
             await press(screen, "#setup-skip", screen.completed)
             await asyncio.wait_for(finished, 10)
@@ -162,7 +170,7 @@ async def test_setup_space_cycles_once_and_review_is_invalidated(tmp_path, monke
     monkeypatch.setattr(app_policy, "discover", rows)
     app = SetupApp()
     async with app.run_test(size=(80, 24)) as pilot:
-        screen = await ready(app)
+        screen = await ready(app, pilot)
         screen.query_one("#setup-app-0", Button).focus()
         assert await screen.wait_for_refresh()
         screen.changed.clear()
@@ -215,11 +223,11 @@ async def test_setup_review_shows_summary_before_enabling_save(monkeypatch):
     many[0]["name"] = "App [bold]literal[/]"
     monkeypatch.setattr(app_policy, "discover", lambda: many)
     app = SetupApp()
-    async with app.run_test(size=(80, 24)):
-        screen = await ready(app)
+    async with app.run_test(size=(80, 24)) as pilot:
+        screen = await ready(app, pilot)
         assert "[bold]literal[/]" in str(screen.query_one("#setup-app-0", Button).label)
         await press(screen, "#setup-review", screen.reviewed)
-        assert await screen.wait_for_refresh()
+        await committed_layout(pilot, screen)
         status = screen.query_one("#setup-status", Static)
         assert screen.region.contains_region(status.region)
         assert status.region.bottom <= screen.query_one("#setup-controls").region.y
@@ -252,7 +260,7 @@ async def test_setup_compact_table_columns_buttons_and_focus(monkeypatch, langua
     monkeypatch.setattr(app_policy, "discover", lambda: demo_rows)
     app = SetupApp(dry_run=True)
     async with app.run_test(size=size) as pilot:
-        screen = await ready(app)
+        screen = await ready(app, pilot)
         body = screen.query_one("#setup-body", VerticalScroll)
         buttons = list(screen.query(".setup-app"))
         assert all(button.region.height == 1 for button in buttons)
@@ -271,7 +279,7 @@ async def test_setup_compact_table_columns_buttons_and_focus(monkeypatch, langua
         assert t("scenario.work") in help_text and "work" not in help_text
         for scenario in ("work", "away"):
             screen.action_column(scenario)
-            assert await screen.wait_for_refresh()
+            await committed_layout(pilot, screen)
             # Inspect the label actually stored/rendered by Textual, not a recomputed row.
             label = buttons[0].label
             work_offset = label.plain.index(t("action.freeze"))
@@ -282,22 +290,21 @@ async def test_setup_compact_table_columns_buttons_and_focus(monkeypatch, langua
             assert active.bold and active.underline
             assert inactive.dim and not inactive.underline
         screen.action_column("work")
-        assert await screen.wait_for_refresh()
+        await committed_layout(pilot, screen)
         # These changes share an input turn: the longer heading reflows at 80 columns.
         screen.action_column("away")
         screen.action_edge(True)
         await asyncio.wait_for(screen.focus_committed.wait(), 10)
-        await pilot._wait_for_screen()
-        assert await screen.wait_for_refresh()
+        await committed_layout(pilot, screen)
         assert screen.focused is buttons[-1]
         assert body.content_region.contains_region(buttons[-1].region)
         await pilot.press("home")
         await asyncio.wait_for(screen.focus_committed.wait(), 10)
-        assert await screen.wait_for_refresh()
+        await committed_layout(pilot, screen)
         assert screen.focused is buttons[0]
         assert body.content_region.contains_region(buttons[0].region)
         await press(screen, "#setup-review", screen.reviewed)
-        assert await screen.wait_for_refresh()
+        await committed_layout(pilot, screen)
         save = screen.query_one("#setup-save", Button)
         assert not save.disabled
         assert not save.styles.text_style.reverse
@@ -336,8 +343,8 @@ async def test_setup_and_cli_omit_protected_rows_from_choices(monkeypatch, capsy
     assert "Ordinary" in output
     assert all(name not in output for name in ("Terminal", "Renamed terminal", "Ancestor", "Foreground"))
     app = SetupApp(dry_run=True)
-    async with app.run_test(size=(120, 36)):
-        screen = await ready(app)
+    async with app.run_test(size=(120, 36)) as pilot:
+        screen = await ready(app, pilot)
         assert [row["name"] for row in screen.rows] == ["Ordinary"]
         assert screen.selected == {
             "work": {"Ordinary": "freeze"},
