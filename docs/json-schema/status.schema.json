@@ -16,9 +16,14 @@
     "app_version",
     "duration_minutes",
     "battery",
-    "sleep_ready"
+    "sleep_ready",
+    "sleep_warning"
   ],
   "properties": {
+    "sleep_warning": {
+      "type": "boolean",
+      "description": "Whether blocked sleep readiness needs a menu bar warning: true only when sleep_ready.state is blocked and a session is active or the current power source is battery. The underlying sleep_ready finding is unchanged."
+    },
     "version": {
       "const": 1
     },

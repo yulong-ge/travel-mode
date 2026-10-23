@@ -172,9 +172,12 @@ travel-mode menubar status
 travel-mode menubar uninstall
 ```
 
-After installing, refresh SwiftBar. The icon shows an outline leaf when power saving is off, a
+After installing, refresh SwiftBar, and turn on "Launch at Login" in SwiftBar's settings so the
+icon is back after a restart; `travel-mode menubar status` reminds you when SwiftBar is not
+running. travel-mode only refreshes SwiftBar when it is already running and never starts it. The icon shows an outline leaf when power saving is off, a
 filled leaf or a moon with the elapsed time while a session is running, and a warning triangle
-when the last check found that closing the lid would not put the Mac to sleep; the menu then says
+when a session is running or the Mac is on battery and the last check found that closing the lid
+would not put the Mac to sleep (on AC power without a session it only adds a grey note); the menu then says
 why, when it was checked, and offers "Restore system sleep" (`travel-mode sleep repair`). The icon
 refreshes right after you turn power saving on or off, not only every 5 minutes. The menu
 shows the session and battery state and opens commands in a terminal when you click them. The

@@ -126,6 +126,26 @@ def fake_runner():
     return FakeRunner(_readonly_responses())
 
 
+@pytest.fixture
+def swiftbar_process(tmp_path, fake_runner):
+    """A running SwiftBar main process, identified from fixture bundle metadata."""
+    bundle = tmp_path / "Menu Utility.app"
+    (bundle / "Contents/MacOS").mkdir(parents=True)
+    (bundle / "Contents/Info.plist").write_bytes(
+        plistlib.dumps(
+            dict(
+                CFBundlePackageType="APPL",
+                CFBundleIdentifier="com.ameba.SwiftBar",
+                CFBundleExecutable="SwiftBar",
+            )
+        )
+    )
+    fake_runner.responses[("ps", "-axo", "pid=,ppid=,stat=,lstart=,comm=")] = CmdResult(
+        f"1234 1 S Thu Oct 15 12:00:00 2026 {bundle}/Contents/MacOS/SwiftBar\n", "", 0
+    )
+    return bundle
+
+
 @pytest.fixture(scope="session", autouse=True)
 def real_user_data_session_guard():
     before = snapshot_user_data(REAL_HOME)

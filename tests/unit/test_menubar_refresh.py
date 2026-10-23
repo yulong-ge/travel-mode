@@ -1,11 +1,12 @@
 """Finite post-operation notifications cannot affect recovery or action counts."""
 
 import asyncio
+import plistlib
 from pathlib import Path
 
 import pytest
 
-from travel_mode import cli, menubar, state
+from travel_mode import cli, i18n, menubar, state
 from travel_mode.actions.base import Context
 from travel_mode.actions.executor import Executor
 from travel_mode.system import shell
@@ -13,7 +14,7 @@ from travel_mode.system.shell import CmdResult
 
 
 @pytest.fixture
-def installed(tmp_path, fake_runner):
+def installed(tmp_path, fake_runner, swiftbar_process):
     folder = tmp_path / "plugins"
     folder.mkdir()
     (folder / menubar.FILENAME).write_bytes(menubar.payload())
@@ -88,6 +89,45 @@ def test_no_swiftbar_is_an_observation_only(fake_runner):
     assert state.load_state() is not None
     assert not state.load_state().get("action_failures")
     assert all(call != tuple(menubar.REFRESH) for call in fake_runner.calls)
+
+
+@pytest.mark.parametrize("process_output,rc", [("", 0), ("", 124), ("invalid process row", 0)])
+def test_stopped_or_unreadable_swiftbar_never_opens_url(installed, fake_runner, process_output, rc):
+    i18n.set_language("en")
+    fake_runner.responses[("ps", "-axo", "pid=,ppid=,stat=,lstart=,comm=")] = CmdResult(
+        process_output, "timeout" if rc else "", rc
+    )
+    with menubar.status_changes():
+        state.save_state(state.new_state())
+    assert tuple(menubar.REFRESH) not in fake_runner.calls
+    assert not state.load_state().get("action_failures")
+    log = (state._path().parent / "travel-mode.log").read_text()
+    assert '"kind": "observation"' in log
+    assert "Skipped menu bar refresh" in log
+    assert (
+        "SwiftBar is not running" if not process_output and not rc else "Cannot check whether SwiftBar"
+    ) in log
+
+
+@pytest.mark.parametrize("identity", ["main", "other-bundle", "helper", "argument", "zombie"])
+def test_refresh_requires_live_main_executable_and_matching_bundle(
+    installed, swiftbar_process, fake_runner, identity
+):
+    executable = str(swiftbar_process / "Contents/MacOS/SwiftBar")
+    if identity == "other-bundle":
+        path = swiftbar_process / "Contents/Info.plist"
+        info = plistlib.loads(path.read_bytes())
+        info["CFBundleIdentifier"] = "org.example.other"
+        path.write_bytes(plistlib.dumps(info))
+    elif identity == "helper":
+        executable = str(swiftbar_process / "Contents/Helpers/SwiftBar")
+    elif identity == "argument":
+        executable = "/bin/tool --app " + executable
+    fake_runner.responses[("ps", "-axo", "pid=,ppid=,stat=,lstart=,comm=")] = CmdResult(
+        f"1234 1 {'Z' if identity == 'zombie' else 'S'} Thu Oct 15 12:00:00 2026 {executable}\n", "", 0
+    )
+    menubar.refresh()
+    assert (tuple(menubar.REFRESH) in fake_runner.calls) is (identity == "main")
 
 
 def test_nested_scope_coalesces_and_readonly_scope_does_not_refresh(installed, fake_runner):

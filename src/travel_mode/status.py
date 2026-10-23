@@ -83,6 +83,7 @@ def data(*, clock=time.monotonic, now=None):
         language=get_language(),
         source_timeout_seconds=SOURCE_TIMEOUT,
     )
+    result["sleep_warning"] = sleep_warning(result)
     result["duration_minutes"] = None
     if result["started_at"]:
         try:
@@ -210,6 +211,13 @@ def checked_line(readiness, *, now=None):
     return text
 
 
+def sleep_warning(result):
+    """A blocked sleep check needs attention only in a session or on battery."""
+    return result.get("sleep_ready", {}).get("state") == "blocked" and (
+        result["active"] or result["power_source"] == "battery"
+    )
+
+
 def render(result, *, now=None):
     executable = os.environ.get("TRAVEL_MODE_BIN", "travel-mode")
     if any(char in executable for char in "\n\r|\x00"):
@@ -221,7 +229,8 @@ def render(result, *, now=None):
     active = result["active"]
     scenario = result["scenario"]
     symbol = ("moon.fill" if scenario == "away" else "leaf.fill") if active else "leaf"
-    if result.get("sleep_ready", {}).get("state") == "blocked":
+    warning = sleep_warning(result)
+    if warning:
         symbol = "exclamationmark.triangle"
     rows = [header(symbol, elapsed), "---"]
     if active:
@@ -233,14 +242,17 @@ def render(result, *, now=None):
         rows.append(t("menubar.inactive"))
     rows.append(power_line(result))
     readiness = result.get("sleep_ready", {})
-    for item in readiness.get("items", ()):
+    quiet = not active and result["power_source"] == "ac"
+    for item in readiness.get("items", ()) if not quiet else ():
         if item["level"] == "red":
             if (item.get("action") or {}).get("kind") == "sleep":
                 rows.append(t("menubar.sleep_disabled"))
                 rows.append(t("menubar.sleep_disabled_detail") + " | color=gray")
             else:
                 rows.append(" ".join(item["message"].replace("|", "/").split()))
-    checked = checked_line(readiness, now=now)
+    if quiet and readiness.get("state") == "blocked":
+        rows.append(t("menubar.sleep_on_power") + " | color=gray")
+    checked = checked_line(readiness, now=now) if not quiet else None
     if checked:
         rows.append(checked)
 
@@ -253,7 +265,7 @@ def render(result, *, now=None):
             "terminal=true refresh=true"
         )
 
-    if any(
+    if warning and any(
         item["level"] == "red" and (item.get("action") or {}).get("kind") == "sleep"
         for item in readiness.get("items", ())
     ):

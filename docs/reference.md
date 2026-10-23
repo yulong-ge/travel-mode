@@ -366,8 +366,13 @@ the empty title kept a visible gap. When sleep readiness is red, the menu lists 
 check time in local time (marked as possibly out of date when older than an hour), and "Restore
 system sleep", which runs `travel-mode sleep repair` in a terminal through the normal Action,
 journal and password flow. After `on`, `off`, a restore or the end of a session, the tool opens
-`swiftbar://refreshplugin?name=travel-mode` once if the plugin is installed; a failure there is
-only logged. Nothing polls.
+`swiftbar://refreshplugin?name=travel-mode` once if the plugin is installed and SwiftBar is
+running (checked by its bundle id `com.ameba.SwiftBar` in one `ps` snapshot); it never starts
+SwiftBar, and a failure is only logged. Nothing polls. The warning icon appears only when
+`sleep_warning` is true in `status --json`: sleep readiness is red and a session is active or the
+Mac is on battery. On AC power without a session the menu shows one grey note instead.
+`menubar status` reports whether SwiftBar is running (`running`, `notice` in JSON) and reminds you
+to enable its "Launch at Login" setting; travel-mode does not change SwiftBar's login item.
 
 The `5m` in the file name sets the refresh interval. Each refresh runs `travel-mode status --json`,
 which reads the configured language, the local state file and one `pmset -g ps` (2-second limit);

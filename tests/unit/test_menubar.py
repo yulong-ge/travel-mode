@@ -39,10 +39,19 @@ def test_copy_install_status_uninstall_only_our_file(plugin_folder, fake_runner,
         executable=True,
         installed_version="2.1.0",
         bundled_version="2.1.0",
+        running=False,
+        notice=menubar.t("menubar.not_running"),
     )
     assert cli.main(["menubar", "uninstall"]) == 0
     assert not path.exists() and other.read_text() == "untouched"
-    assert fake_runner.calls == [tuple(menubar.PREFERENCE)] * 3
+    query = ("ps", "-axo", "pid=,ppid=,stat=,lstart=,comm=")
+    assert fake_runner.calls == [
+        tuple(menubar.PREFERENCE),
+        query,
+        tuple(menubar.PREFERENCE),
+        query,
+        tuple(menubar.PREFERENCE),
+    ]
 
 
 def test_install_requires_force_for_different_content(plugin_folder):
@@ -126,3 +135,24 @@ def test_plain_status_localizes_booleans_but_json_retains_types(
         assert cli.main(["menubar", "status", "--json"]) == 0
         data = json.loads(capsys.readouterr().out)
         assert all(data[key] is installed for key in ("installed", "current", "executable"))
+
+
+@pytest.mark.parametrize("language", ["en", "zh"])
+@pytest.mark.parametrize("running", [False, True])
+def test_install_and_status_explain_manual_launch_and_login_setting(
+    plugin_folder, swiftbar_process, fake_runner, language, running, monkeypatch, darwin_platform, capsys
+):
+    monkeypatch.setenv("TRAVEL_MODE_LANG", language)
+    if not running:
+        fake_runner.responses[("ps", "-axo", "pid=,ppid=,stat=,lstart=,comm=")] = CmdResult("", "", 0)
+    for command in (["menubar", "install"], ["menubar", "status"]):
+        assert cli.main(command) == 0
+        output = capsys.readouterr().out
+        notice = menubar.t("menubar.not_running")
+        assert (notice in output) is not running
+    assert cli.main(["menubar", "status", "--json"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["running"] is running
+    assert data["notice"] == (None if running else notice)
+    assert not any(call[0] in {"open", "osascript"} for call in fake_runner.calls)
+    assert not any(call[:2] == ("defaults", "write") for call in fake_runner.calls)

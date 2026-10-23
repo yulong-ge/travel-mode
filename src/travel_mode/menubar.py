@@ -13,6 +13,7 @@ from .system.shell import ReadError, _read
 FILENAME = "travel-mode.5m.sh"
 MARKER = b"# travel-mode SwiftBar plugin: io.github.yulong-ge.travel-mode\n"
 PREFERENCE = ["defaults", "read", "com.ameba.SwiftBar", "PluginDirectory"]
+BUNDLE_ID = "com.ameba.SwiftBar"
 _preview_directory = ContextVar("menubar_preview_directory", default=None)
 
 
@@ -61,10 +62,48 @@ def plugin_version(content):
     return match[1].decode("ascii") if match else None
 
 
-def status():
+def swiftbar_running():
+    """Verify the running main executable and bundle identity, without launching an app."""
+    from .system.app_bundle import inferred_path, read_bundle
+    from .system.process_control import process_table
+
+    # comm= is an executable path, not argv. Do not match SwiftBar in arguments,
+    # bundle directory names, helpers, or an unrelated executable with the same name.
+    for process in process_table(timeout=2):
+        executable = Path(process.command)
+        if "Z" in process.stat or executable.name != "SwiftBar":
+            continue
+        bundle = inferred_path(process.command)
+        if bundle is None or executable.parent != Path(bundle) / "Contents/MacOS":
+            continue
+        info = read_bundle(bundle)
+        if info.get("CFBundleIdentifier") == BUNDLE_ID and info.get("CFBundleExecutable") == executable.name:
+            return True
+    return False
+
+
+def runtime_status():
+    from .failures import CommandError
+
+    try:
+        running = swiftbar_running()
+    except (CommandError, ReadError, OSError, ValueError) as exc:
+        return dict(running=None, notice=t("menubar.running_unknown", detail=str(exc)))
+    return dict(running=running, notice=None if running else t("menubar.not_running"))
+
+
+def print_runtime_notice():
+    result = runtime_status()
+    if result["notice"]:
+        print(result["notice"])
+    if result["running"] is None:
+        _observation(result["notice"])
+
+
+def status(*, include_runtime=True):
     path = directory() / FILENAME
     content = read_plugin(path)
-    return dict(
+    result = dict(
         path=str(path),
         installed=content is not None,
         current=content == payload(),
@@ -72,6 +111,11 @@ def status():
         installed_version=plugin_version(content) if content is not None else None,
         bundled_version=plugin_version(payload()),
     )
+    if include_runtime:
+        result.update(runtime_status())
+        if result["running"] is None:
+            _observation(result["notice"])
+    return result
 
 
 REFRESH = ["open", "-g", "swiftbar://refreshplugin?name=travel-mode"]
@@ -89,11 +133,15 @@ def refresh(*, preview=False):
     from .system.shell import run_result
 
     try:
-        installed = status()["installed"]
+        installed = status(include_runtime=False)["installed"]
     except (MenubarError, OSError) as exc:
         _observation(exc)
         return
     if not installed:
+        return
+    runtime = runtime_status()
+    if runtime["running"] is not True:
+        _observation(t("menubar.refresh_skipped", reason=runtime["notice"]))
         return
     if preview:
         import shlex

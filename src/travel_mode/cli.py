@@ -240,6 +240,8 @@ def _main(argv=None):
                 if args.json
                 else t("menubar.plugin_status", **{**result, **labels})
             )
+            if not args.json and result["notice"]:
+                print(result["notice"])
             return 0
         if args.config_cmd not in {"install", "uninstall"} or args.json:
             parser.error(t("menubar.usage"))

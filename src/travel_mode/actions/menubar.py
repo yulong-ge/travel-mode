@@ -40,6 +40,7 @@ class InstallMenubar(Action):
             if temporary is not None:
                 temporary.unlink(missing_ok=True)
         print(t("menubar.installed", path=path))
+        menubar.print_runtime_notice()
         return True
 
 

@@ -26,8 +26,8 @@ class Process:
         return dict(pid=self.pid, started=self.started, command=self.command, path=path)
 
 
-def process_table() -> list[Process]:
-    output, rc = run_rc(["ps", "-axo", "pid=,ppid=,stat=,lstart=,comm="], timeout=10)
+def process_table(*, timeout=10) -> list[Process]:
+    output, rc = run_rc(["ps", "-axo", "pid=,ppid=,stat=,lstart=,comm="], timeout=timeout)
     if rc:
         raise CommandError(["ps", "process identities"], rc, output)
     result = []

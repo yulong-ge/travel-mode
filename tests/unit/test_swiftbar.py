@@ -18,13 +18,13 @@ FIXTURES = Path(__file__).parents[1] / "fixtures" / "swiftbar"
 
 
 def model(case):
-    active = case in {"work", "away"}
-    ac = case in {"charging", "charged", "paused", "finishing"}
+    active = case in {"work", "away", "blocked-active-ac", "blocked-active-battery"}
+    ac = case in {"charging", "charged", "paused", "finishing", "blocked-ac", "blocked-active-ac"}
     percent = 100 if case in {"charged", "finishing"} else 85 if ac else 82
     states = {"paused": "not charging", "finishing": "finishing charge"}
     result = dict(
         active=active,
-        scenario=case if active else None,
+        scenario=("work" if case.startswith("blocked-") else case) if active else None,
         started_at="2026-10-17T10:00:00+00:00" if active else None,
         duration_minutes=80 if active else None,
         power_source="ac" if ac else "battery",
@@ -72,6 +72,9 @@ def bash_run(script, env, *, syntax=False):
         "unknown",
         "blocked-fresh",
         "blocked-stale",
+        "blocked-ac",
+        "blocked-active-ac",
+        "blocked-active-battery",
     ],
 )
 def test_complete_localized_menu_fixture(case, language, monkeypatch):
@@ -83,7 +86,7 @@ def test_complete_localized_menu_fixture(case, language, monkeypatch):
         status.render(model(case), now=datetime(2026, 10, 22, 10, 30, tzinfo=timezone.utc)) + "\n"
         == (FIXTURES / f"{case}-{language}.txt").read_text()
     )
-    if case not in {"work", "away"}:
+    if not model(case)["active"]:
         assert status.render(model(case)).splitlines()[2] == (
             "省电模式未开启" if language == "zh" else "Power saving is off"
         )

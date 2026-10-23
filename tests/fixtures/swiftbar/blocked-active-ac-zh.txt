@@ -1,0 +1,20 @@
+:exclamationmark.triangle: 1:20 | symbolize=true sfsize=16 dropdown=false emojize=false
+---
+外出中 · 已 1 小时 20 分
+接电 · 85%
+合盖后可能不会睡眠：系统睡眠已被禁用
+可能由远程控制或防睡工具的「接电时防止睡眠」选项引起 | color=gray
+检查于 18:16
+恢复系统睡眠 | sfimage=moon.zzz bash="/fixture/travel-mode" param1="sleep" param2="repair" terminal=true refresh=true
+---
+恢复（off） | sfimage=arrow.uturn.backward bash="/fixture/travel-mode" param1="off" terminal=true refresh=true
+---
+体检 | sfimage=stethoscope bash="/fixture/travel-mode" param1="check" terminal=true refresh=true
+测量功耗 | sfimage=bolt bash="/fixture/travel-mode" param1="power" terminal=true refresh=true
+会话历史 | sfimage=clock bash="/fixture/travel-mode" param1="history" terminal=true refresh=true
+---
+更多 | sfimage=ellipsis.circle
+--自动触发状态 | sfimage=bolt.horizontal.circle bash="/fixture/travel-mode" param1="automation" param2="status" terminal=true refresh=true
+--编辑配置 | sfimage=slider.horizontal.3 bash="/fixture/travel-mode" param1="config" param2="edit" terminal=true refresh=true
+--项目主页 | sfimage=link href=https://github.com/yulong-ge/travel-mode
+--版本 1.1.0

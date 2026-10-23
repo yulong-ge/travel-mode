@@ -15,7 +15,13 @@ from travel_mode.system.shell import CmdResult
 
 @pytest.mark.parametrize(
     "active,language,source",
-    [(False, "en", "AC Power"), (True, "zh", "Battery Power"), (True, "en", "UPS Power")],
+    [
+        (False, "en", "AC Power"),
+        (False, "zh", "Battery Power"),
+        (True, "zh", "Battery Power"),
+        (True, "en", "AC Power"),
+        (True, "en", "UPS Power"),
+    ],
 )
 def test_status_json_schema_only_source_command_and_no_migration(
     active, language, source, darwin_platform, fake_runner, monkeypatch, capsys
@@ -43,6 +49,7 @@ def test_status_json_schema_only_source_command_and_no_migration(
     assert result["active"] is active and result["language"] == language
     assert observed == [(["pmset", "-g", "ps"], 2, False), (["pmset", "-g"], 2, False)]
     assert result["sleep_ready"]["state"] == "blocked"
+    assert result["sleep_warning"] is (active or source == "Battery Power")
     assert ("--scenario" in result["swiftbar"]) is not active
     assert ('param1="off"' in result["swiftbar"]) is active
     assert "terminal=false" not in result["swiftbar"]
@@ -97,7 +104,7 @@ def test_blocked_menu_explains_reason_in_two_lines_and_offers_terminal_repair(la
     readiness["observed_at"] = "2026-10-22T10:20:00+00:00"
     readiness["assertions_observed_at"] = "2026-10-22T09:00:00+00:00"
     menu = status.render(
-        dict(active=False, scenario=None, power_source="ac", sleep_ready=readiness),
+        dict(active=False, scenario=None, power_source="battery", sleep_ready=readiness),
         now=datetime(2026, 10, 22, 10, 30, tzinfo=timezone.utc),
     )
     lines = menu.splitlines()
@@ -111,6 +118,40 @@ def test_blocked_menu_explains_reason_in_two_lines_and_offers_terminal_repair(la
     ]
     assert "+00:00" not in menu
     assert "sfimage=" not in lines[0]
+
+
+@pytest.mark.parametrize("language", ["en", "zh"])
+@pytest.mark.parametrize(
+    "active,source", [(False, "ac"), (False, "battery"), (True, "ac"), (True, "battery")]
+)
+def test_sleep_warning_scope_and_quiet_power_menu(language, active, source):
+    from travel_mode.sleep_readiness import evaluate
+
+    i18n.set_language(language)
+    readiness = evaluate("1")
+    result = dict(
+        active=active, scenario="work" if active else None, power_source=source, sleep_ready=readiness
+    )
+    menu = status.render(result)
+    warning = active or source == "battery"
+    assert status.sleep_warning(result) is warning
+    assert menu.splitlines()[0] == status.header("exclamationmark.triangle" if warning else "leaf")
+    assert ('param1="sleep" param2="repair"' in menu) is warning
+    if not warning:
+        section = menu.split("---")[1].strip().splitlines()
+        assert section == [
+            i18n.t("menubar.inactive"),
+            i18n.t("menubar.source_ac"),
+            i18n.t("menubar.sleep_on_power") + " | color=gray",
+        ]
+        assert t_line(language, "conclusion") not in menu
+    else:
+        assert t_line(language, "conclusion") in menu
+    # Quiet menu presentation must not change the finding used by check and plan.
+    assert readiness["state"] == "blocked" and not readiness["ready"]
+    result["sleep_ready"] = evaluate("0")
+    assert status.sleep_warning(result) is False
+    assert "exclamationmark.triangle" not in status.render(result).splitlines()[0]
 
 
 def t_line(language, kind):

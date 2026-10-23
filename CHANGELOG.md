@@ -6,6 +6,7 @@ All notable changes follow Keep a Changelog.
 
 ### Fixed
 
+- The menu bar no longer shows a warning on AC power without a session, and refreshing it no longer launches SwiftBar when it is not running; `menubar status` reminds you to enable SwiftBar's Launch at Login.
 - The menu bar icon no longer leaves a gap to its right: the symbol is part of the title text. The menu explains a warning icon, shows when it was checked and offers "Restore system sleep" (new `travel-mode sleep repair`), and the icon refreshes as soon as power saving is turned on or off.
 - The guarded e2e capability check waits for real applet exits instead of a fixed AppleEvent timeout, which failed on a slow runner.
 - The foreground app is read through the documented `NSWorkspace` API, with `lsappinfo` only as a fallback; battery data is read from `ioreg -a` plist output instead of text. Apps installed in several copies (for example several Python versions) appear once in setup with a copy count, and actions apply to every copy.

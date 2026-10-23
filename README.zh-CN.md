@@ -145,8 +145,9 @@ travel-mode menubar status
 travel-mode menubar uninstall
 ```
 
-安装后在 SwiftBar 里刷新一次即可。省电模式未开启时显示空心叶子；外出会话进行中显示实心叶子，过夜 / 飞行时显示月亮，
-旁边是已用时长；最近一次检查发现合盖不会睡眠时显示警告三角，菜单里会写明原因和检查时间，并提供「恢复系统睡眠」
+安装后在 SwiftBar 里刷新一次，并在 SwiftBar 的设置里打开「Launch at Login」，这样重启后图标会自动出现；SwiftBar 没在运行时，
+`travel-mode menubar status` 会提醒你。travel-mode 只在 SwiftBar 已经运行时通知它刷新，不会替你启动它。省电模式未开启时显示空心叶子；外出会话进行中显示实心叶子，过夜 / 飞行时显示月亮，
+旁边是已用时长；正在省电会话中或正在用电池、且最近一次检查发现合盖不会睡眠时显示警告三角（接电且没有会话时只加一行灰字），菜单里会写明原因和检查时间，并提供「恢复系统睡眠」
 （`travel-mode sleep repair`）。开启或恢复省电模式后，图标会立即刷新，不必等 5 分钟。点开菜单可以看到当前会话和电池状态，点击菜单项会在终端里运行对应命令。插件每 5 分钟用
 `travel-mode status --json` 刷新一次，这个命令只读取本地状态文件和 `pmset -g ps`。常驻运行的只有 SwiftBar 本身，
 travel-mode 不会额外留下任何进程。
